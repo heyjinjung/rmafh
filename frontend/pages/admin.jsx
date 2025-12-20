@@ -114,9 +114,11 @@ export default function AdminPage() {
 
       <div className="min-h-screen bg-black text-white">
         <div className="mx-auto w-full max-w-none px-4 lg:px-0">
-          <div className="relative min-h-screen lg:h-screen lg:overflow-hidden">
-            {/* Left: Sidebar (match / layout on desktop) */}
-            <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:absolute lg:left-[8px] lg:top-0 lg:w-[345px]">
+          <div className="relative min-h-screen lg:flex lg:items-stretch">
+            {/* Left column: Sidebar + Footer (desktop fixed width) */}
+            <div className="lg:w-[356px] lg:shrink-0 lg:flex lg:flex-col lg:min-h-screen">
+              {/* Sidebar */}
+              <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:ml-[8px] lg:w-[345px]">
                 <nav className="flex items-start justify-between">
                   <div className="flex items-center gap-[5px] w-[184px]">
                     <div className="h-[27px] w-[26px] shrink-0 rounded-[18px] overflow-hidden">
@@ -181,22 +183,23 @@ export default function AdminPage() {
                 </div>
               </aside>
 
-            {/* Footer (match / layout on desktop) */}
-            <footer className="bg-cc-accent2 px-[20px] py-[24px] mt-6 lg:mt-0 lg:absolute lg:left-0 lg:bottom-0 lg:w-[356px] lg:h-[222px] lg:flex lg:items-end lg:py-[31px]">
-              <div className="flex flex-col gap-[12.639px] items-start">
-                <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
-                <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
-                  <p>CC고객센터 텔레그램</p>
-                  <p>CC카지노 바로가기</p>
-                  <p>CC카지노 공식 탤래채널</p>
+              {/* Footer */}
+              <footer className="bg-cc-accent2 px-[20px] py-[24px] mt-6 lg:mt-auto lg:w-[356px] lg:h-[222px] lg:flex lg:items-end lg:py-[31px]">
+                <div className="flex flex-col gap-[12.639px] items-start">
+                  <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
+                  <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
+                    <p>CC고객센터 텔레그램</p>
+                    <p>CC카지노 바로가기</p>
+                    <p>CC카지노 공식 탤래채널</p>
+                  </div>
                 </div>
-              </div>
-            </footer>
+              </footer>
+            </div>
 
-            {/* Right/Main (match / layout on desktop) */}
-            <main className="bg-admin-bg text-admin-text lg:absolute lg:top-[-14px] lg:right-[10px] lg:bottom-0 lg:left-[362px] lg:overflow-y-auto lg:overflow-x-hidden">
-              <div className="py-5 px-[25px] lg:py-0">
-                <div className="pt-3 lg:pt-5">
+            {/* Right/Main */}
+            <main className="bg-admin-bg text-admin-text lg:flex-1 lg:min-w-0 lg:overflow-x-hidden lg:flex lg:flex-col lg:min-h-screen lg:-mt-[14px]">
+              <div className="py-5 px-[25px] lg:py-0 lg:flex-1 lg:flex lg:flex-col">
+                <div className="pt-3 lg:pt-5 lg:flex-1">
                 <div className="mb-3">
                   <h1 className="text-[28px] sm:text-[32px] font-medium tracking-[-0.84px] leading-[1.058]">
                     <span className="text-admin-text">관리자</span>{' '}
@@ -496,7 +499,7 @@ export default function AdminPage() {
 
                 {busyKey ? <div className="mt-6 text-sm text-cc-textSub">처리 중이에요: {busyKey}</div> : null}
 
-                <div className="text-center text-cc-textSub text-xs mt-6 pb-6">
+                <div className="text-center text-cc-textSub text-xs mt-6 lg:mt-auto pb-6 lg:pt-6">
                   <p>© 2025 CC Casino - 관리자 도구</p>
                 </div>
               </div>

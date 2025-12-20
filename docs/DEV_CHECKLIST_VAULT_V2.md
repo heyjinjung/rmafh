@@ -3,12 +3,15 @@
 ## Changelog
 - 2025-12-20: `/api/vault/user-daily-import` 반영, 유저 출석 CTA 제거에 맞춰 FE/테스트 항목 정합화
 - 2025-12-20: 어드민(`/admin/`) 개발 상태 체크 항목 추가
+- 2025-12-20: 어드민 결과/에러 응답을 운영자 친화 요약 UI로 개선(원문은 접기)
+- 2025-12-20: 어드민 컬러 토큰(`admin.*`) 추가 및 레이아웃(세로/스크롤 체감) 개선 작업 반영
 
 ## 인프라 / 환경
 - [x] docker-compose로 db/api/worker 기동 (api 호스트 포트 18000 매핑)
 - [x] Postgres 16 컨테이너 헬스체크 설정
 - [x] API/Worker 이미지 빌드 (Python 3.11-slim)
 - [x] web(frontend) 서비스 추가 (Next.js) 후 compose 통합 (호스트 3002)
+- [ ] `docker-compose.yml`의 `version` 필드 제거(Compose 경고 제거)
 
 ## 데이터베이스
 - [x] DB 마이그레이션 스크립트 준비: docs/DB_MIGRATION_VAULT_V2.sql
@@ -56,6 +59,9 @@
 - [x] 만료 연장: `/api/vault/extend-expiry` 호출(요청번호 생성, scope/시간 검증, shadow 토글)
 - [x] 알림 요청: `/api/vault/notify` 호출(type/variant_id, 대상 외부아이디 검증)
 - [x] 추천 revive: `/api/vault/referral-revive` 호출(요청번호 생성)
+- [x] 성공/실패 응답을 운영자 친화 요약 UI로 표시(원문 JSON은 접기 처리)
+- [x] 어드민 전용 컬러 토큰(`admin.*`) 반영
+- [ ] 어드민 레이아웃/스크롤 최종 검증 (모바일/태블릿/데스크탑에서 세로 확장 체감 확인)
 - [ ] 어드민 접근 제어(인증/권한) 적용
 - [ ] 어드민 작업 감사 로그(누가/언제/무엇을) 및 운영 가이드 정리
 
