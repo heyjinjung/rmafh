@@ -104,8 +104,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "diamond_deposit_current": diamond_deposit_current,
         "expires_at": expires_at.isoformat(),
         "now": now.isoformat(),
-        "loss_total": 130000,
-        "loss_breakdown": {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 100000, "BONUS": 0},
+        "loss_total": 120000,
+        "loss_breakdown": {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 100000, "BONUS": 0},
         "ms_countdown": ms_countdown,
         "referral_revive_available": True,
         "social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
@@ -314,6 +314,12 @@ def _parse_joined_date(value: str | None):
     return dt.date()
 
 
+def _select_import_date(last_deposit_at: datetime | None) -> datetime.date:
+    if last_deposit_at is not None:
+        return last_deposit_at.date()
+    return _now().date()
+
+
 @app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
 async def user_daily_import(body: DailyUserImportRequest):
     """일일 엑셀/CSV 업로드 데이터로 운영 스냅샷 + 조건을 갱신.
@@ -371,9 +377,11 @@ async def user_daily_import(body: DailyUserImportRequest):
             deposit_total = max(0, _parse_int(getattr(r, "deposit_total", 0), default=0))
             last_deposit_at = _parse_iso_datetime(getattr(r, "last_deposit_at", None))
             telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
+            review_ok = _parse_bool(getattr(r, "review_ok", False))
+            import_date = _select_import_date(last_deposit_at)
 
-            snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok))
-            vault_update_values.append((user_id, deposit_total, telegram_ok))
+            snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
+            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date))
 
         if not snapshot_values:
             raise HTTPException(status_code=400, detail="NO_VALID_ROWS")
@@ -382,7 +390,7 @@ async def user_daily_import(body: DailyUserImportRequest):
             cur,
             """
             INSERT INTO user_admin_snapshot
-                (user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, updated_at)
+                (user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok, updated_at)
             VALUES %s
             ON CONFLICT (user_id) DO UPDATE
                SET nickname=EXCLUDED.nickname,
@@ -390,10 +398,11 @@ async def user_daily_import(body: DailyUserImportRequest):
                    deposit_total=EXCLUDED.deposit_total,
                    last_deposit_at=EXCLUDED.last_deposit_at,
                    telegram_ok=EXCLUDED.telegram_ok,
+                   review_ok=EXCLUDED.review_ok,
                    updated_at=NOW()
             """,
             snapshot_values,
-            template="(%s,%s,%s,%s,%s,%s,NOW())",
+            template="(%s,%s,%s,%s,%s,%s,%s,NOW())",
         )
 
         # Ensure baseline rows exist
@@ -401,12 +410,12 @@ async def user_daily_import(body: DailyUserImportRequest):
         execute_values(
             cur,
             """
-            INSERT INTO vault_status (user_id, expires_at)
+            INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
             VALUES %s
             ON CONFLICT (user_id) DO NOTHING
             """,
             ensure_values,
-            template="(%s,%s)",
+            template="(%s,%s,'UNLOCKED','LOCKED','LOCKED')",
         )
 
         execute_values(
@@ -414,20 +423,58 @@ async def user_daily_import(body: DailyUserImportRequest):
             """
             UPDATE vault_status AS vs
                SET diamond_deposit_current = v.deposit_total,
-                   gold_status = CASE
-                                  WHEN vs.gold_status='LOCKED' AND v.telegram_ok THEN 'UNLOCKED'
-                                  ELSE vs.gold_status
-                                END,
+                                     gold_status = CASE
+                                                                    WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
+                                                                    ELSE 'UNLOCKED'
+                                                                END,
+                                     platinum_attendance_days = CASE
+                                         WHEN (
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
+                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                         )
+                                         THEN CASE
+                                             WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
+                                                 THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
+                                             ELSE 1
+                                         END
+                                         ELSE vs.platinum_attendance_days
+                                     END,
+                                     last_attended_at = CASE
+                                         WHEN (
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
+                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                         )
+                                         THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
+                                         ELSE vs.last_attended_at
+                                     END,
+                                     platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
+                                     platinum_status = CASE
+                                         WHEN vs.platinum_status IN ('LOCKED','ACTIVE') AND v.review_ok AND (
+                                             CASE
+                                                 WHEN (
+                                                     (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
+                                                     AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                                 )
+                                                 THEN CASE
+                                                     WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
+                                                         THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
+                                                     ELSE 1
+                                                 END
+                                                 ELSE COALESCE(vs.platinum_attendance_days, 0)
+                                             END
+                                         ) >= 3 THEN 'UNLOCKED'
+                                         ELSE vs.platinum_status
+                                     END,
                    diamond_status = CASE
-                                     WHEN vs.diamond_status='LOCKED' AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                                                                         WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
                                      ELSE vs.diamond_status
                                    END,
                    updated_at = NOW()
-              FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok)
+                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date)
              WHERE vs.user_id = v.user_id
             """,
             vault_update_values,
-            template="(%s,%s,%s)",
+                        template="(%s,%s,%s,%s,%s)",
         )
         vault_rows_updated = int(cur.rowcount or 0)
 
@@ -611,7 +658,7 @@ def _ensure_schema():
             CREATE TABLE IF NOT EXISTS vault_status (
                 user_id INTEGER PRIMARY KEY,
                 expires_at TIMESTAMPTZ NOT NULL,
-                gold_status TEXT NOT NULL DEFAULT 'LOCKED',
+                gold_status TEXT NOT NULL DEFAULT 'UNLOCKED',
                 platinum_status TEXT NOT NULL DEFAULT 'LOCKED',
                 diamond_status TEXT NOT NULL DEFAULT 'LOCKED',
                 expiry_extend_count INTEGER NOT NULL DEFAULT 0,
@@ -622,6 +669,7 @@ def _ensure_schema():
                 diamond_claimed_at TIMESTAMPTZ,
                 platinum_attendance_days INTEGER NOT NULL DEFAULT 0,
                 platinum_deposit_done BOOLEAN NOT NULL DEFAULT FALSE,
+                platinum_deposit_total_last BIGINT NOT NULL DEFAULT 0,
                 diamond_deposit_current INTEGER NOT NULL DEFAULT 0,
                 last_attended_at TIMESTAMPTZ,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -638,6 +686,7 @@ def _ensure_schema():
                 deposit_total BIGINT NOT NULL DEFAULT 0,
                 last_deposit_at TIMESTAMPTZ,
                 telegram_ok BOOLEAN NOT NULL DEFAULT FALSE,
+                review_ok BOOLEAN NOT NULL DEFAULT FALSE,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             """
@@ -648,9 +697,11 @@ def _ensure_schema():
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS deposit_total BIGINT NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS last_deposit_at TIMESTAMPTZ")
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS telegram_ok BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS review_ok BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
 
         # Backward compatible adds if the table already exists with older schema.
+        cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'UNLOCKED'")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_reason TEXT")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_at TIMESTAMPTZ")
@@ -659,6 +710,7 @@ def _ensure_schema():
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_claimed_at TIMESTAMPTZ")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_attendance_days INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_deposit_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_deposit_total_last BIGINT NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_deposit_current INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_attended_at TIMESTAMPTZ")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")

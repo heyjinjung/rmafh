@@ -90,6 +90,7 @@ class DailyUserImportRow(BaseModel):
     deposit_total: int = 0
     last_deposit_at: Optional[str] = None
     telegram_ok: bool = False
+    review_ok: bool = False
 
 
 class DailyUserImportRequest(BaseModel):

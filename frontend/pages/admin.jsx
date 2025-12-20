@@ -79,6 +79,7 @@ function parseCsvDailyImportRows(text) {
     joined_at: new Set(['joined_at', 'join_date', '가입일', '가입일자']),
     last_deposit_at: new Set(['last_deposit_at', 'deposit_at', '입금일', '입금일자', '최근입금일']),
     telegram_ok: new Set(['telegram_ok', 'telegram', '텔레그램', '채널확인', 'telegram_ok 처리', '텔레그램ok']),
+    review_ok: new Set(['review_ok', 'review', '리뷰', '리뷰체크', '리뷰확인', '리뷰작성', '리뷰작성여부']),
   };
 
   const findIndex = (keys) => headerCells.findIndex((c) => keys.has(c));
@@ -102,6 +103,7 @@ function parseCsvDailyImportRows(text) {
   const idxJoinedAt = hasHeader ? findIndex(headerMap.joined_at) : 3;
   const idxLastDepositAt = hasHeader ? findIndex(headerMap.last_deposit_at) : 4;
   const idxTelegramOk = hasHeader ? findIndex(headerMap.telegram_ok) : 5;
+  const idxReviewOk = hasHeader ? findIndex(headerMap.review_ok) : 6;
 
   const out = [];
   const seen = new Set();
@@ -120,6 +122,7 @@ function parseCsvDailyImportRows(text) {
       joined_at: String(cells[idxJoinedAt] || '').trim() || undefined,
       last_deposit_at: String(cells[idxLastDepositAt] || '').trim() || undefined,
       telegram_ok: getBool(cells[idxTelegramOk]),
+      review_ok: getBool(cells[idxReviewOk]),
     });
   }
 
