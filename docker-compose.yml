@@ -50,7 +50,7 @@ services:
       api:
         condition: service_started
     environment:
-      NEXT_PUBLIC_API_BASE: http://localhost:18000
+      NEXT_PUBLIC_API_BASE: http://api:8000
     ports:
       - "3000:3000"
 

@@ -1,8 +1,14 @@
 # Frontend build
 FROM node:18-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json* .npmrc* ./
-RUN npm install --no-progress --loglevel=error
+ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
+	npm_config_loglevel=error \
+	npm_config_progress=false \
+	npm_config_fetch_retries=5 \
+	npm_config_fetch_retry_mintimeout=10000 \
+	npm_config_fetch_retry_maxtimeout=60000
+COPY package.json package-lock.json .npmrc* ./
+RUN npm ci
 COPY . .
 RUN npm run build
 
