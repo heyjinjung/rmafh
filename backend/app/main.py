@@ -944,6 +944,9 @@ async def notify(body: NotifyRequest):
 async def compensation_enqueue(body: CompensationEnqueueRequest):
     with db.get_conn() as conn:
         cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '10s'")
         user_id = body.user_id
         if user_id is None:
             user_id = _resolve_user_id(cur, user_id=None, external_user_id=body.external_user_id, default_user_id=None, create_if_missing=True)
