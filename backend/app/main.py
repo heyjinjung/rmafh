@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from typing import List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from psycopg2.extras import Json
@@ -20,6 +21,15 @@ from app.schemas import (
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
 
+# Allow local/dev origins for FE preview and Docker usage.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.on_event("startup")
 def _startup():
@@ -34,6 +44,61 @@ def _shutdown():
 @app.get("/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(status="ok")
+
+
+@app.get("/api/vault/status")
+async def vault_status(user_id: int = 1):
+    """Return vault status snapshot for the given user (default demo user).
+
+    This mirrors the FE contract in docs/API_SPEC_VAULT_V2.md and uses
+    vault_status table if present; otherwise returns a safe default.
+    """
+    now = _now()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT expires_at,
+                   gold_status,
+                   platinum_status,
+                   diamond_status
+              FROM vault_status
+             WHERE user_id=%s
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+
+    # Fallback defaults if user row not found
+    expires_at = row[0] if row else now + timedelta(hours=72)
+    gold_status = row[1] if row else "UNLOCKED"
+    platinum_status = row[2] if row else "LOCKED"
+    diamond_status = row[3] if row else "LOCKED"
+
+    # Demo progress; in a real impl, replace with aggregates
+    platinum_attendance_days = 1
+    platinum_deposit_done = False
+    diamond_deposit_current = 120000
+
+    remaining_ms = int((expires_at - now).total_seconds() * 1000)
+    ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
+
+    return {
+        "gold_status": gold_status,
+        "platinum_status": platinum_status,
+        "diamond_status": diamond_status,
+        "platinum_attendance_days": platinum_attendance_days,
+        "platinum_deposit_done": platinum_deposit_done,
+        "diamond_deposit_current": diamond_deposit_current,
+        "expires_at": expires_at.isoformat(),
+        "now": now.isoformat(),
+        "loss_total": 130000,
+        "loss_breakdown": {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 100000, "BONUS": 0},
+        "ms_countdown": ms_countdown,
+        "referral_revive_available": True,
+        "social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
+        "curation_tier": "PLATINUM_BIASED",
+    }
 
 
 def _now():
