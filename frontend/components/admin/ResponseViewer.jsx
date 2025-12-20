@@ -103,10 +103,14 @@ export function ResponseViewer({
   const summaryItems = actionSummary(actionKey, response);
   const hasAny = loading || error || response;
   if (!hasAny) {
+    const emptyText =
+      actionKey === 'status'
+        ? '왼쪽은 카드 요약, 오른쪽은 결과 요약이 표시돼요.'
+        : '아직 실행한 요청이 없어요.';
     return (
       <div className={`${cardBase} p-4 md:p-6`}>
         <h3 className="text-lg font-bold">{title}</h3>
-        <p className="mt-2 text-sm text-cc-textSub">아직 실행한 요청이 없어요.</p>
+        <p className="mt-2 text-sm text-cc-textSub">{emptyText}</p>
       </div>
     );
   }

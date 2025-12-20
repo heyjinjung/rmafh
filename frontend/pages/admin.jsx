@@ -68,7 +68,7 @@ export default function AdminPage() {
     return body;
   }
 
-  const cardBase = 'rounded-[8px] border border-gold-primary/30 bg-gold-darker';
+  const cardBase = 'rounded-[8px] border border-gold-primary/30 bg-black';
   const inputBase =
     'w-full rounded-[4px] border border-gold-primary/30 bg-black px-3 py-2 text-sm text-white placeholder:text-cc-textSub outline-none focus:ring-1 focus:ring-gold-primary';
   const selectBase = `${inputBase} pr-8`;
@@ -116,7 +116,7 @@ export default function AdminPage() {
         <div className="mx-auto w-full max-w-none px-4 lg:px-6">
           <div className="flex flex-col lg:flex-row">
             {/* Left: Sidebar + Footer (Figma layout) */}
-            <div className="flex flex-col lg:w-[356px]">
+            <div className="flex flex-col lg:w-[300px]">
               <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:ml-[8px] lg:w-[345px]">
                 <nav className="flex items-start justify-between">
                   <div className="flex items-center gap-[5px] w-[184px]">
@@ -140,7 +140,7 @@ export default function AdminPage() {
                 </nav>
 
                 <div className="flex flex-col gap-[20px] items-start">
-                  <h1 className="font-medium leading-[1.058] tracking-[-0.84px] text-[42px]">
+                  <h1 className="font-medium leading-[1.058] tracking-[-0.84px] text-[34px]">
                     <span className="block">씨씨카지노</span>
                     <span className="block text-gold-primary">신규회원 전용금고</span>
                   </h1>
@@ -158,7 +158,7 @@ export default function AdminPage() {
                       type="button"
                       onClick={() => setActiveSection('csv')}
                       disabled={!!busyKey}
-                      className="bg-gold-primary text-black rounded-[4px] px-[10px] py-[20px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <img alt="" src={ICON_GAME} className="h-[30px] w-[30px]" />
                       <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
@@ -170,7 +170,7 @@ export default function AdminPage() {
                       type="button"
                       onClick={() => setActiveSection('extend')}
                       disabled={!!busyKey}
-                      className="bg-gold-primary text-black rounded-[4px] px-[10px] py-[20px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <img alt="" src={ICON_TELEGRAM} className="h-[30px] w-[30px]" />
                       <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
@@ -182,7 +182,7 @@ export default function AdminPage() {
                 </div>
               </aside>
 
-              <footer className="bg-cc-accent2 px-[20px] py-[31px] lg:w-[356px]">
+              <footer className="bg-cc-accent2 px-[20px] py-[24px] lg:w-[300px]">
                 <div className="flex flex-col gap-[12.639px] items-start">
                   <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
                   <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
@@ -197,7 +197,7 @@ export default function AdminPage() {
             {/* Right: Admin tools */}
             <div className="flex-1 lg:w-[908px] py-6 lg:py-0 lg:pr-[10px]">
               <div className="pt-4 lg:pt-[32px]">
-                <div className="mb-6">
+                <div className="mb-4">
                   <h1 className="text-[32px] sm:text-[36px] font-medium tracking-[-0.84px] leading-[1.058]">
                     <span className="text-white">관리자</span>{' '}
                     <span className="text-gold-primary">도구</span>
@@ -209,7 +209,7 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <div className={`${cardBase} p-4 md:p-6 mb-6`}>
+                <div className={`${cardBase} p-4 md:p-5 mb-4`}>
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
                       <div className="flex-1">
@@ -222,7 +222,7 @@ export default function AdminPage() {
                           onChange={(e) => setExternalUserId(e.target.value)}
                           placeholder="예: ext-123"
                         />
-                        <p className="mt-2 text-xs text-cc-textSub">
+                        <p className="mt-2 text-xs text-white/80">
                           비워도 동작할 수 있지만, 대부분의 작업은 외부 아이디를 넣는 게 안전해요.
                         </p>
                       </div>
@@ -498,7 +498,7 @@ export default function AdminPage() {
 
                 {busyKey ? <div className="mt-6 text-sm text-cc-textSub">처리 중이에요: {busyKey}</div> : null}
 
-                <div className="text-center text-cc-textSub text-xs mt-10 pb-10">
+                <div className="text-center text-cc-textSub text-xs mt-6 pb-6">
                   <p>© 2025 CC Casino - 관리자 도구</p>
                 </div>
               </div>
