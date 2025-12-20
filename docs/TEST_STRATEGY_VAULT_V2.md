@@ -7,7 +7,7 @@
 - 대상: QA/백엔드/프론트엔드
 
 ## 2. 범위
-- BE: 상태 조회, 수령, 출석, 입금 훅, 만료 배치, 알림 트리거
+- BE: 상태 조회, 수령, 출석, (추가 예정) 입금 훅, (추가 예정) 만료 배치, 알림 트리거
 - FE: 금고 대시보드 UI, 진행률/타이머, 모달/토스트, 상태 라벨/카피
 - 데이터: vault_status 스키마, 만료/아카이빙
 
@@ -17,6 +17,10 @@
 - 계약(API): 응답 스키마/에러 코드 검증
 - E2E(UI): 대시보드 노출, 해금/출석/만료 플로우
 - 배치/잡: 만료 배치, 알림 배치, DLQ 재처리
+
+## 3.1 현재 자동화 테스트 현황(2025-12-20)
+- 존재: `/health`, `/api/vault/notify`, `/api/vault/compensation-enqueue`, `/api/vault/referral-revive`
+- TODO: `/api/vault/status`, `/api/vault/claim`, `/api/vault/attendance`에 대한 통합/계약 테스트 추가
 
 ## 4. 주요 케이스 (발췌)
 - 상태 전이: LOCKED→UNLOCKED→CLAIMED, 만료 시 EXPIRED

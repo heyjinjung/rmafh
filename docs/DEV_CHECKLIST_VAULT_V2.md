@@ -4,7 +4,7 @@
 - [x] docker-compose로 db/api/worker 기동 (api 호스트 포트 18000 매핑)
 - [x] Postgres 16 컨테이너 헬스체크 설정
 - [x] API/Worker 이미지 빌드 (Python 3.11-slim)
-- [ ] web(frontend) 서비스 추가 (Next.js 등) 후 compose 통합
+- [x] web(frontend) 서비스 추가 (Next.js) 후 compose 통합 (호스트 3002)
 
 ## 데이터베이스
 - [x] DB 마이그레이션 스크립트 준비: docs/DB_MIGRATION_VAULT_V2.sql
@@ -17,11 +17,14 @@
 
 ## 백엔드 API (FastAPI)
 - [x] /health 헬스체크
+- [x] /api/vault/status (데모 user_id 기본 1)
+- [x] /api/vault/claim
+- [x] /api/vault/attendance
 - [x] /api/vault/referral-revive (만료 D-1 구간 24h 연장, 1회 제한)
 - [x] /api/vault/extend-expiry (shadow/real, 범위 ALL_ACTIVE/USER_IDS)
 - [x] /api/vault/notify (type/variant 검증, dedup enqueue)
 - [x] /api/vault/compensation-enqueue (202 enqueue)
-- [ ] 각 엔드포인트 통합 테스트/계약 테스트 추가
+- [ ] status/claim/attendance 통합 테스트/계약 테스트 추가
 - [ ] 실제 비즈니스 로직/에러 처리 보완 (현재 단순화된 로직)
 
 ## 워커
@@ -42,5 +45,6 @@
 - [ ] CI 구성 (lint/test/build) 추가
 
 ## 프런트엔드 (옵션)
-- [ ] ./frontend 생성 및 web 서비스 compose 추가
-- [ ] API 연동 화면/UX 설계
+- [x] ./frontend 및 web 서비스 compose 추가
+- [x] 금고 메인 페이지 UI + `/api/vault/status|claim|attendance` 연동
+- [ ] 손실 배너/토스트/부활권/티켓0 모달 등 확장 UX 적용

@@ -9,10 +9,13 @@
 
 ## 2. 공통
 - Base URL: /api
-- Auth: JWT (Authorization: Bearer <token>)
+- Auth: (현재 로컬/데모 구현은 미적용, 기본 user_id=1)
 - 응답 형식: application/json; charset=utf-8
 - 타임존: 모든 시간은 ISO8601 UTC, FE는 로컬 변환
 - 상태 값: LOCKED, UNLOCKED, CLAIMED, EXPIRED
+
+### 2.1 구현 노트(Next.js trailingSlash)
+- Next 설정이 `trailingSlash: true` 이므로 FE에서 `/api/vault/status/` 처럼 슬래시 포함 호출을 기본으로 합니다.
 
 ## 3. Validation 규칙 (요약)
 - 공통 헤더: Authorization 필수(Bearer), Content-Type: application/json
@@ -59,10 +62,14 @@
 - Validation: vault_type 필수, 상태가 UNLOCKED일 때만 허용, 만료 시 거부
 - Response 200
 ```json
-{ "claimed": true, "vault_type": "GOLD", "new_balance": 10000 }
+{ "claimed": true, "vault_type": "GOLD", "now": "2025-12-20T12:00:00Z", "expires_at": "2025-12-26T00:00:00Z" }
 ```
-- 외부 보상 지급 장애 시: 202 Accepted + compensation_queue_id 반환, 워커가 재시도 후 최종 상태 갱신
+- (추가 구현 예정) 외부 보상 지급 장애 시: 202 Accepted + compensation_queue_id 반환
 - 에러: 400 (잘못된 상태), 409 (이미 수령), 404 (존재하지 않음)
+
+#### 현재 구현(로컬/데모)
+- 상태가 UNLOCKED가 아니면 403 `NOT_CLAIMABLE`
+- 이미 수령이면 409 `ALREADY_CLAIMED`
 
 ### 4.3 POST /api/vault/attendance
 - 설명: 일일 출석 체크, 플래티넘 진행률 반영 (일 1회)
@@ -70,9 +77,12 @@
 - Validation: 당일 이미 체크된 경우 409, expires_at 경과 시 403
 - Response 200
 ```json
-{ "platinum_attendance_days": 2, "platinum_status": "LOCKED" }
+{ "platinum_attendance_days": 2, "now": "2025-12-20T12:00:00Z", "expires_at": "2025-12-26T00:00:00Z" }
 ```
 - 에러: 409 (중복 출석), 403 (기간 만료)
+
+#### 현재 구현(로컬/데모)
+- 당일 중복 출석이면 409 `ALREADY_ATTENDED`
 
 ### 4.4 POST /api/vault/deposit-hook
 - 설명: 입금 웹훅/내부 콜백, 단일 50,000원/누적 500,000원 반영
@@ -87,6 +97,9 @@
 { "platinum_deposit_done": true, "diamond_deposit_current": 190000 }
 ```
 - 에러: 409 (중복 tx_id), 404 (user 미존재)
+
+#### 현재 상태
+- 아직 미구현(문서 설계만 존재)
 
 ### 4.5 POST /api/vault/notify
 - 설명: 알림 트리거(내부용). 소멸 경고/출석 부족 알림 발송

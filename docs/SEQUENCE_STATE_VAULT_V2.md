@@ -8,6 +8,7 @@
 
 ## 2. 시퀀스: 입금 훅
 - Actor: PaymentSystem → API /api/vault/deposit-hook → VaultService
+- 현재 상태: 아직 미구현(문서 설계만 존재)
 - 플로우:
   1) PaymentSystem → deposit-hook (user_id, amount, tx_id, occurred_at)
   2) VaultService: idempotency(tx_id) 검사
@@ -25,6 +26,7 @@
 
 ## 4. 시퀀스: 만료 배치
 - Actor: Scheduler → VaultService.batch_expire
+- 현재 상태: 아직 미구현(문서 설계만 존재)
 - 플로우:
   1) expires_at < now AND status != CLAIMED 인 레코드 스캔
   2) 상태를 EXPIRED로 업데이트 (idempotent WHERE)

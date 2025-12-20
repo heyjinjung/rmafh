@@ -24,6 +24,12 @@
 - RATE_LIMITED → 429
 - INTERNAL_ERROR → 500
 
+### 3.1 현재 구현에서 사용 중인 detail 코드(보강)
+- 출석 중복: `ALREADY_ATTENDED` (409)
+- 수령 불가(UNLOCKED 아님): `NOT_CLAIMABLE` (403)
+- scope/user_ids 검증: `INVALID_SCOPE`(400), `USER_IDS_REQUIRED`(400), `INVALID_EXTEND_HOURS`(400)
+- 알림 검증: `INVALID_NOTIFY_TYPE`(400), `EMPTY_USER_IDS`(400)
+
 ## 4. 프레임워크별 예외 클래스 (예: FastAPI + Pydantic)
 - HTTPException(status_code, detail={code, message})
 - ValidationError: 요청 스키마 불일치 → 400 INVALID_REQUEST_BODY

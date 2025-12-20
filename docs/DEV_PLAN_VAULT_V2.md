@@ -6,21 +6,21 @@
 - 시드/백필: 신규 유저 기본 레코드, 기존 유저 백필 옵션
 
 ## 2) 백엔드 API/도메인
-- status/claim/attendance/deposit-hook 완료
+- status/claim/attendance 완료
+- deposit-hook은 아직 미구현(문서 설계만 존재)
 - referral-revive (+24h), extend-expiry(admin, shadow 지원) 구현
 - claim 외부 보상 실패 시 compensation_queue enqueue 로직
 - notify API variant_id 검증, social_proof/referral_revive 타입 추가
 
 ## 3) 배치/워커
-- 만료 배치 shadow 모드 플래그 적용
+- 만료 배치(스케줄러/잡)는 아직 미구현(워커는 compensation_queue 처리만 존재)
 - 알림 필터: EXPIRY_D2/D0, ATTENDANCE_D2, TICKET_ZERO, SOCIAL_PROOF, REFERRAL_REVIVE
 - CompensationWorker: 지수 백오프, DLQ 연계
 
 ## 4) 프런트엔드
-- 카드/배지/그라디언트/네온 스타일 적용 (FE 스타일 가이드 준수)
-- 손실 시뮬레이터 플로팅 배너 + <1h ms 타이머
-- 사회적 증거 토스트, 개인화 큐레이션 배너, 부활권 CTA 모달
-- Figma figma:react prop 정의 및 폰트 로드
+- 카드/배지/그라디언트 스타일 + 메인 페이지 레이아웃(사이드바/푸터/메인) 구현
+- 상태 조회/출석/수령 연동: `/api/vault/status|attendance|claim` (Next 프록시 통해 백엔드 호출)
+- <1h ms 타이머/손실 시뮬레이터/사회적 증거 토스트/부활권 CTA/티켓0 모달은 아직 미구현
 
 ## 5) 관측/로그/메트릭
 - 이벤트: EXPIRY_EXTENDED, REFERRAL_REVIVED, COMPENSATION_ENQUEUED
