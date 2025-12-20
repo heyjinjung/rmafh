@@ -78,13 +78,13 @@ function VaultCard({ tier, status, amountWon, expiresAt, conditions, cardBase })
   );
 }
 
-export function StatusViewer({ statusData, cardBase, externalUserId }) {
+export function StatusSummary({ statusData, externalUserId }) {
   if (!statusData) {
     return (
-      <div className={`${cardBase} p-4 md:p-6`}>
+      <>
         <h2 className="text-lg font-bold">상태 정보</h2>
         <p className="mt-2 text-sm text-cc-textSub">외부 아이디를 입력하고 상태 조회를 실행하세요.</p>
-      </div>
+      </>
     );
   }
 
@@ -121,7 +121,7 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
   ];
 
   return (
-    <div className={`${cardBase} p-4 md:p-6`}>
+    <>
       <h2 className="text-lg font-bold">상태 정보</h2>
 
       <div className="mt-4">
@@ -147,7 +147,7 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
             amountWon={goldAmount}
             expiresAt={goldStatus === 'UNLOCKED' ? expiresAt : null}
             conditions={[]}
-            cardBase={cardBase}
+            cardBase={null}
           />
 
           <VaultCard
@@ -156,10 +156,18 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
             amountWon={platinumAmount}
             expiresAt={platinumStatus === 'UNLOCKED' ? expiresAt : null}
             conditions={platinumConditions}
-            cardBase={cardBase}
+            cardBase={null}
           />
         </div>
       </div>
+    </>
+  );
+}
+
+export function StatusViewer({ statusData, cardBase, externalUserId }) {
+  return (
+    <div className={`${cardBase} p-4 md:p-6`}>
+      <StatusSummary statusData={statusData} externalUserId={externalUserId} />
     </div>
   );
 }

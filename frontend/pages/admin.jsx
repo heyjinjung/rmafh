@@ -299,6 +299,7 @@ export default function AdminPage() {
                         response={statusData}
                         lastCall={statusLastCall}
                         cardBase={cardBase}
+                        actionKey="status"
                       />
                     </div>
                   ) : null}
@@ -344,6 +345,7 @@ export default function AdminPage() {
                         response={csvResponse}
                         lastCall={csvLastCall}
                         cardBase={cardBase}
+                        actionKey="user-daily-import"
                       />
                     </div>
                   ) : null}
@@ -392,6 +394,7 @@ export default function AdminPage() {
                         response={extendResponse}
                         lastCall={extendLastCall}
                         cardBase={cardBase}
+                        actionKey="extend-expiry"
                       />
                     </div>
                   ) : null}
@@ -439,6 +442,7 @@ export default function AdminPage() {
                         response={notifyResponse}
                         lastCall={notifyLastCall}
                         cardBase={cardBase}
+                        actionKey="notify"
                       />
                     </div>
                   ) : null}
@@ -486,6 +490,7 @@ export default function AdminPage() {
                         response={reviveResponse}
                         lastCall={reviveLastCall}
                         cardBase={cardBase}
+                        actionKey="referral-revive"
                       />
                     </div>
                   ) : null}
