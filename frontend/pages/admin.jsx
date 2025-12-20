@@ -643,7 +643,7 @@ export default function AdminPage() {
                       placeholder="예: base"
                     />
                     <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
-                      비워도 돼요. 팀에서 정한 값이 있을 때만 넣어요.
+                      알림 문구/배너 버전(A/B)을 나눌 때만 입력해요. 비우면 기본(base) 버전으로 처리돼요.
                     </p>
                   </div>
 

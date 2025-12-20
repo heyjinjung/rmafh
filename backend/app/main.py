@@ -66,6 +66,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     with db.get_conn() as conn:
         cur = conn.cursor()
         user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
+        review_row = None
         cur.execute(
             """
             SELECT expires_at,
@@ -82,6 +83,16 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         )
         row = cur.fetchone()
 
+        cur.execute(
+            """
+            SELECT COALESCE(review_ok, false)
+              FROM user_admin_snapshot
+             WHERE user_id=%s
+            """,
+            (user_id,),
+        )
+        review_row = cur.fetchone()
+
     # Fallback defaults if user row not found
     expires_at = row[0] if row else now + timedelta(hours=72)
     gold_status = row[1] if row else "UNLOCKED"
@@ -92,6 +103,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     platinum_deposit_done = bool(row[5]) if row and row[5] is not None else False
     diamond_deposit_current = int(row[6]) if row and row[6] is not None else 0
 
+    platinum_review_done = bool(review_row[0]) if review_row and review_row[0] is not None else False
+
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
 
@@ -101,6 +114,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "diamond_status": diamond_status,
         "platinum_attendance_days": platinum_attendance_days,
         "platinum_deposit_done": platinum_deposit_done,
+        "platinum_review_done": platinum_review_done,
         "diamond_deposit_current": diamond_deposit_current,
         "expires_at": expires_at.isoformat(),
         "now": now.isoformat(),
@@ -406,7 +420,7 @@ async def user_daily_import(body: DailyUserImportRequest):
         )
 
         # Ensure baseline rows exist
-        ensure_values = [(int(user_id), default_expires) for user_id, _, _, _, _, _ in snapshot_values]
+        ensure_values = [(int(row[0]), default_expires) for row in snapshot_values]
         execute_values(
             cur,
             """

@@ -161,8 +161,17 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     const payload = contentType.includes('application/json') ? await res.json() : null;
 
     if (!res.ok) {
-      const message = payload?.error?.message || payload?.detail || '요청에 실패했습니다.';
       const code = payload?.error?.code || payload?.detail || String(res.status);
+      const rawMessage = payload?.error?.message || payload?.detail || '요청에 실패했습니다.';
+
+      const messageMap = {
+        ALREADY_ATTENDED: '오늘은 이미 출석 체크가 완료되어 있어요.',
+        ALREADY_CLAIMED: '이미 수령한 금고예요.',
+        NOT_CLAIMABLE: '아직 수령할 수 없는 상태예요.',
+        VARIANT_NOT_FOUND: '알림 변형 ID가 허용 목록에 없어요.',
+        EMPTY_USER_IDS: '대상 아이디가 비어 있어요.',
+      };
+      const message = messageMap[code] || rawMessage;
       const err = new Error(message);
       err.code = code;
       throw err;
@@ -245,7 +254,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const vaults = useMemo(() => {
     const api = status || {};
     const attendanceDays = Number(api.platinum_attendance_days || 0);
-    const depositDone = Boolean(api.platinum_deposit_done);
+    const reviewDone = Boolean(api.platinum_review_done);
     const diamondDeposit = Number(api.diamond_deposit_current || 0);
     const diamondTarget = 500000;
     const diamondProgress = Math.max(0, Math.min(100, Math.floor((diamondDeposit / diamondTarget) * 100)));
@@ -265,16 +274,16 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       {
         id: 'platinum-vault',
         tier: 'platinum',
-        rewardAmount: 30000,
+        rewardAmount: 20000,
         status: mapApiStatusToUi(api.platinum_status),
         expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
         missions: [
-          { id: 'p1', label: '출석 체크 3일 연속 완료', isDone: attendanceDays >= 3, hint: '출석 체크로 진행' },
-          { id: 'p2', label: '단일 5충 1회 완료', isDone: depositDone, hint: '입금 조건 충족 필요' },
+          { id: 'p1', label: '연속 3일 달성 (일별 5만원 이상)', isDone: attendanceDays >= 3, hint: `현재 ${Math.min(3, attendanceDays)}/3 · 하루라도 건너뛰면 1일부터 다시` },
+          { id: 'p2', label: `리뷰 키 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
           { id: 'p3', label: '플래티넘 금고 해금', isDone: api.platinum_status === 'UNLOCKED' || api.platinum_status === 'CLAIMED' },
           { id: 'p4', label: '수령 완료', isDone: api.platinum_status === 'CLAIMED' },
         ],
-        meta: { attendanceDays, depositDone },
+        meta: { attendanceDays, reviewDone },
       },
       {
         id: 'diamond-vault',
@@ -529,6 +538,15 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
 
+  const socialProofText = useMemo(() => {
+    const sp = status?.social_proof;
+    const count = Number(sp?.claimed_last_24h || 0);
+    const vt = String(sp?.vault_type || '').toUpperCase();
+    if (!count || !vt) return '';
+    const tierLabel = vt === 'PLATINUM' ? '플래티넘' : vt === 'GOLD' ? '골드' : vt === 'DIAMOND' ? '다이아' : vt;
+    return `지금 ${count.toLocaleString('ko-KR')}명이 ${tierLabel} 금고를 회수했습니다`;
+  }, [status]);
+
   return (
     <div
       className="min-h-full text-white p-4 md:p-6 lg:p-8"
@@ -608,6 +626,19 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#07AF4D]/30">
             <span className="text-[#07AF4D] font-medium">LIMITED EVENT</span>
           </div>
+
+          {status?.loss_total ? (
+            <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#F97935]/30">
+              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(Number(status.loss_total || 0))} 소멸</span>
+            </div>
+          ) : null}
+
+          {socialProofText ? (
+            <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
+              <span className="text-white/80 font-medium">{socialProofText}</span>
+            </div>
+          ) : null}
+
           <button
             className="bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-1.5 rounded-full text-sm"
             onClick={refreshStatus}
@@ -743,6 +774,24 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                     <span className="text-sm font-medium text-[#F97935]">
                       {timeRemaining.hours}시간 {timeRemaining.minutes}분 후 소멸
                     </span>
+                  </div>
+                </div>
+              )}
+
+              {vault.tier === 'platinum' && (
+                <div className="px-4 pb-2">
+                  <div className="bg-black/30 border border-white/10 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-white/80 font-medium">연속 진행</span>
+                      <span className="text-white font-bold">{Math.min(3, vault.meta?.attendanceDays ?? 0)}/3</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="text-white/60">리뷰 키</span>
+                      <span className="text-white/80 font-semibold">{vault.meta?.reviewDone ? '1/1 (완료)' : '0/1 (필요)'}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-white/60">
+                      오늘 조건을 채우면 +1, 하루라도 건너뛰면 1일부터 다시 시작돼요.
+                    </div>
                   </div>
                 </div>
               )}
