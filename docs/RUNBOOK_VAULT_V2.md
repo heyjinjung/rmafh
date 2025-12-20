@@ -2,7 +2,7 @@
 
 ## 1. 메타
 - 문서 타입: 런북
-- 버전: v0.1
+- 버전: v0.2
 - 작성일: 2025-12-20
 - 대상: 운영/데브옵스/백엔드
 
@@ -16,6 +16,7 @@
 - 배치 실패 시 재실행: 만료 배치는 idempotent, 중복 실행 허용
 - 큐 컨슈머: 지수백오프(1s,5s,30s) 5회 후 DLQ
 - DLQ 처리: 15분 주기 스크럽, 원인별 재큐/폐기, 모니터링 DLQ 사이즈
+- compensation_queue: 202 응답으로 넘어간 보상 요청은 워커 재시도; PENDING/DLQ가 10분 이상 지속되면 강제 재큐 또는 외부 서비스 헬스체크 후 수동 지급
 
 ## 4. 롤백 시나리오
 - 애플리케이션 롤백 후에도 DB 스키마는 유지 (forward-compatible) → 필요한 경우 별도 다운그레이드 릴리스
@@ -35,3 +36,9 @@
 - enable_expiry_batch (default ON in prod)
 - enable_alerts (default ON in prod)
 - enable_ticket_zero_modal (FE)
+
+## 8. 만료 연장/부활권 운영 절차
+- 부활권(사용자): expires_at - now 24~48h 구간 확인 후 referral-revive 노출; 중복 시도 시 409 여부 확인
+- 운영 연장: extend-expiry API는 shadow=true로 먼저 실행해 대상/카운트 검증 → shadow=false로 적용
+- 롤백: 잘못된 연장 시 extension_log 기반 prev_expires_at로 되돌리는 보정 스크립트 준비
+- 리포트: 연장 적용/미적용, shadow 결과는 슬랙/대시보드 공유

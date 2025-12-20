@@ -2,22 +2,25 @@
 
 ## 1. 메타
 - 문서 타입: 관측성
-- 버전: v0.1
+- 버전: v0.2
 - 작성일: 2025-12-20
 - 대상: SRE/백엔드/데이터
 
 ## 2. 로그 스키마 (핵심 이벤트)
-- VAULT_UNLOCKED, VAULT_CLAIMED, VAULT_EXPIRED, ALERT_SENT, ATTENDANCE_MARKED, DEPOSIT_RECORDED
+- VAULT_UNLOCKED, VAULT_CLAIMED, VAULT_EXPIRED, ALERT_SENT, ATTENDANCE_MARKED, DEPOSIT_RECORDED, EXPIRY_EXTENDED, REFERRAL_REVIVED, COMPENSATION_ENQUEUED
 - 공통 필드: ts, event, user_id, vault_type, req_id, env
-- 추가 필드: tx_id(deposit), amount(deposit), attendance_day, expires_at, status_before, status_after
+- 추가 필드: tx_id(deposit), amount(deposit), attendance_day, expires_at, status_before, status_after, variant_id(notify), extension_reason, shadow (연장 드라이런), compensation_id
 
 ## 3. 메트릭 정의
 - 전환: vault_claim_rate_by_type (claimed/eligible)
 - 만료: vault_expire_rate_by_type (expired/total)
 - 출석: platinum_attendance_progress (avg days)
 - 충전: diamond_deposit_progress (p50/p90)
-- 알림: alert_sent_count, alert_click_rate, alert_claim_within_24h
-- 배치/큐: batch_fail_count, dlq_size, notify_enqueue_latency
+- 알림: alert_sent_count, alert_click_rate, alert_claim_within_24h, alert_claim_rate_by_variant
+- 사회적 증거: social_proof_impression_count, social_proof_click_rate, social_proof_claim_within_24h
+- 손실 시뮬레이터: loss_banner_impressions, loss_banner_click_rate, loss_banner_claim_within_1h
+- 부활권/연장: referral_revive_success_count, extend_expiry_applied_count(shadow vs actual)
+- 배치/큐: batch_fail_count, dlq_size, notify_enqueue_latency, compensation_pending_count, compensation_retry_success_rate
 
 ## 4. 대시보드 레이아웃 (예시)
 - 퍼널: LOCKED→UNLOCKED→CLAIMED→EXPIRED by vault_type
@@ -32,6 +35,8 @@
 - notify_enqueue_latency p95 > 5s (15분) → Warn
 - claim_rate_drop > 20% QoQ → Investigate
 - expire_rate_spike > +15% DoD → Investigate
+- compensation_pending_count > 0 (10분 지속) → Warn, > 50 → Critical
+- alert_claim_rate_by_variant 차이 > 15pp → 실험/템플릿 품질 점검
 
 ## 6. 수집/전송
 - 로그: JSON line, 중앙 수집(ELK/Cloud Logging)

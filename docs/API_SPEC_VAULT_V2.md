@@ -2,7 +2,7 @@
 
 ## 1. 메타
 - 문서 타입: API 스펙
-- 버전: v0.1 (초안)
+- 버전: v0.2 (초안)
 - 작성일: 2025-12-20
 - 대상: 백엔드/프론트엔드 개발자
 - 범위: 금고 상태 조회/수령, 출석, 입금 훅, 알림 트리거
@@ -22,6 +22,9 @@
 - idempotency: tx_id는 per user 고유, 중복 시 409 DUPLICATE_TX
 - 출석: 하루 1회, 서버 기준 일자 중복 시 409 DUPLICATE_ATTENDANCE
 - 만료: expires_at 지난 후 상태 변경 요청은 403 EXPIRED
+- 요청 상관관계: request_id(X-Request-Id) 헤더/바디는 멱등키, 중복 시 409 DUPLICATE_REQUEST
+- 만료 연장: extend_hours는 1~72, reason은 OPS|PROMO|REFERRAL|ADMIN만 허용
+- 알림 A/B: variant_id는 사전 등록된 값만 허용, 미등록 시 400 VARIANT_NOT_FOUND
 
 ## 4. 엔드포인트
 ### 4.1 GET /api/vault/status
@@ -37,7 +40,13 @@
 	"platinum_deposit_done": false,
 	"diamond_deposit_current": 120000,
 	"expires_at": "2025-12-26T00:00:00Z",
-	"now": "2025-12-20T12:00:00Z"
+	"now": "2025-12-20T12:00:00Z",
+	"loss_total": 130000,
+	"loss_breakdown": {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 100000, "BONUS": 0},
+	"ms_countdown": {"enabled": true, "remaining_ms": 3578123},
+	"referral_revive_available": true,
+	"social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
+	"curation_tier": "PLATINUM_BIASED"
 }
 ```
 
@@ -52,6 +61,7 @@
 ```json
 { "claimed": true, "vault_type": "GOLD", "new_balance": 10000 }
 ```
+- 외부 보상 지급 장애 시: 202 Accepted + compensation_queue_id 반환, 워커가 재시도 후 최종 상태 갱신
 - 에러: 400 (잘못된 상태), 409 (이미 수령), 404 (존재하지 않음)
 
 ### 4.3 POST /api/vault/attendance
@@ -82,10 +92,33 @@
 - 설명: 알림 트리거(내부용). 소멸 경고/출석 부족 알림 발송
 - Body
 ```json
-{ "type": "EXPIRY_D2" | "ATTENDANCE_D2" | "TICKET_ZERO", "user_ids": [123,124] }
+{ "type": "EXPIRY_D2" | "ATTENDANCE_D2" | "TICKET_ZERO", "user_ids": [123,124], "variant_id": "A" }
 ```
-- Validation: type 필수, user_ids 비어있으면 400, 최대 1000명 제한, 내부 인증 필요
+- Validation: type 필수, user_ids 비어있으면 400, 최대 1000명 제한, variant_id는 사전 등록된 값만 허용, 내부 인증 필요
 - Response 202: 비동기 큐 enqueue 결과
+
+### 4.6 POST /api/vault/referral-revive
+- 설명: 만료 D-1 사용자가 친구 초대/특정 액션 수행 시 expires_at을 +24h 연장 (1회 제한)
+- Body
+```json
+{ "request_id": "req-123", "channel": "KAKAO" | "LINK", "invite_code": "abc123" }
+```
+- Validation: expires_at - now ∈ [24h, 48h], 이미 연장된 경우 409 EXTENSION_LIMIT, request_id 멱등
+- Response 200
+```json
+{ "revived": true, "expires_at": "2025-12-27T00:00:00Z" }
+```
+
+### 4.7 POST /api/vault/extend-expiry (admin/ops)
+- 설명: 운영/마케팅/점검 사유로 특정 사용자 또는 전체 활성 금고의 expires_at을 일괄/개별 연장
+- Body
+```json
+{ "request_id": "req-ops-1", "scope": "ALL_ACTIVE" | "USER_IDS", "user_ids": [1,2], "extend_hours": 24, "reason": "OPS" | "PROMO" | "ADMIN", "shadow": true }
+```
+- Validation: extend_hours 1~72, scope/user_ids 일관성, shadow=true면 실제 업데이트 없이 대상/결과만 프리뷰
+- Response
+	- 200 (shadow=false): {"updated": 1200, "new_expires_at": "..."}
+	- 200 (shadow=true): {"shadow": true, "candidates": 1400, "sample_user_ids": [1,2,3]}
 
 ## 5. 에러 포맷
 ```json
@@ -103,7 +136,11 @@
 | INVALID_STATE | 400 | 상태 전이 불가 (LOCKED→CLAIMED 등) | claim · attendance |
 | DUPLICATE_ATTENDANCE | 409 | 동일 일자 출석 중복 | attendance |
 | DUPLICATE_TX | 409 | tx_id 중복 | deposit-hook |
+| DUPLICATE_REQUEST | 409 | request_id 재사용 | claim · referral-revive · extend-expiry |
 | ALREADY_CLAIMED | 409 | 이미 수령 완료 | claim |
+| EXTENSION_LIMIT | 409 | 허용 연장 횟수 초과 | referral-revive · extend-expiry |
+| EXTENSION_FORBIDDEN | 403 | 만료/비대상 구간에서 연장 요청 | referral-revive |
+| VARIANT_NOT_FOUND | 400 | 등록되지 않은 variant_id | notify |
 | EXPIRED | 403 | 만료 후 요청 | claim · attendance |
 | NOT_FOUND | 404 | user/vault 미존재 | status · claim · attendance |
 | RATE_LIMITED | 429 | (옵션) 알림/훅 과다 호출 | notify |
@@ -118,7 +155,13 @@
 - 출석: 00시 단위, 하루 1회 증가, 3회 달성 시 플래티넘 해금 조건 충족
 - 수령: UNLOCKED 상태에서만 가능, 중복 수령 불가
 - 중복 방지: tx_id idempotency, 출석 일별 락 처리
+- 손실 시뮬레이터: loss_total은 UNLOCKED/LOCKED 미수령 금액 합계(완성 보너스 포함), EXPIRED/CLAIMED 제외
+- 긴박 타이머: expires_at - now < 1h → ms_countdown.enabled=true, remaining_ms 제공
+- 부활권: referral-revive는 만료 D-1 구간 1회 제한, 성공 시 expires_at +24h
+- 운영 연장: extend-expiry는 shadow 모드(미적용 프리뷰) 지원, request_id 멱등
+- 알림 A/B: variant_id로 템플릿 분기, 클릭/claim 전환율을 variant 단위로 측정
+- 보상 재시도: claim 중 외부 지급 실패 시 compensation_queue로 이관, 멱등 보장
 
 ## 8. 추적/로그
-- 이벤트: VAULT_UNLOCKED, VAULT_CLAIMED, VAULT_EXPIRED, ALERT_SENT
-- 메트릭: 단계별 이탈률, 출석 진행률, 충전 분포, 알림 전환율
+- 이벤트: VAULT_UNLOCKED, VAULT_CLAIMED, VAULT_EXPIRED, ALERT_SENT, EXPIRY_EXTENDED, REFERRAL_REVIVED, COMPENSATION_ENQUEUED
+- 메트릭: 단계별 이탈률, 출석 진행률, 충전 분포, 알림 전환율, variant별 claim 전환, compensation 재시도 성공률

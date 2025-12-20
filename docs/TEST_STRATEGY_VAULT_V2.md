@@ -2,7 +2,7 @@
 
 ## 1. 메타
 - 문서 타입: 테스트 전략
-- 버전: v0.1
+- 버전: v0.2
 - 작성일: 2025-12-20
 - 대상: QA/백엔드/프론트엔드
 
@@ -27,6 +27,10 @@
 - 만료: expires_at 경과 후 수령/출석 시 403
 - 알림: EXPIRY_D2 필터링 정확도, ATTENDANCE_D2 대상 선정
 - UI: 카운트다운 표시, 게이지 퍼센트 계산, 티켓0 모달 자동 표시
+- UI 추가: 손실 시뮬레이터 총합 계산 정확도, 만료 <1h ms 타이머 전환, 사회적 증거 토스트 노출/쿨다운, 개인화 배너 노출 조건
+- 부활권/연장: referral-revive 1회 제한, extend-expiry shadow 모드 미적용 확인, 실제 적용 시 expires_at 증가 검증
+- A/B 알림: variant_id별 템플릿 분기, dedup_key에 variant 포함, variant별 전환 집계
+- 보상 재시도: claim 외부 실패 시 202 + compensation_queue enqueue, 워커 재시도 후 최종 상태/중복 방지
 
 ## 5. 픽스처/모킹
 - Clock mock: now 고정, 만료/출석/배치 테스트에 사용

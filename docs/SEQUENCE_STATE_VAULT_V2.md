@@ -2,7 +2,7 @@
 
 ## 1. 메타
 - 문서 타입: 시퀀스/상태
-- 버전: v0.1
+- 버전: v0.2
 - 작성일: 2025-12-20
 - 대상: 백엔드/프론트엔드/기획자
 
@@ -38,6 +38,26 @@
   3) Notification worker → Push/Email/In-app 발송
   4) 클릭/열람/수령 이벤트 로그
 
+## 5.1 시퀀스: 부활권/만료 연장
+- Actor: FE(사용자 초대) 또는 Admin → /api/vault/referral-revive · /api/vault/extend-expiry
+- 플로우(사용자 부활권):
+  1) FE → referral-revive (request_id, channel, invite_code)
+  2) Service: expires_at - now ∈ [24h,48h], expiry_extend_count=0 검사
+  3) expires_at = expires_at + 24h, expiry_extend_count +=1, extension_log insert(reason=REFERRAL)
+  4) 응답 200 {revived:true, expires_at:new}
+- 플로우(운영 연장/드라이런):
+  1) Admin → extend-expiry(scope, extend_hours, reason, shadow?)
+  2) shadow=true: 대상만 계산해 리포트(미반영), extension_log에 shadow=true 기록
+  3) shadow=false: 대상 업데이트 + extension_log insert(reason=OPS/PROMO/ADMIN)
+  4) 슬랙/모니터링에 결과 전송
+
+## 5.2 시퀀스: 보상 재시도 (compensation_queue)
+- Actor: Claim API → CompensationWorker
+- 플로우:
+  1) Claim 시 외부 보상(포인트/쿠폰) 호출 실패 → 202 Accepted + compensation_queue enqueue(request_id, payload)
+  2) 워커가 next_retry_at 도래 시 재시도 (지수백오프)
+  3) 성공 → DONE 후 vault 상태/로그 업데이트, 실패 누적 → FAILED + DLQ 알림
+
 ## 6. 상태 머신 요약 (텍스트)
 - 공통: LOCKED → UNLOCKED → CLAIMED, 만료 시 EXPIRED
 - Gold: 채널 추가 시 UNLOCKED → CLAIMED
@@ -50,6 +70,7 @@
 - CLAIMED이면 중복 수령 거부
 - 출석은 하루 1회, 서버 날짜 기준
 - deposit-hook은 tx_id idempotent
+- expires_at 연장은 EXPIRED/CLAIMED 이후 불가, REFERRAL 이유는 1회 제한
 
 ## 8. 다이어그램 참고
 - 시각 다이어그램이 필요하면 draw.io/mermaid로 표현 (추후 추가)

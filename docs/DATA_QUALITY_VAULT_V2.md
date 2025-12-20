@@ -2,7 +2,7 @@
 
 ## 1. 메타
 - 문서 타입: 데이터 품질/마이그레이션
-- 버전: v0.1
+- 버전: v0.2
 - 작성일: 2025-12-20
 - 대상: DBA/백엔드/데이터
 
@@ -17,6 +17,9 @@
 - 상태 도메인: 세 상태 컬럼 모두 ENUM 집합 내 값
 - 출석: platinum_attendance_days BETWEEN 0 AND 3
 - 금액: diamond_deposit_current >= 0
+- 만료 연장: expiry_extend_count >= 0, last_extension_reason NULL 또는 ENUM 집합 내 값
+- 연장 로그: vault_expiry_extension_log.request_id 유니크, reason ENUM 검증, shadow=true 레코드는 상태 변경 미발생 여부 샘플링
+- 보상 큐: compensation_queue.status ∈ (PENDING, RETRYING, DONE, FAILED), retry_count >= 0
 
 ## 4. 백필 전략
 - 기존 유저에 대해 vault_status 생성: expires_at = 가입 + 7일 (또는 커스텀)
@@ -31,6 +34,8 @@
 - 만료 앞둔 사용자: SELECT user_id FROM vault_status WHERE expires_at < now() + interval '48 hours' AND gold_status!='CLAIMED';
 - 출석 진행률: SELECT platinum_attendance_days, COUNT(*) FROM vault_status GROUP BY 1;
 - 누적 충전 분포: SELECT width_bucket(diamond_deposit_current,0,500000,5), COUNT(*) FROM vault_status GROUP BY 1;
+- 부활권 사용률: SELECT COUNT(*) FROM vault_expiry_extension_log WHERE reason='REFERRAL' AND shadow=false;
+- 보상 큐 적체: SELECT status, COUNT(*) FROM compensation_queue GROUP BY status;
 
 ## 7. 릴리스 전 체크리스트
 - 마이그레이션 실행 로그 확인
