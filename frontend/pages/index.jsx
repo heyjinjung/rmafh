@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
 /* ─── Figma Assets ─── */
@@ -142,6 +142,43 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
+  const useCountUp = (targetValue, { durationMs = 900 } = {}) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    const rafRef = useRef(0);
+    const lastTargetRef = useRef(null);
+
+    useEffect(() => {
+      const nextTarget = Number.isFinite(Number(targetValue)) ? Number(targetValue) : 0;
+      if (lastTargetRef.current === nextTarget) return;
+      lastTargetRef.current = nextTarget;
+
+      const from = displayValue;
+      const to = Math.max(0, nextTarget);
+      const start = performance.now();
+
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / Math.max(1, durationMs));
+        // Ease-out for finance-style count-up.
+        const eased = 1 - Math.pow(1 - t, 3);
+        const current = Math.round(from + (to - from) * eased);
+        setDisplayValue(current);
+        if (t < 1) {
+          rafRef.current = requestAnimationFrame(tick);
+        }
+      };
+
+      rafRef.current = requestAnimationFrame(tick);
+      return () => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetValue, durationMs]);
+
+    return displayValue;
+  };
+
   const [serverClock, setServerClock] = useState({
     fetchedAtMs: 0,
     serverNowMs: 0,
@@ -238,6 +275,35 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       maximumFractionDigits: 0,
     }).format(amount);
 
+  function RewardBadge({ amount, colorScheme }) {
+    const animated = useCountUp(amount, { durationMs: 800 });
+    return (
+      <div className="relative flex justify-center w-full -mt-4 z-10">
+        <div
+          className={`px-6 py-1.5 rounded-full border ${colorScheme.border} ${colorScheme.bgActive} flex items-center
+            shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
+            before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
+          aria-label={`보상 금액 ${formatCurrency(amount)}`}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="mr-2 flex-shrink-0"
+            style={{ filter: `drop-shadow(0 0 2px ${colorScheme.iconColor})` }}
+          >
+            <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
+            {formatCurrency(animated)}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   const mapApiStatusToUi = (apiStatus) => {
     switch (apiStatus) {
       case 'UNLOCKED':
@@ -330,21 +396,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     [apiFetch, refreshStatus]
   );
 
-  const attendance = useCallback(async () => {
-    setNotice('');
-    setError('');
-    try {
-      const res = await apiFetch('/api/vault/attendance/', { method: 'POST' });
-      if (res?.platinum_attendance_days !== undefined) {
-        setNotice(`출석 체크 완료 (${res.platinum_attendance_days}일)`);
-      } else {
-        setNotice('출석 체크 완료');
-      }
-      await refreshStatus();
-    } catch (e) {
-      setError(e?.message || '출석 체크에 실패했습니다.');
-    }
-  }, [apiFetch, refreshStatus]);
+  // NOTE: 플래티넘 연속일수는 어드민 업로드(입금 데이터)로 자동 반영됩니다.
+  // 유저가 버튼을 눌러 “출석 체크”를 찍는 플로우는 사용하지 않습니다.
 
   const getVaultColorScheme = (tier) => {
     switch (tier) {
@@ -510,33 +563,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     }
   };
 
-  const renderRewardBadge = (amount, colorScheme) => (
-    <div className="relative flex justify-center w-full -mt-4 z-10">
-      <div
-        className={`px-6 py-1.5 rounded-full border ${colorScheme.border} ${colorScheme.bgActive} flex items-center
-          shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
-          before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
-        aria-label={`보상 금액 ${formatCurrency(amount)}`}
-      >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="mr-2 flex-shrink-0"
-          style={{ filter: `drop-shadow(0 0 2px ${colorScheme.iconColor})` }}
-        >
-          <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
-          {formatCurrency(amount)}
-        </span>
-      </div>
-    </div>
-  );
-
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
+
+  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: 1000 });
 
   const socialProofText = useMemo(() => {
     const sp = status?.social_proof;
@@ -629,7 +658,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
           {status?.loss_total ? (
             <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#F97935]/30">
-              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(Number(status.loss_total || 0))} 소멸</span>
+              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(animatedLossTotal)} 소멸</span>
             </div>
           ) : null}
 
@@ -659,20 +688,12 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           const isLocked = vault.status === 'locked';
           const isOpened = vault.status === 'opened';
 
-          const canAttendance =
-            vault.tier === 'platinum' &&
-            isLocked &&
-            (vault.meta?.attendanceDays ?? 0) < 3 &&
-            timeRemaining.remainingMs > 0;
-
-          const buttonEnabled = isAvailable || canAttendance;
+          const buttonEnabled = isAvailable;
           const buttonLabel = isAvailable
             ? `${vault.tier === 'gold' ? '황금' : vault.tier === 'platinum' ? '플래티넘' : '다이아'} 금고 열기`
-            : canAttendance
-              ? '출석 체크'
-              : isOpened
-                ? '완료됨'
-                : '조건 필요';
+            : isOpened
+              ? '완료됨'
+              : '조건 자동 반영 중';
 
           return (
             <motion.div
@@ -741,7 +762,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                   </motion.div>
                 </motion.div>
 
-                {renderRewardBadge(vault.rewardAmount, colorScheme)}
+                <RewardBadge amount={vault.rewardAmount} colorScheme={colorScheme} />
               </div>
 
               {vault.progress !== undefined && (
@@ -858,7 +879,6 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                   onClick={(e) => {
                     e.stopPropagation();
                     if (isAvailable) return claimVault(vault.tier);
-                    if (canAttendance) return attendance();
                   }}
                 >
                   {buttonEnabled && (
