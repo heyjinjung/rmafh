@@ -1,0 +1,21 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "backend: pytest (docker)",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"compose",
+				"exec",
+				"-T",
+				"api",
+				"pytest",
+				"-vv",
+				"-ra",
+				"--maxfail=1"
+			],
+			"isBackground": false
+		}
+	]
+}
