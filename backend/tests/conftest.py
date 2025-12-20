@@ -5,6 +5,7 @@ from pathlib import Path
 import psycopg2
 import pytest
 from fastapi.testclient import TestClient
+from psycopg2 import OperationalError
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -27,6 +28,14 @@ def _running_in_docker() -> bool:
     return False
 
 
+def _with_connect_timeout(url: str, seconds: int = 3) -> str:
+    # For libpq/psycopg2, connect_timeout can be specified as a URI query param.
+    if "connect_timeout=" in url:
+        return url
+    joiner = "&" if "?" in url else "?"
+    return f"{url}{joiner}connect_timeout={seconds}"
+
+
 @pytest.fixture(scope="session")
 def db_url():
     """Database URL for tests.
@@ -37,16 +46,16 @@ def db_url():
     """
     env_url = os.getenv("DATABASE_URL")
     if env_url:
-        return env_url
+        return _with_connect_timeout(env_url)
     host = "db" if _running_in_docker() else "localhost"
-    return f"postgresql://vault:vaultpass@{host}:5432/vault"
+    return _with_connect_timeout(f"postgresql://vault:vaultpass@{host}:5432/vault")
 
 
 @pytest.fixture(scope="session")
 def db_conn(db_url):
     try:
-        conn = psycopg2.connect(db_url)
-    except psycopg2.OperationalError as exc:  # pragma: no cover - skip if DB unavailable
+        conn = psycopg2.connect(db_url, connect_timeout=3)
+    except OperationalError as exc:  # pragma: no cover - skip if DB unavailable
         pytest.skip(f"database not reachable: {exc}")
     yield conn
     conn.close()
@@ -70,24 +79,31 @@ def _reset_db_state(db_url):
     without cleanup, re-running tests can be affected by previous data.
     """
     try:
-        conn = psycopg2.connect(db_url)
-    except psycopg2.OperationalError:  # pragma: no cover
+        conn = psycopg2.connect(db_url, connect_timeout=3)
+    except OperationalError:  # pragma: no cover
         yield
         return
 
     conn.autocommit = True
-    with conn.cursor() as cur:
-        cur.execute(
-            """
-            TRUNCATE TABLE
-                notifications_queue,
-                compensation_queue,
-                vault_expiry_extension_log,
-                user_admin_snapshot,
-                vault_status,
-                user_identity
-            RESTART IDENTITY
-            """
-        )
+    try:
+        with conn.cursor() as cur:
+            # Avoid hanging forever if other containers (e.g. worker) hold locks.
+            cur.execute("SET lock_timeout = '2s'")
+            cur.execute("SET statement_timeout = '10s'")
+            cur.execute(
+                """
+                TRUNCATE TABLE
+                    notifications_queue,
+                    compensation_queue,
+                    vault_expiry_extension_log,
+                    user_admin_snapshot,
+                    vault_status,
+                    user_identity
+                RESTART IDENTITY
+                """
+            )
+    except psycopg2.Error as exc:  # pragma: no cover
+        conn.close()
+        pytest.skip(f"database reset skipped (DB busy/locked): {exc}")
     conn.close()
     yield

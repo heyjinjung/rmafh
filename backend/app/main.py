@@ -430,6 +430,9 @@ async def user_daily_import(body: DailyUserImportRequest):
 
     with db.get_conn() as conn:
         cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
         mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
         identity_created = int(mapping.pop("__created_count__", 0))
 
@@ -848,6 +851,9 @@ async def referral_revive(body: ReferralReviveRequest, user_id: int | None = Non
     invite_code = _require_non_empty(getattr(body, "invite_code", None), code="INVALID_INVITE_CODE")
     with db.get_conn() as conn:
         cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
         user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=None, create_if_missing=True)
 
         # Idempotency: if we already processed this request_id, return the recorded result.
@@ -928,6 +934,9 @@ async def extend_expiry(body: ExtendExpiryRequest):
 
     with db.get_conn() as conn:
         cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
         now = _now()
 
         # Best-effort idempotency on request_id (for ops retries).
@@ -947,9 +956,12 @@ async def extend_expiry(body: ExtendExpiryRequest):
                 return ExtendExpiryResponse(shadow=False, updated=0)
 
         if body.scope == "USER_IDS":
-            resolved_user_ids = user_ids
-            if not resolved_user_ids and external_user_ids:
-                resolved_user_ids = _resolve_user_ids_by_external_user_ids(cur, external_user_ids)
+            resolved_user_ids: list[int] = []
+            if user_ids:
+                resolved_user_ids.extend(user_ids)
+            if external_user_ids:
+                resolved_user_ids.extend(_resolve_user_ids_by_external_user_ids(cur, external_user_ids))
+            resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
             cur.execute(
                 """
                 SELECT user_id, expires_at
@@ -1034,9 +1046,15 @@ async def notify(body: NotifyRequest):
     inserted = 0
     with db.get_conn() as conn:
         cur = conn.cursor()
-        resolved_user_ids = user_ids
-        if not resolved_user_ids and external_user_ids:
-            resolved_user_ids = _resolve_user_ids_by_external_user_ids(cur, external_user_ids)
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
+        resolved_user_ids: list[int] = []
+        if user_ids:
+            resolved_user_ids.extend(user_ids)
+        if external_user_ids:
+            resolved_user_ids.extend(_resolve_user_ids_by_external_user_ids(cur, external_user_ids))
+        resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
         for uid in resolved_user_ids or []:
             dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{now.date()}"
             cur.execute(
