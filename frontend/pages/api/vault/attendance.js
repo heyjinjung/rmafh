@@ -2,6 +2,23 @@ function getBaseUrl() {
   return process.env.NEXT_PUBLIC_API_BASE || process.env.API_BASE || 'http://localhost:18000';
 }
 
+function buildQuery(req) {
+  const params = new URLSearchParams();
+  const query = req?.query || {};
+
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) params.append(key, String(v));
+    } else {
+      params.set(key, String(value));
+    }
+  }
+
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -10,7 +27,7 @@ export default async function handler(req, res) {
 
   try {
     const base = getBaseUrl();
-    const upstream = await fetch(`${base}/api/vault/attendance`, {
+    const upstream = await fetch(`${base}/api/vault/attendance${buildQuery(req)}`, {
       method: 'POST',
       headers: { accept: 'application/json' },
     });

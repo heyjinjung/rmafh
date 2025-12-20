@@ -27,7 +27,7 @@ export default async function handler(req, res) {
 
   try {
     const base = getBaseUrl();
-    const upstream = await fetch(`${base}/api/vault/claim${buildQuery(req)}`, {
+    const upstream = await fetch(`${base}/api/vault/referral-revive${buildQuery(req)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
       body: JSON.stringify(req.body || {}),

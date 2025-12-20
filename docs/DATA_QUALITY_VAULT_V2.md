@@ -6,6 +6,10 @@
 - 작성일: 2025-12-20
 - 대상: DBA/백엔드/데이터
 
+## 1.1 현재 구현 상태(2025-12-20)
+- 로컬/테스트는 API 스타트업 시 `_ensure_schema()`가 최소 스키마를 자동 보강합니다.
+- 운영 데이터 품질 검증/마이그레이션 검증은 [docs/DB_MIGRATION_VAULT_V2.sql](DB_MIGRATION_VAULT_V2.sql) 기준으로 수행하는 것을 권장합니다.
+
 ## 2. 마이그레이션 검증 쿼리
 - 테이블 존재: SELECT 1 FROM information_schema.tables WHERE table_name='vault_status';
 - ENUM 확인: vaultstatusenum 값(LOCKED,UNLOCKED,CLAIMED,EXPIRED)

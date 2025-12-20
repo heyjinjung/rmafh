@@ -35,35 +35,35 @@ export default function Home() {
           <nav style={styles.nav}>
             <div style={styles.logo}>
               <img src={ICON_STAR} alt="CC Casino" style={styles.logoIcon} />
-              <span style={styles.logoText}>CC CASINO</span>
+              <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
-            <a href="#" style={styles.navButton}>금고 가이드</a>
+            <a href="#" style={styles.navButton} className="cc-navButton">금고 가이드</a>
           </nav>
 
           {/* Header */}
           <div style={styles.header}>
-            <h1 style={styles.title} className="title">
+            <h1 style={styles.title} className="title cc-title">
               <span style={{ color: TOKENS.textWhite }}>씨씨카지노</span>
               <br />
               <span style={{ color: TOKENS.accent1 }}>신규회원 전용금고</span>
             </h1>
-            <p style={styles.address}>평생주소 : 씨씨주소.COM</p>
+            <p style={styles.address} className="cc-address">평생주소 : 씨씨주소.COM</p>
           </div>
 
           {/* Game Links */}
           <div style={styles.offerings}>
-            <h3 style={styles.offeringsTitle}>게임 바로가기</h3>
+            <h3 style={styles.offeringsTitle} className="cc-offeringsTitle">게임 바로가기</h3>
             <div style={styles.modules} className="modules">
               <a href="#" style={styles.navCard} className="nav-card">
                 <img src={ICON_GAME} alt="" style={styles.navCardIcon} />
-                <div style={styles.navCardText}>
+                <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>바로가기</span>
                 </div>
               </a>
               <a href="#" style={styles.navCard} className="nav-card">
                 <img src={ICON_TELEGRAM} alt="" style={styles.navCardIcon} />
-                <div style={styles.navCardText}>
+                <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>텔레공식채널</span>
                 </div>
@@ -71,6 +71,11 @@ export default function Home() {
             </div>
           </div>
         </aside>
+
+        {/* ─── Main Content ─── */}
+        <main style={styles.main} className="main">
+          <VaultChallenge />
+        </main>
 
         {/* ─── Footer ─── */}
         <footer style={styles.footer} className="footer">
@@ -83,11 +88,6 @@ export default function Home() {
             </div>
           </div>
         </footer>
-
-        {/* ─── Main Content ─── */}
-        <main style={styles.main} className="main">
-          <VaultChallenge />
-        </main>
       </div>
 
       <style jsx global>{`
@@ -102,14 +102,31 @@ export default function Home() {
         @media (max-width: 1024px) {
           .page { display: flex !important; flex-direction: column !important; }
           .sidebar { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; padding: 20px !important; gap: 20px !important; left: 0 !important; }
+          .main { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; }
           .footer { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; left: 0 !important; bottom: 0 !important; }
-          .main { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; order: -1; }
           .modules { flex-wrap: wrap; }
           .nav-card { width: 121px !important; height: 85px !important; padding: 14px 10px !important; }
+
+          /* Sidebar becomes App Header */
+          .sidebar { order: 0; }
+          .main { order: 1; }
+          .footer { order: 2; }
+
+          /* Responsive typography */
+          .cc-title { font-size: 34px !important; font-weight: 600 !important; }
+          .cc-address { font-size: 14px !important; }
+          .cc-logoText { font-size: 18px !important; }
+          .cc-offeringsTitle { font-size: 18px !important; }
+          .cc-navCardText { font-size: 16px !important; font-weight: 600 !important; }
         }
         @media (max-width: 640px) {
           .sidebar { max-width: 100% !important; padding: 10px 16px !important; }
-          .title { font-size: 28px !important; }
+          .cc-title { font-size: 28px !important; font-weight: 700 !important; }
+          .cc-address { font-size: 12px !important; }
+          .cc-logoText { font-size: 16px !important; }
+          .cc-navButton { padding: 10px 12px !important; font-size: 10px !important; }
+          .cc-offeringsTitle { font-size: 16px !important; }
+          .cc-navCardText { font-size: 18px !important; font-weight: 700 !important; }
           .nav-card { width: 157px !important; height: 99px !important; }
           .footer { height: 144px !important; padding: 20px !important; }
         }
