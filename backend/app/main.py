@@ -42,7 +42,10 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup():
     db.init_pool()
-    _ensure_schema()
+    # In tests we assume migrations (or a prepared DB) are present.
+    # Running best-effort DDL here can hang if the DB is busy/locked.
+    if config.APP_ENV != "test":
+        _ensure_schema()
 
 
 @app.on_event("shutdown")
