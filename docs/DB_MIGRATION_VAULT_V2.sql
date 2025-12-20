@@ -1,6 +1,19 @@
 -- Vault v2.0 DB migration (PostgreSQL dialect)
 -- Run in a transaction per section where possible.
 
+-- 0) Baseline vault_status (for fresh environments)
+CREATE TABLE IF NOT EXISTS vault_status (
+  user_id BIGINT PRIMARY KEY,
+  expires_at TIMESTAMPTZ NOT NULL,
+  gold_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  platinum_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  diamond_status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  expires_initial_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expiry_extend_count INT NOT NULL DEFAULT 0,
+  last_extension_reason VARCHAR(32),
+  last_extension_at TIMESTAMPTZ
+);
+
 -- 1) Extend vault_status
 ALTER TABLE vault_status
   ADD COLUMN IF NOT EXISTS expires_initial_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

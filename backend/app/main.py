@@ -4,6 +4,8 @@ from typing import List
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
+from psycopg2.extras import Json
+
 from app import config, db
 from app.schemas import (
     CompensationEnqueueRequest,
@@ -178,7 +180,7 @@ async def notify(body: NotifyRequest):
                 VALUES (%s, %s, NULL, %s, %s, %s, %s, 'PENDING')
                 ON CONFLICT (dedup_key) DO NOTHING
                 """,
-                (uid, body.type, body.variant_id, dedup_key, {"type": body.type, "variant_id": body.variant_id}, now),
+                (uid, body.type, body.variant_id, dedup_key, Json({"type": body.type, "variant_id": body.variant_id}), now),
             )
             if cur.rowcount > 0:
                 inserted += 1
@@ -197,7 +199,7 @@ async def compensation_enqueue(body: CompensationEnqueueRequest):
             VALUES (%s, %s, %s, %s, %s, 'PENDING', 0, NOW())
             ON CONFLICT (request_id, external_service) DO NOTHING
             """,
-            (body.user_id, body.vault_type, body.request_id, body.external_service, body.payload),
+            (body.user_id, body.vault_type, body.request_id, body.external_service, Json(body.payload)),
         )
         conn.commit()
     return JSONResponse(status_code=202, content={"enqueued": True})
