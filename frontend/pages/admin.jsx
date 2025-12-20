@@ -31,16 +31,56 @@ function parseJsonOrThrow(text) {
   }
 }
 
+function generateRequestId(prefix) {
+  const rand = Math.random().toString(16).slice(2, 10);
+  return `${prefix}-${Date.now()}-${rand}`;
+}
+
+function parseUserIdsText(text) {
+  const raw = String(text || '')
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const ids = raw.map((v) => Number(v));
+  if (ids.some((n) => !Number.isFinite(n) || !Number.isInteger(n) || n <= 0)) {
+    const err = new Error('회원 번호 목록에 숫자가 아닌 값이 섞여 있어요. 예: 1, 2, 3');
+    throw err;
+  }
+  return ids;
+}
+
+function tryParseUserIdsText(text) {
+  try {
+    return { ok: true, ids: parseUserIdsText(text), message: '' };
+  } catch (e) {
+    return { ok: false, ids: [], message: e?.message || '회원 번호 목록을 확인해주세요.' };
+  }
+}
+
 export default function AdminPage() {
   const [memberId, setMemberId] = useState('');
   const [busyKey, setBusyKey] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  const [statusBodyText, setStatusBodyText] = useState('');
-  const [extendBodyText, setExtendBodyText] = useState(JSON.stringify({ dry_run: true }, null, 2));
-  const [notifyBodyText, setNotifyBodyText] = useState(JSON.stringify({}, null, 2));
-  const [reviveBodyText, setReviveBodyText] = useState(JSON.stringify({}, null, 2));
+  // 만료 연장(extend-expiry) — ExtendExpiryRequest
+  const [extendScope, setExtendScope] = useState('USER_IDS');
+  const [extendUserIdsText, setExtendUserIdsText] = useState('');
+  const [extendHours, setExtendHours] = useState(24);
+  const [extendReason, setExtendReason] = useState('ADMIN');
+  const [extendShadow, setExtendShadow] = useState(true);
+  const [extendRequestId, setExtendRequestId] = useState(() => generateRequestId('extend'));
+
+  // 알림(notify) — NotifyRequest
+  const [notifyType, setNotifyType] = useState('EXPIRY_D2');
+  const [notifyUserIdsText, setNotifyUserIdsText] = useState('');
+  const [notifyVariantId, setNotifyVariantId] = useState('');
+
+  // 추천 상태 되살리기(referral-revive) — ReferralReviveRequest
+  const [reviveChannel, setReviveChannel] = useState('TELEGRAM');
+  const [reviveInviteCode, setReviveInviteCode] = useState('');
+  const [reviveRequestId, setReviveRequestId] = useState(() => generateRequestId('revive'));
 
   const qs = useMemo(() => {
     const params = new URLSearchParams();
@@ -71,6 +111,44 @@ export default function AdminPage() {
 
   const cardBase = 'bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]';
   const inputBase = 'w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 outline-none focus:border-white/20';
+  const selectBase = `${inputBase} appearance-none`;
+
+  const extendIdsParsed = useMemo(() => tryParseUserIdsText(extendUserIdsText || memberId), [extendUserIdsText, memberId]);
+  const notifyIdsParsed = useMemo(() => tryParseUserIdsText(notifyUserIdsText || memberId), [notifyUserIdsText, memberId]);
+
+  const extendPayload = useMemo(() => {
+    const scope = extendScope;
+    const payload = {
+      request_id: extendRequestId,
+      scope,
+      extend_hours: Number(extendHours),
+      reason: extendReason,
+      shadow: Boolean(extendShadow),
+    };
+    if (scope === 'USER_IDS') {
+      payload.user_ids = extendIdsParsed.ids;
+    }
+    return payload;
+  }, [extendScope, extendRequestId, extendHours, extendReason, extendShadow, extendIdsParsed.ids]);
+
+  const notifyPayload = useMemo(() => {
+    const payload = {
+      type: notifyType,
+      user_ids: notifyIdsParsed.ids,
+    };
+    if (notifyVariantId && String(notifyVariantId).trim()) {
+      payload.variant_id = String(notifyVariantId).trim();
+    }
+    return payload;
+  }, [notifyType, notifyVariantId, notifyIdsParsed.ids]);
+
+  const revivePayload = useMemo(() => {
+    return {
+      request_id: reviveRequestId,
+      channel: reviveChannel,
+      invite_code: reviveInviteCode,
+    };
+  }, [reviveRequestId, reviveChannel, reviveInviteCode]);
 
   return (
     <>
@@ -140,20 +218,6 @@ export default function AdminPage() {
                 </button>
               </div>
             </div>
-
-            <div className="mt-4">
-              <label className="block text-xs font-semibold mb-2" style={{ color: TOKENS.textSub }}>
-                (참고) 상태 보기에는 보낼 내용이 없어요
-              </label>
-              <textarea
-                className={`${inputBase} font-mono text-xs`}
-                rows={2}
-                value={statusBodyText}
-                onChange={(e) => setStatusBodyText(e.target.value)}
-                placeholder="상태 보기는 GET이라서 내용(body)이 없어요."
-                readOnly
-              />
-            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6">
@@ -166,44 +230,111 @@ export default function AdminPage() {
                   <p className="mt-1 text-sm" style={{ color: TOKENS.textSub }}>
                     쉽게 말해: “이벤트 시간이 끝나기 전에 조금 더 늘려줄게요” 같은 작업이에요.
                     <br />
-                    먼저 <strong>dry_run: true</strong>로 “미리보기”를 하고, 괜찮으면 <strong>false</strong>로 바꿔서 진짜 실행하세요.
+                    먼저 <strong>미리보기(적용 안 함)</strong>로 확인하고, 괜찮으면 <strong>진짜 실행</strong>을 해주세요.
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className="px-4 py-3 rounded-xl font-bold text-black disabled:opacity-60"
-                    style={{ background: TOKENS.accent1 }}
-                    disabled={!!busyKey}
-                    onClick={() => setExtendBodyText(JSON.stringify({ dry_run: true }, null, 2))}
-                  >
-                    미리보기
-                  </button>
-                  <button
-                    className="px-4 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
-                    disabled={!!busyKey}
-                    onClick={() => setExtendBodyText(JSON.stringify({ dry_run: false }, null, 2))}
-                  >
-                    진짜 실행용
-                  </button>
                 </div>
               </div>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold mb-2">보내는 내용(JSON)</label>
-                <textarea
-                  className={`${inputBase} font-mono text-xs`}
-                  rows={6}
-                  value={extendBodyText}
-                  onChange={(e) => setExtendBodyText(e.target.value)}
-                  placeholder={'예: {\n  "dry_run": true\n}'}
-                />
-                <div className="mt-3 flex justify-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">적용 방식</label>
+                    <select className={selectBase} value={extendScope} onChange={(e) => setExtendScope(e.target.value)}>
+                      <option value="USER_IDS">특정 회원만</option>
+                      <option value="ALL_ACTIVE">전체(진행 중인 회원)</option>
+                    </select>
+                    <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                      “전체”는 많은 사람에게 영향이 갈 수 있어요.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">몇 시간 늘릴까요? (1~72)</label>
+                    <input
+                      className={inputBase}
+                      type="number"
+                      min={1}
+                      max={72}
+                      value={extendHours}
+                      onChange={(e) => setExtendHours(e.target.value)}
+                      placeholder="예: 24"
+                    />
+                    <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                      숫자는 시간 단위예요. 예: 24 = 하루
+                    </p>
+                  </div>
+
+                  {extendScope === 'USER_IDS' && (
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2">대상 회원 번호(여러 명 가능)</label>
+                      <input
+                        className={inputBase}
+                        value={extendUserIdsText}
+                        onChange={(e) => setExtendUserIdsText(e.target.value)}
+                        placeholder={memberId ? `예: ${memberId}` : '예: 1, 2, 3'}
+                      />
+                      <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                        쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 회원 번호(user_id)를 사용해요.
+                      </p>
+                      {!extendIdsParsed.ok ? (
+                        <p className="mt-2 text-xs" style={{ color: '#F97935' }}>
+                          {extendIdsParsed.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">왜 늘리나요?</label>
+                    <select className={selectBase} value={extendReason} onChange={(e) => setExtendReason(e.target.value)}>
+                      <option value="ADMIN">관리자</option>
+                      <option value="OPS">운영</option>
+                      <option value="PROMO">프로모션</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">미리보기(적용 안 함)</label>
+                    <div className="flex items-center gap-3 bg-black/30 border border-white/10 rounded-xl px-4 py-3">
+                      <input
+                        id="extendShadow"
+                        type="checkbox"
+                        checked={extendShadow}
+                        onChange={(e) => setExtendShadow(e.target.checked)}
+                      />
+                      <label htmlFor="extendShadow" className="text-sm" style={{ color: TOKENS.textSub }}>
+                        체크하면 “적용하지 않고 후보만 보여줘요”
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="px-4 py-3 rounded-xl font-bold text-black disabled:opacity-60"
+                      style={{ background: TOKENS.accent1 }}
+                      disabled={!!busyKey}
+                      onClick={() => setExtendRequestId(generateRequestId('extend'))}
+                    >
+                      요청번호 새로 만들기
+                    </button>
+                    <span className="text-xs" style={{ color: TOKENS.textSub }}>
+                      요청번호는 중복 실행을 막는 데 도움돼요.
+                    </span>
+                  </div>
+
                   <button
                     className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
                     disabled={!!busyKey}
                     onClick={() => {
                       try {
-                        const body = parseJsonOrThrow(extendBodyText);
+                        if (!extendRequestId) throw new Error('요청번호가 비어 있어요. “요청번호 새로 만들기”를 눌러주세요.');
+                        const hours = Number(extendHours);
+                        if (!Number.isFinite(hours) || hours < 1 || hours > 72) throw new Error('늘릴 시간은 1~72 사이 숫자여야 해요.');
+                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ok) throw new Error(extendIdsParsed.message);
+                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ids.length) throw new Error('대상 회원 번호가 비어 있어요.');
+                        const body = extendPayload;
                         return callApi('extend-expiry', '/api/vault/extend-expiry/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -217,6 +348,15 @@ export default function AdminPage() {
                     만료 시간 늘리기 실행
                   </button>
                 </div>
+
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
+                    고급: 서버로 보내는 JSON 보기
+                  </summary>
+                  <div className="mt-3">
+                    <textarea className={`${inputBase} font-mono text-xs`} rows={7} value={safeJsonPretty(extendPayload)} readOnly />
+                  </div>
+                </details>
               </div>
             </div>
 
@@ -229,21 +369,60 @@ export default function AdminPage() {
               </p>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold mb-2">보내는 내용(JSON)</label>
-                <textarea
-                  className={`${inputBase} font-mono text-xs`}
-                  rows={6}
-                  value={notifyBodyText}
-                  onChange={(e) => setNotifyBodyText(e.target.value)}
-                  placeholder={'예: {\n  "message": "안내 문구"\n}'}
-                />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">알림 종류</label>
+                    <select className={selectBase} value={notifyType} onChange={(e) => setNotifyType(e.target.value)}>
+                      <option value="EXPIRY_D2">만료 2일 전</option>
+                      <option value="EXPIRY_D0">만료 당일</option>
+                      <option value="ATTENDANCE_D2">출석 2일 차</option>
+                      <option value="TICKET_ZERO">티켓 0개</option>
+                      <option value="SOCIAL_PROOF">인기/후기(표시용)</option>
+                      <option value="REFERRAL_REVIVE">추천 되살리기 안내</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">세부 버전(선택)</label>
+                    <input
+                      className={inputBase}
+                      value={notifyVariantId}
+                      onChange={(e) => setNotifyVariantId(e.target.value)}
+                      placeholder="예: base"
+                    />
+                    <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                      비워도 돼요. 팀에서 정한 값이 있을 때만 넣어요.
+                    </p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold mb-2">대상 회원 번호(여러 명 가능)</label>
+                    <input
+                      className={inputBase}
+                      value={notifyUserIdsText}
+                      onChange={(e) => setNotifyUserIdsText(e.target.value)}
+                      placeholder={memberId ? `예: ${memberId}` : '예: 1, 2, 3'}
+                    />
+                    <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                      쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 회원 번호(user_id)를 사용해요.
+                    </p>
+                    {!notifyIdsParsed.ok ? (
+                      <p className="mt-2 text-xs" style={{ color: '#F97935' }}>
+                        {notifyIdsParsed.message}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
                 <div className="mt-3 flex justify-end">
                   <button
                     className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
                     disabled={!!busyKey}
                     onClick={() => {
                       try {
-                        const body = parseJsonOrThrow(notifyBodyText);
+                        if (!notifyIdsParsed.ok) throw new Error(notifyIdsParsed.message);
+                        if (!notifyIdsParsed.ids.length) throw new Error('대상 회원 번호가 비어 있어요.');
+                        const body = notifyPayload;
                         return callApi('notify', '/api/vault/notify/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -257,6 +436,15 @@ export default function AdminPage() {
                     알림 요청 넣기
                   </button>
                 </div>
+
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
+                    고급: 서버로 보내는 JSON 보기
+                  </summary>
+                  <div className="mt-3">
+                    <textarea className={`${inputBase} font-mono text-xs`} rows={7} value={safeJsonPretty(notifyPayload)} readOnly />
+                  </div>
+                </details>
               </div>
             </div>
 
@@ -269,21 +457,53 @@ export default function AdminPage() {
               </p>
 
               <div className="mt-4">
-                <label className="block text-sm font-semibold mb-2">보내는 내용(JSON)</label>
-                <textarea
-                  className={`${inputBase} font-mono text-xs`}
-                  rows={6}
-                  value={reviveBodyText}
-                  onChange={(e) => setReviveBodyText(e.target.value)}
-                  placeholder={'예: {\n  "reason": "점검"\n}'}
-                />
-                <div className="mt-3 flex justify-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">채널</label>
+                    <input
+                      className={inputBase}
+                      value={reviveChannel}
+                      onChange={(e) => setReviveChannel(e.target.value)}
+                      placeholder="예: TELEGRAM"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-2">초대 코드</label>
+                    <input
+                      className={inputBase}
+                      value={reviveInviteCode}
+                      onChange={(e) => setReviveInviteCode(e.target.value)}
+                      placeholder="예: ABC123"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <button
+                      className="px-4 py-3 rounded-xl font-bold text-black disabled:opacity-60"
+                      style={{ background: TOKENS.accent1 }}
+                      disabled={!!busyKey}
+                      onClick={() => setReviveRequestId(generateRequestId('revive'))}
+                    >
+                      요청번호 새로 만들기
+                    </button>
+                    <span className="text-xs" style={{ color: TOKENS.textSub }}>
+                      요청번호는 중복 실행을 막는 데 도움돼요.
+                    </span>
+                  </div>
+
                   <button
                     className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
                     disabled={!!busyKey}
                     onClick={() => {
                       try {
-                        const body = parseJsonOrThrow(reviveBodyText);
+                        if (!memberId) throw new Error('회원 번호(user_id)를 먼저 적어주세요.');
+                        if (!reviveRequestId) throw new Error('요청번호가 비어 있어요. “요청번호 새로 만들기”를 눌러주세요.');
+                        if (!String(reviveChannel || '').trim()) throw new Error('채널을 적어주세요.');
+                        if (!String(reviveInviteCode || '').trim()) throw new Error('초대 코드를 적어주세요.');
+
+                        const body = revivePayload;
                         return callApi('referral-revive', '/api/vault/referral-revive/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -297,6 +517,15 @@ export default function AdminPage() {
                     추천 상태 되살리기 실행
                   </button>
                 </div>
+
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
+                    고급: 서버로 보내는 JSON 보기
+                  </summary>
+                  <div className="mt-3">
+                    <textarea className={`${inputBase} font-mono text-xs`} rows={7} value={safeJsonPretty(revivePayload)} readOnly />
+                  </div>
+                </details>
               </div>
             </div>
           </div>
