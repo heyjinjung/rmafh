@@ -57,11 +57,82 @@ function tryParseExternalUserIdsText(text) {
   }
 }
 
+function parseCsvDailyImportRows(text) {
+  const rawLines = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n');
+
+  const lines = rawLines
+    .map((l) => String(l).trim())
+    .filter((l) => l && !l.startsWith('#'));
+
+  if (!lines.length) return [];
+
+  const toCells = (line) => line.split(/[\t,;]/).map((c) => c.trim().replace(/^"|"$/g, ''));
+  const headerCells = toCells(lines[0]).map((c) => c.toLowerCase());
+
+  const headerMap = {
+    external_user_id: new Set(['external_user_id', 'external_id', 'id', '아이디', '외부아이디', 'externaluserid']),
+    nickname: new Set(['nickname', 'nick', '닉네임', '별명']),
+    deposit_total: new Set(['deposit_total', 'total_deposit', '누적입금액', '누적입금', '누적입금액(원)']),
+    joined_at: new Set(['joined_at', 'join_date', '가입일', '가입일자']),
+    last_deposit_at: new Set(['last_deposit_at', 'deposit_at', '입금일', '입금일자', '최근입금일']),
+    telegram_ok: new Set(['telegram_ok', 'telegram', '텔레그램', '채널확인', 'telegram_ok 처리', '텔레그램ok']),
+  };
+
+  const findIndex = (keys) => headerCells.findIndex((c) => keys.has(c));
+  const idxExternal = findIndex(headerMap.external_user_id);
+  const hasHeader = idxExternal !== -1;
+
+  const getBool = (v) => {
+    const s = String(v || '').trim().toLowerCase();
+    if (!s) return false;
+    return ['1', 'true', 't', 'yes', 'y', 'ok', 'o', 'ㅇㅇ', '확인', '완료'].includes(s);
+  };
+  const getInt = (v) => {
+    const s = String(v || '').replace(/,/g, '').trim();
+    const digits = s.replace(/[^0-9-]/g, '');
+    const n = Number(digits);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const idxNickname = hasHeader ? findIndex(headerMap.nickname) : 1;
+  const idxDepositTotal = hasHeader ? findIndex(headerMap.deposit_total) : 2;
+  const idxJoinedAt = hasHeader ? findIndex(headerMap.joined_at) : 3;
+  const idxLastDepositAt = hasHeader ? findIndex(headerMap.last_deposit_at) : 4;
+  const idxTelegramOk = hasHeader ? findIndex(headerMap.telegram_ok) : 5;
+
+  const out = [];
+  const seen = new Set();
+  for (let i = 0; i < lines.length; i += 1) {
+    if (i === 0 && hasHeader) continue;
+    const cells = toCells(lines[i]);
+    const ext = String(cells[hasHeader ? idxExternal : 0] || '').trim();
+    if (!ext) continue;
+    if (seen.has(ext)) continue;
+    seen.add(ext);
+
+    out.push({
+      external_user_id: ext,
+      nickname: String(cells[idxNickname] || '').trim() || undefined,
+      deposit_total: getInt(cells[idxDepositTotal]),
+      joined_at: String(cells[idxJoinedAt] || '').trim() || undefined,
+      last_deposit_at: String(cells[idxLastDepositAt] || '').trim() || undefined,
+      telegram_ok: getBool(cells[idxTelegramOk]),
+    });
+  }
+
+  return out;
+}
+
 export default function AdminPage() {
   const [externalUserId, setExternalUserId] = useState('');
+  const [activeSection, setActiveSection] = useState('status');
   const [busyKey, setBusyKey] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [lastCall, setLastCall] = useState(null);
 
   // 만료 연장(extend-expiry) — ExtendExpiryRequest
   const [extendScope, setExtendScope] = useState('USER_IDS');
@@ -81,6 +152,11 @@ export default function AdminPage() {
   const [reviveInviteCode, setReviveInviteCode] = useState('');
   const [reviveRequestId, setReviveRequestId] = useState(() => generateRequestId('revive'));
 
+  // CSV 업로드(일일 업로드: 아이디/닉넴/누적입금/가입일/입금일/텔레그램OK)
+  const [csvName, setCsvName] = useState('');
+  const [csvText, setCsvText] = useState('');
+  const csvDailyRows = useMemo(() => parseCsvDailyImportRows(csvText), [csvText]);
+
   const qs = useMemo(() => {
     const params = new URLSearchParams();
     if (externalUserId) params.set('external_user_id', externalUserId);
@@ -93,6 +169,8 @@ export default function AdminPage() {
     setError(null);
     setResult(null);
     try {
+      const method = (init?.method || 'GET').toUpperCase();
+      setLastCall({ key, method, path: `${path}${qs}`, at: new Date().toISOString() });
       const res = await fetch(`${path}${qs}`, init);
       const ct = res.headers.get('content-type') || '';
       const body = ct.includes('application/json') ? await res.json() : await res.text();
@@ -111,6 +189,14 @@ export default function AdminPage() {
   const cardBase = 'bg-black/70 backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.55)]';
   const inputBase = 'w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/50 outline-none focus:border-white/40';
   const selectBase = `${inputBase} appearance-none`;
+  const buttonBase = 'px-5 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60 disabled:cursor-not-allowed';
+
+  const sectionButtonClass = (id) => {
+    const active = activeSection === id;
+    return `px-4 py-2 rounded-xl border text-sm font-semibold disabled:opacity-60 disabled:cursor-not-allowed ${
+      active ? 'bg-white/20 border-white/30 text-white' : 'bg-white/5 border-white/15 text-white/80 hover:bg-white/10'
+    }`;
+  };
 
   const extendIdsParsed = useMemo(
     () => tryParseExternalUserIdsText(extendUserIdsText || externalUserId),
@@ -155,6 +241,36 @@ export default function AdminPage() {
     };
   }, [reviveRequestId, reviveChannel, reviveInviteCode]);
 
+  const extendValidation = useMemo(() => {
+    const hours = Number(extendHours);
+    if (!extendRequestId) return { ok: false, message: '요청번호가 비어 있어요.' };
+    if (!Number.isFinite(hours) || hours < 1 || hours > 72) return { ok: false, message: '늘릴 시간은 1~72 사이 숫자여야 해요.' };
+    if (extendScope === 'USER_IDS' && !extendIdsParsed.ok) return { ok: false, message: extendIdsParsed.message };
+    if (extendScope === 'USER_IDS' && !extendIdsParsed.ids.length) return { ok: false, message: '대상 외부 아이디가 비어 있어요.' };
+    return { ok: true, message: '' };
+  }, [extendHours, extendRequestId, extendScope, extendIdsParsed.ok, extendIdsParsed.message, extendIdsParsed.ids.length]);
+
+  const notifyValidation = useMemo(() => {
+    if (!notifyIdsParsed.ok) return { ok: false, message: notifyIdsParsed.message };
+    if (!notifyIdsParsed.ids.length) return { ok: false, message: '대상 외부 아이디가 비어 있어요.' };
+    return { ok: true, message: '' };
+  }, [notifyIdsParsed.ok, notifyIdsParsed.message, notifyIdsParsed.ids.length]);
+
+  const reviveValidation = useMemo(() => {
+    if (!externalUserId) return { ok: false, message: '외부 아이디(external_user_id)를 먼저 적어주세요.' };
+    if (!reviveRequestId) return { ok: false, message: '요청번호가 비어 있어요.' };
+    if (!String(reviveChannel || '').trim()) return { ok: false, message: '채널을 적어주세요.' };
+    if (!String(reviveInviteCode || '').trim()) return { ok: false, message: '초대 코드를 적어주세요.' };
+    return { ok: true, message: '' };
+  }, [externalUserId, reviveRequestId, reviveChannel, reviveInviteCode]);
+
+  const csvValidation = useMemo(() => {
+    if (!csvText) return { ok: false, message: 'CSV 파일을 선택해주세요.' };
+    if (!csvDailyRows.length) return { ok: false, message: 'CSV에서 외부 아이디를 하나도 찾지 못했어요.' };
+    if (csvDailyRows.length > 10000) return { ok: false, message: '한 번에 최대 10,000개까지 업로드할 수 있어요.' };
+    return { ok: true, message: '' };
+  }, [csvText, csvDailyRows.length]);
+
   return (
     <>
       <Head>
@@ -183,49 +299,173 @@ export default function AdminPage() {
               <span className="ml-2" style={{ color: TOKENS.accent1 }}>(전용금고)</span>
             </h1>
             <p className="mt-2 text-sm md:text-base" style={{ color: TOKENS.textSub }}>
-              이 페이지는 <strong>확인/점검용</strong>이에요. 버튼을 누르면 서버에 바로 요청이 갑니다.
+              운영자가 빠르게 처리할 수 있게, 필요한 입력만 남긴 간단한 도구예요.
               <br />
-              잘 모르겠으면 먼저 “미리보기(shadow)”부터 눌러주세요.
+              영향이 큰 작업은 먼저 <strong>미리보기(shadow)</strong>로 확인 후 실행하세요.
             </p>
           </div>
 
           <div className={`${cardBase} p-4 md:p-6 mb-6`}>
-            <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
-              <div className="flex-1">
-                <label className="block text-sm font-semibold mb-2" style={{ color: TOKENS.accent1 }}>
-                  외부 아이디( external_user_id )
-                </label>
-                <input
-                  className={inputBase}
-                  value={externalUserId}
-                  onChange={(e) => setExternalUserId(e.target.value)}
-                  placeholder="예: ext-123"
-                />
-                <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
-                  팁: 외부 아이디를 넣으면 그 사람 기준으로 상태를 볼 수 있어요.
-                </p>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
+                <div className="flex-1">
+                  <label className="block text-sm font-semibold mb-2" style={{ color: TOKENS.accent1 }}>
+                    외부 아이디 (external_user_id)
+                  </label>
+                  <input
+                    className={inputBase}
+                    value={externalUserId}
+                    onChange={(e) => setExternalUserId(e.target.value)}
+                    placeholder="예: ext-123"
+                  />
+                  <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                    비워도 동작할 수 있지만, 대부분의 작업은 외부 아이디를 넣는 게 안전해요.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className={buttonBase}
+                    disabled={!!busyKey}
+                    onClick={() => {
+                      setActiveSection('status');
+                      return callApi('status', '/api/vault/status/', { method: 'GET' });
+                    }}
+                  >
+                    상태 조회
+                  </button>
+                  <button
+                    className={buttonBase}
+                    disabled={!!busyKey}
+                    onClick={() => {
+                      setResult(null);
+                      setError(null);
+                      setLastCall(null);
+                    }}
+                  >
+                    결과 초기화
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  className="px-4 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
-                  disabled={!!busyKey}
-                  onClick={() => callApi('status', '/api/vault/status/', { method: 'GET' })}
-                >
-                  상태 보기
-                </button>
-                <button
-                  className="px-4 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
-                  disabled={!!busyKey}
-                  onClick={() => setResult(null) || setError(null)}
-                >
-                  결과 지우기
-                </button>
+
+              <div>
+                <div className="text-xs mb-2" style={{ color: TOKENS.textSub }}>
+                  작업 선택
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button className={sectionButtonClass('status')} disabled={!!busyKey} onClick={() => setActiveSection('status')}>
+                    상태
+                  </button>
+                  <button className={sectionButtonClass('csv')} disabled={!!busyKey} onClick={() => setActiveSection('csv')}>
+                    엑셀 업로드
+                  </button>
+                  <button className={sectionButtonClass('extend')} disabled={!!busyKey} onClick={() => setActiveSection('extend')}>
+                    만료 연장
+                  </button>
+                  <button className={sectionButtonClass('notify')} disabled={!!busyKey} onClick={() => setActiveSection('notify')}>
+                    알림
+                  </button>
+                  <button className={sectionButtonClass('revive')} disabled={!!busyKey} onClick={() => setActiveSection('revive')}>
+                    추천 revive
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            <div className={`${cardBase} p-4 md:p-6`}>
+            {activeSection === 'csv' ? (
+              <div className={`${cardBase} p-4 md:p-6`}>
+              <h2 className="text-lg font-bold" style={{ color: TOKENS.accent1 }}>
+                엑셀/CSV 업로드 (일일 업데이트)
+              </h2>
+              <p className="mt-1 text-sm" style={{ color: TOKENS.textSub }}>
+                매일 엑셀을 업로드해서 <strong>누적입금액</strong> / <strong>텔레그램 OK</strong> 같은 운영 정보를 반영할 수 있어요.
+                <br />
+                반영되는 컬럼(권장): <strong>external_user_id</strong>, nickname, deposit_total(누적), joined_at, last_deposit_at, telegram_ok
+              </p>
+
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2">CSV 파일</label>
+                  <input
+                    className={inputBase}
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={async (e) => {
+                      const f = e.target.files && e.target.files[0];
+                      if (!f) return;
+                      setCsvName(f.name);
+                      const text = await f.text();
+                      setCsvText(text);
+                    }}
+                  />
+                  <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
+                    선택된 파일: {csvName || '없음'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2">읽어온 외부 아이디 개수</label>
+                  <div className="bg-black/50 border border-white/20 rounded-xl px-4 py-3">
+                    <div className="text-xl font-bold" style={{ color: TOKENS.textWhite }}>
+                      {csvDailyRows.length}
+                    </div>
+                    <div className="text-xs" style={{ color: TOKENS.textSub }}>
+                      중복은 자동으로 제거돼요.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
+                  고급: 업로드 데이터 미리보기(앞 20개)
+                </summary>
+                <div className="mt-3">
+                  <textarea
+                    className={`${inputBase} font-mono text-xs`}
+                    rows={7}
+                    value={(csvDailyRows.slice(0, 20) || [])
+                      .map((r) => `${r.external_user_id}\t${r.deposit_total}\t${r.telegram_ok ? 'OK' : 'NO'}`)
+                      .join('\n')}
+                    readOnly
+                  />
+                </div>
+              </details>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  className={buttonBase}
+                  disabled={!!busyKey || !csvValidation.ok}
+                  onClick={() => {
+                    try {
+                      if (!csvValidation.ok) throw new Error(csvValidation.message);
+
+                      setActiveSection('csv');
+                      return callApi('user-daily-import', '/api/vault/user-daily-import/', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ rows: csvDailyRows }),
+                      });
+                    } catch (e) {
+                      setError({ 상태코드: 0, 응답: { message: e?.message || '입력을 확인해주세요.' } });
+                    }
+                  }}
+                >
+                  업로드 반영하기
+                </button>
+              </div>
+
+              {!csvValidation.ok ? (
+                <p className="mt-3 text-xs" style={{ color: TOKENS.accent1 }}>
+                  {csvValidation.message}
+                </p>
+              ) : null}
+            </div>
+            ) : null}
+
+            {activeSection === 'extend' ? (
+              <div className={`${cardBase} p-4 md:p-6`}>
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold" style={{ color: TOKENS.accent1 }}>
@@ -330,15 +570,12 @@ export default function AdminPage() {
 
                   <button
                     className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
-                    disabled={!!busyKey}
+                    disabled={!!busyKey || !extendValidation.ok}
                     onClick={() => {
                       try {
-                        if (!extendRequestId) throw new Error('요청번호가 비어 있어요. “요청번호 새로 만들기”를 눌러주세요.');
-                        const hours = Number(extendHours);
-                        if (!Number.isFinite(hours) || hours < 1 || hours > 72) throw new Error('늘릴 시간은 1~72 사이 숫자여야 해요.');
-                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ok) throw new Error(extendIdsParsed.message);
-                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ids.length) throw new Error('대상 외부 아이디가 비어 있어요.');
+                        if (!extendValidation.ok) throw new Error(extendValidation.message);
                         const body = extendPayload;
+                        setActiveSection('extend');
                         return callApi('extend-expiry', '/api/vault/extend-expiry/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -353,6 +590,12 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {!extendValidation.ok ? (
+                  <p className="mt-3 text-xs" style={{ color: TOKENS.accent1 }}>
+                    {extendValidation.message}
+                  </p>
+                ) : null}
+
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
                     고급: 서버로 보내는 JSON 보기
@@ -363,8 +606,10 @@ export default function AdminPage() {
                 </details>
               </div>
             </div>
+            ) : null}
 
-            <div className={`${cardBase} p-4 md:p-6`}>
+            {activeSection === 'notify' ? (
+              <div className={`${cardBase} p-4 md:p-6`}>
               <h2 className="text-lg font-bold" style={{ color: TOKENS.accent1 }}>
                 알림 보내기(큐에 넣기)
               </h2>
@@ -420,13 +665,13 @@ export default function AdminPage() {
 
                 <div className="mt-3 flex justify-end">
                   <button
-                    className="px-5 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
-                    disabled={!!busyKey}
+                    className={buttonBase}
+                    disabled={!!busyKey || !notifyValidation.ok}
                     onClick={() => {
                       try {
-                        if (!notifyIdsParsed.ok) throw new Error(notifyIdsParsed.message);
-                        if (!notifyIdsParsed.ids.length) throw new Error('대상 외부 아이디가 비어 있어요.');
+                        if (!notifyValidation.ok) throw new Error(notifyValidation.message);
                         const body = notifyPayload;
+                        setActiveSection('notify');
                         return callApi('notify', '/api/vault/notify/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -441,6 +686,12 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {!notifyValidation.ok ? (
+                  <p className="mt-3 text-xs" style={{ color: TOKENS.accent1 }}>
+                    {notifyValidation.message}
+                  </p>
+                ) : null}
+
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
                     고급: 서버로 보내는 JSON 보기
@@ -451,8 +702,10 @@ export default function AdminPage() {
                 </details>
               </div>
             </div>
+            ) : null}
 
-            <div className={`${cardBase} p-4 md:p-6`}>
+            {activeSection === 'revive' ? (
+              <div className={`${cardBase} p-4 md:p-6`}>
               <h2 className="text-lg font-bold" style={{ color: TOKENS.accent1 }}>
                 추천 상태 되살리기
               </h2>
@@ -498,16 +751,14 @@ export default function AdminPage() {
                   </div>
 
                   <button
-                    className="px-5 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
-                    disabled={!!busyKey}
+                    className={buttonBase}
+                    disabled={!!busyKey || !reviveValidation.ok}
                     onClick={() => {
                       try {
-                        if (!externalUserId) throw new Error('외부 아이디(external_user_id)를 먼저 적어주세요.');
-                        if (!reviveRequestId) throw new Error('요청번호가 비어 있어요. “요청번호 새로 만들기”를 눌러주세요.');
-                        if (!String(reviveChannel || '').trim()) throw new Error('채널을 적어주세요.');
-                        if (!String(reviveInviteCode || '').trim()) throw new Error('초대 코드를 적어주세요.');
+                        if (!reviveValidation.ok) throw new Error(reviveValidation.message);
 
                         const body = revivePayload;
+                        setActiveSection('revive');
                         return callApi('referral-revive', '/api/vault/referral-revive/', {
                           method: 'POST',
                           headers: { 'content-type': 'application/json' },
@@ -522,6 +773,12 @@ export default function AdminPage() {
                   </button>
                 </div>
 
+                {!reviveValidation.ok ? (
+                  <p className="mt-3 text-xs" style={{ color: TOKENS.accent1 }}>
+                    {reviveValidation.message}
+                  </p>
+                ) : null}
+
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm" style={{ color: TOKENS.textSub }}>
                     고급: 서버로 보내는 JSON 보기
@@ -532,6 +789,7 @@ export default function AdminPage() {
                 </details>
               </div>
             </div>
+            ) : null}
           </div>
 
           {busyKey ? (
@@ -550,6 +808,13 @@ export default function AdminPage() {
                   (응답이 길면 스크롤로 내려서 볼 수 있어요)
                 </span>
               </div>
+
+              {lastCall ? (
+                <div className="mt-3 text-xs" style={{ color: TOKENS.textSub }}>
+                  마지막 요청: <span style={{ color: TOKENS.textWhite }}>{lastCall.method}</span>{' '}
+                  <span style={{ color: TOKENS.textWhite }}>{lastCall.path}</span>
+                </div>
+              ) : null}
 
               {error ? (
                 <div className="mt-4 bg-black/30 border border-white/10 rounded-xl p-4">

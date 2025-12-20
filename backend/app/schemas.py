@@ -70,3 +70,34 @@ class CompensationEnqueueRequest(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+
+
+class UserIdentityBulkRequest(BaseModel):
+    external_user_ids: List[str]
+
+
+class UserIdentityBulkResponse(BaseModel):
+    total: int
+    created: int
+    resolved: int
+    mappings: dict[str, int]
+
+
+class DailyUserImportRow(BaseModel):
+    external_user_id: str
+    nickname: Optional[str] = None
+    joined_at: Optional[str] = None
+    deposit_total: int = 0
+    last_deposit_at: Optional[str] = None
+    telegram_ok: bool = False
+
+
+class DailyUserImportRequest(BaseModel):
+    rows: List[DailyUserImportRow]
+
+
+class DailyUserImportResponse(BaseModel):
+    total: int
+    processed: int
+    identity_created: int
+    vault_rows_updated: int

@@ -5,7 +5,7 @@
 - FE/BE/Worker/DB가 분리된 구조에서, “전역 동기화(특히 타이머/만료)”를 안전하게 확인/운영
 
 ## 접근 경로
-- 어드민 페이지: `/admin` (Next.js 페이지)
+- 어드민 페이지: `/admin/` (Next.js 페이지)
 - 프록시 API: `/api/vault/*` (Next API Routes → FastAPI로 upstream 전달)
 
 ## 실행 순서(권장)
@@ -30,8 +30,28 @@
   - `external_user_id` 입력값을 쿼리스트링으로 전달: `?external_user_id=...`
   - 버튼들은 Next API Routes를 호출
 
+### 화면 구성(간단)
+- 상단에서 `external_user_id`를 입력하고 “작업 선택”에서 필요한 작업만 골라서 실행해요.
+- 선택한 작업만 화면에 보여서(나머지는 숨김) 복잡함을 줄였어요.
+
 ## 어드민 사용법(쉬운 입력 폼)
 어드민은 “JSON을 직접 쓰는 방식”이 아니라, 체크박스/숫자/드롭다운/목록 입력으로 요청 내용을 만들어요.
+
+### 0) 엑셀/CSV 업로드(일일 업데이트)
+- 매일 엑셀을 업로드해서 아래 정보를 한 번에 반영해요.
+  - `external_user_id`(필수)
+  - `nickname`(선택)
+  - `deposit_total`(필수, 누적입금액)
+  - `joined_at`(선택, 가입일)
+  - `last_deposit_at`(선택, 입금일)
+  - `telegram_ok`(필수, 텔레그램 OK 여부)
+- 업로드하면 서버가 내부적으로:
+  - `user_identity` 매핑을 자동 생성/해결하고
+  - `vault_status`에 누적입금/텔레그램 조건을 반영해요
+
+#### 조건 반영(현재 구현)
+- `telegram_ok=true`이면 GOLD가 `LOCKED → UNLOCKED`로 전이될 수 있어요.
+- `deposit_total >= 500000`이면 DIAMOND가 `LOCKED → UNLOCKED`로 전이될 수 있어요.
 
 ### 1) 상태 조회(Status)
 - “외부 아이디(external_user_id)”를 입력한 뒤 “상태 조회”를 누르면 `/api/vault/status/`를 호출해요.
@@ -81,6 +101,9 @@
 
 ## 안전 운영 체크
 - 운영 작업은 항상 `shadow`(미리보기)로 결과 확인 후 실제 실행
+- 외부 아이디로 작업할 때 `EXTERNAL_USER_NOT_FOUND` / `EXTERNAL_USER_IDS_NOT_FOUND`가 나오면:
+  - 운영 DB에는 외부 아이디 매핑(user_identity)이 아직 없다는 뜻이에요.
+  - 로컬/데모 환경에서는 해당 외부 아이디로 한 번 “상태 보기”를 하면(조회 경로) 매핑이 자동 생성될 수 있어요.
 - 응답이 4xx/5xx인 경우:
   - 어드민 UI의 Error 블록에서 `status`/`body` 확인
   - API 컨테이너 로그 확인: `docker compose logs -f api`

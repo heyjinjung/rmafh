@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from psycopg2.extras import Json
+from psycopg2.extras import execute_values
 
 from app import config, db
 from app.schemas import (
@@ -20,6 +21,10 @@ from app.schemas import (
     NotifyResponse,
     ReferralReviveRequest,
     ReferralReviveResponse,
+    UserIdentityBulkRequest,
+    UserIdentityBulkResponse,
+    DailyUserImportRequest,
+    DailyUserImportResponse,
 )
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
@@ -253,6 +258,189 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _parse_bool(value) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, bool):
+        return value
+    s = str(value).strip().lower()
+    if not s:
+        return False
+    return s in {"1", "true", "t", "yes", "y", "ok", "o", "ㅇㅇ", "확인", "완료"}
+
+
+def _parse_int(value, default: int = 0) -> int:
+    if value is None:
+        return default
+    if isinstance(value, int):
+        return value
+    s = str(value).strip()
+    if not s:
+        return default
+    # Allow numbers like "500,000"
+    s = s.replace(",", "")
+    digits = "".join(ch for ch in s if ch.isdigit() or ch == "-")
+    if not digits or digits == "-":
+        return default
+    try:
+        return int(digits)
+    except ValueError:
+        return default
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    s = str(value or "").strip()
+    if not s:
+        return None
+    try:
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        # date-only
+        if len(s) == 10 and s[4] == "-" and s[7] == "-":
+            d = datetime.fromisoformat(s)
+            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _parse_joined_date(value: str | None):
+    dt = _parse_iso_datetime(value)
+    if dt is None:
+        return None
+    return dt.date()
+
+
+@app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
+async def user_daily_import(body: DailyUserImportRequest):
+    """일일 엑셀/CSV 업로드 데이터로 운영 스냅샷 + 조건을 갱신.
+
+    입력(권장): external_user_id, nickname, deposit_total(누적), joined_at, last_deposit_at, telegram_ok
+
+    반영:
+    - user_identity: external_user_id → user_id 매핑 생성/해결
+    - user_admin_snapshot: 업로드된 운영 컬럼 업서트
+    - vault_status:
+      - diamond_deposit_current = deposit_total
+      - gold_status: LOCKED → UNLOCKED (telegram_ok=true)
+      - diamond_status: LOCKED → UNLOCKED (deposit_total>=500000)
+    """
+    rows = body.rows or []
+    if not rows:
+        raise HTTPException(status_code=400, detail="EMPTY_ROWS")
+    if len(rows) > 10000:
+        raise HTTPException(status_code=400, detail="TOO_MANY_ROWS")
+
+    cleaned_rows = []
+    external_ids = []
+    seen = set()
+    for r in rows:
+        ext = _normalize_external_user_id(getattr(r, "external_user_id", None))
+        if not ext:
+            continue
+        if ext in seen:
+            continue
+        seen.add(ext)
+        external_ids.append(ext)
+        cleaned_rows.append(r)
+
+    if not external_ids:
+        raise HTTPException(status_code=400, detail="EMPTY_EXTERNAL_USER_IDS")
+
+    now = _now()
+    default_expires = now + timedelta(hours=72)
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
+        identity_created = int(mapping.pop("__created_count__", 0))
+
+        snapshot_values = []
+        vault_update_values = []
+
+        for r in cleaned_rows:
+            ext = _normalize_external_user_id(getattr(r, "external_user_id", None))
+            if not ext:
+                continue
+            user_id = int(mapping[ext])
+            nickname = str(getattr(r, "nickname", "") or "").strip() or None
+            joined_date = _parse_joined_date(getattr(r, "joined_at", None))
+            deposit_total = max(0, _parse_int(getattr(r, "deposit_total", 0), default=0))
+            last_deposit_at = _parse_iso_datetime(getattr(r, "last_deposit_at", None))
+            telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
+
+            snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok))
+            vault_update_values.append((user_id, deposit_total, telegram_ok))
+
+        if not snapshot_values:
+            raise HTTPException(status_code=400, detail="NO_VALID_ROWS")
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO user_admin_snapshot
+                (user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, updated_at)
+            VALUES %s
+            ON CONFLICT (user_id) DO UPDATE
+               SET nickname=EXCLUDED.nickname,
+                   joined_date=EXCLUDED.joined_date,
+                   deposit_total=EXCLUDED.deposit_total,
+                   last_deposit_at=EXCLUDED.last_deposit_at,
+                   telegram_ok=EXCLUDED.telegram_ok,
+                   updated_at=NOW()
+            """,
+            snapshot_values,
+            template="(%s,%s,%s,%s,%s,%s,NOW())",
+        )
+
+        # Ensure baseline rows exist
+        ensure_values = [(int(user_id), default_expires) for user_id, _, _, _, _, _ in snapshot_values]
+        execute_values(
+            cur,
+            """
+            INSERT INTO vault_status (user_id, expires_at)
+            VALUES %s
+            ON CONFLICT (user_id) DO NOTHING
+            """,
+            ensure_values,
+            template="(%s,%s)",
+        )
+
+        execute_values(
+            cur,
+            """
+            UPDATE vault_status AS vs
+               SET diamond_deposit_current = v.deposit_total,
+                   gold_status = CASE
+                                  WHEN vs.gold_status='LOCKED' AND v.telegram_ok THEN 'UNLOCKED'
+                                  ELSE vs.gold_status
+                                END,
+                   diamond_status = CASE
+                                     WHEN vs.diamond_status='LOCKED' AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                                     ELSE vs.diamond_status
+                                   END,
+                   updated_at = NOW()
+              FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok)
+             WHERE vs.user_id = v.user_id
+            """,
+            vault_update_values,
+            template="(%s,%s,%s)",
+        )
+        vault_rows_updated = int(cur.rowcount or 0)
+
+        conn.commit()
+
+    return DailyUserImportResponse(
+        total=len(rows),
+        processed=len(snapshot_values),
+        identity_created=identity_created,
+        vault_rows_updated=vault_rows_updated,
+    )
+
+
 def _normalize_external_user_id(value: str | None) -> str | None:
     if value is None:
         return None
@@ -337,6 +525,69 @@ def _resolve_user_ids_by_external_user_ids(cur, external_user_ids: list[str]) ->
     return [mapping[ext] for ext in cleaned]
 
 
+def _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_user_ids: list[str]) -> dict[str, int]:
+    cleaned = [str(v).strip() for v in (external_user_ids or []) if str(v).strip()]
+    if not cleaned:
+        return {}
+
+    # Insert missing mappings (idempotent)
+    cur.execute(
+        """
+        INSERT INTO user_identity (external_user_id)
+        SELECT DISTINCT x
+          FROM unnest(%s::text[]) AS x
+         WHERE x IS NOT NULL AND btrim(x) <> ''
+        ON CONFLICT (external_user_id) DO NOTHING
+        """,
+        (cleaned,),
+    )
+    created = int(cur.rowcount or 0)
+
+    cur.execute(
+        """
+        SELECT external_user_id, user_id
+          FROM user_identity
+         WHERE external_user_id = ANY(%s)
+        """,
+        (cleaned,),
+    )
+    rows = cur.fetchall() or []
+    mapping = {str(ext): int(uid) for ext, uid in rows}
+
+    missing = [ext for ext in cleaned if ext not in mapping]
+    if missing:
+        raise HTTPException(status_code=500, detail="IDENTITY_BULK_RESOLVE_FAILED")
+
+    mapping["__created_count__"] = created
+    return mapping
+
+
+@app.post("/api/vault/user-identity/bulk", response_model=UserIdentityBulkResponse)
+async def user_identity_bulk(body: UserIdentityBulkRequest):
+    """외부 아이디 목록을 user_identity에 일괄 등록/해결.
+
+    - 입력: external_user_ids (CSV 업로드 결과)
+    - 동작: 없으면 생성, 있으면 그대로 사용 (멱등)
+    """
+    cleaned = [str(v).strip() for v in (body.external_user_ids or []) if str(v).strip()]
+    cleaned = cleaned[:10000]
+    if not cleaned:
+        raise HTTPException(status_code=400, detail="EMPTY_EXTERNAL_USER_IDS")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, cleaned)
+        created = int(mapping.pop("__created_count__", 0))
+        conn.commit()
+
+    return UserIdentityBulkResponse(
+        total=len(cleaned),
+        created=created,
+        resolved=len(mapping),
+        mappings=mapping,
+    )
+
+
 def _ensure_schema():
     """Best-effort schema bootstrap for local/dev.
 
@@ -377,6 +628,27 @@ def _ensure_schema():
             );
             """
         )
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_admin_snapshot (
+                user_id INTEGER PRIMARY KEY,
+                nickname TEXT,
+                joined_date DATE,
+                deposit_total BIGINT NOT NULL DEFAULT 0,
+                last_deposit_at TIMESTAMPTZ,
+                telegram_ok BOOLEAN NOT NULL DEFAULT FALSE,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS nickname TEXT")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS joined_date DATE")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS deposit_total BIGINT NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS last_deposit_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS telegram_ok BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
 
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
