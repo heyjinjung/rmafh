@@ -2,6 +2,23 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 
+class ClaimRequest(BaseModel):
+    vault_type: str = Field(..., description="GOLD | PLATINUM | DIAMOND")
+
+
+class ClaimResponse(BaseModel):
+    claimed: bool
+    vault_type: str
+    now: str
+    expires_at: str
+
+
+class AttendanceResponse(BaseModel):
+    platinum_attendance_days: int
+    now: str
+    expires_at: str
+
+
 class ReferralReviveRequest(BaseModel):
     request_id: str = Field(..., description="멱등키")
     channel: str

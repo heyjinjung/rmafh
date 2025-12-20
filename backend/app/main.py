@@ -9,6 +9,9 @@ from psycopg2.extras import Json
 
 from app import config, db
 from app.schemas import (
+    AttendanceResponse,
+    ClaimRequest,
+    ClaimResponse,
     CompensationEnqueueRequest,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
@@ -34,6 +37,7 @@ app.add_middleware(
 @app.on_event("startup")
 def _startup():
     db.init_pool()
+    _ensure_schema()
 
 
 @app.on_event("shutdown")
@@ -61,7 +65,10 @@ async def vault_status(user_id: int = 1):
             SELECT expires_at,
                    gold_status,
                    platinum_status,
-                   diamond_status
+                   diamond_status,
+                   platinum_attendance_days,
+                   platinum_deposit_done,
+                   diamond_deposit_current
               FROM vault_status
              WHERE user_id=%s
             """,
@@ -75,10 +82,9 @@ async def vault_status(user_id: int = 1):
     platinum_status = row[2] if row else "LOCKED"
     diamond_status = row[3] if row else "LOCKED"
 
-    # Demo progress; in a real impl, replace with aggregates
-    platinum_attendance_days = 1
-    platinum_deposit_done = False
-    diamond_deposit_current = 120000
+    platinum_attendance_days = int(row[4]) if row and row[4] is not None else 0
+    platinum_deposit_done = bool(row[5]) if row and row[5] is not None else False
+    diamond_deposit_current = int(row[6]) if row and row[6] is not None else 0
 
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
@@ -101,8 +107,247 @@ async def vault_status(user_id: int = 1):
     }
 
 
+@app.post("/api/vault/claim", response_model=ClaimResponse)
+async def claim_vault(body: ClaimRequest, user_id: int = 1):
+    vault_type = body.vault_type.upper()
+    if vault_type not in {"GOLD", "PLATINUM", "DIAMOND"}:
+        raise HTTPException(status_code=400, detail="INVALID_VAULT_TYPE")
+
+    now = _now()
+    status_col = f"{vault_type.lower()}_status"
+    claimed_at_col = f"{vault_type.lower()}_claimed_at"
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT expires_at, gold_status, platinum_status, diamond_status
+              FROM vault_status
+             WHERE user_id=%s
+             FOR UPDATE
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+
+        if not row:
+            # Create a baseline row for demo user.
+            expires_at = now + timedelta(hours=72)
+            cur.execute(
+                """
+                INSERT INTO vault_status
+                    (user_id, expires_at, gold_status, platinum_status, diamond_status)
+                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+                ON CONFLICT (user_id) DO NOTHING
+                """,
+                (user_id, expires_at),
+            )
+            cur.execute(
+                """
+                SELECT expires_at, gold_status, platinum_status, diamond_status
+                  FROM vault_status
+                 WHERE user_id=%s
+                 FOR UPDATE
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+
+        expires_at, gold_status, platinum_status, diamond_status = row
+        current_status = {
+            "GOLD": gold_status,
+            "PLATINUM": platinum_status,
+            "DIAMOND": diamond_status,
+        }[vault_type]
+
+        if current_status == "CLAIMED":
+            raise HTTPException(status_code=409, detail="ALREADY_CLAIMED")
+        if current_status != "UNLOCKED":
+            raise HTTPException(status_code=403, detail="NOT_CLAIMABLE")
+
+        cur.execute(
+            f"""
+            UPDATE vault_status
+               SET {status_col}='CLAIMED',
+                   {claimed_at_col}=%s,
+                   updated_at=NOW()
+             WHERE user_id=%s
+            """,
+            (now, user_id),
+        )
+        conn.commit()
+
+    return ClaimResponse(claimed=True, vault_type=vault_type, now=now.isoformat(), expires_at=expires_at.isoformat())
+
+
+@app.post("/api/vault/attendance", response_model=AttendanceResponse)
+async def attendance(user_id: int = 1):
+    now = _now()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
+              FROM vault_status
+             WHERE user_id=%s
+             FOR UPDATE
+            """,
+            (user_id,),
+        )
+        row = cur.fetchone()
+
+        if not row:
+            expires_at = now + timedelta(hours=72)
+            cur.execute(
+                """
+                INSERT INTO vault_status
+                    (user_id, expires_at, gold_status, platinum_status, diamond_status, platinum_attendance_days, platinum_deposit_done, last_attended_at)
+                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED', 0, false, NULL)
+                ON CONFLICT (user_id) DO NOTHING
+                """,
+                (user_id, expires_at),
+            )
+            cur.execute(
+                """
+                SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
+                  FROM vault_status
+                 WHERE user_id=%s
+                 FOR UPDATE
+                """,
+                (user_id,),
+            )
+            row = cur.fetchone()
+
+        expires_at, days, last_attended_at, deposit_done, platinum_status = row
+        days = int(days or 0)
+        deposit_done = bool(deposit_done)
+
+        if last_attended_at is not None and last_attended_at.date() == now.date():
+            raise HTTPException(status_code=409, detail="ALREADY_ATTENDED")
+
+        new_days = min(3, days + 1)
+        new_platinum_status = platinum_status
+        if new_days >= 3 and deposit_done and platinum_status == "LOCKED":
+            new_platinum_status = "UNLOCKED"
+
+        cur.execute(
+            """
+            UPDATE vault_status
+               SET platinum_attendance_days=%s,
+                   last_attended_at=%s,
+                   platinum_status=%s,
+                   updated_at=NOW()
+             WHERE user_id=%s
+            """,
+            (new_days, now, new_platinum_status, user_id),
+        )
+        conn.commit()
+
+    return AttendanceResponse(platinum_attendance_days=new_days, now=now.isoformat(), expires_at=expires_at.isoformat())
+
+
 def _now():
     return datetime.now(timezone.utc)
+
+
+def _ensure_schema():
+    """Best-effort schema bootstrap for local/dev.
+
+    Keeps API endpoints usable even if migrations were not applied.
+    """
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vault_status (
+                user_id INTEGER PRIMARY KEY,
+                expires_at TIMESTAMPTZ NOT NULL,
+                gold_status TEXT NOT NULL DEFAULT 'LOCKED',
+                platinum_status TEXT NOT NULL DEFAULT 'LOCKED',
+                diamond_status TEXT NOT NULL DEFAULT 'LOCKED',
+                expiry_extend_count INTEGER NOT NULL DEFAULT 0,
+                last_extension_reason TEXT,
+                last_extension_at TIMESTAMPTZ,
+                gold_claimed_at TIMESTAMPTZ,
+                platinum_claimed_at TIMESTAMPTZ,
+                diamond_claimed_at TIMESTAMPTZ,
+                platinum_attendance_days INTEGER NOT NULL DEFAULT 0,
+                platinum_deposit_done BOOLEAN NOT NULL DEFAULT FALSE,
+                diamond_deposit_current INTEGER NOT NULL DEFAULT 0,
+                last_attended_at TIMESTAMPTZ,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+
+        # Backward compatible adds if the table already exists with older schema.
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_reason TEXT")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_claimed_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_claimed_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_claimed_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_attendance_days INTEGER NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_deposit_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_deposit_current INTEGER NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_attended_at TIMESTAMPTZ")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS vault_expiry_extension_log (
+                id BIGSERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                prev_expires_at TIMESTAMPTZ,
+                new_expires_at TIMESTAMPTZ,
+                reason TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                shadow BOOLEAN NOT NULL DEFAULT FALSE,
+                metadata JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_vault_expiry_extension_log_request_id ON vault_expiry_extension_log (request_id)")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notifications_queue (
+                id BIGSERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                vault_type TEXT,
+                variant_id TEXT,
+                dedup_key TEXT NOT NULL,
+                payload JSONB,
+                scheduled_at TIMESTAMPTZ,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_notifications_queue_dedup_key ON notifications_queue (dedup_key)")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS compensation_queue (
+                id BIGSERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                vault_type TEXT NOT NULL,
+                request_id TEXT NOT NULL,
+                external_service TEXT NOT NULL,
+                payload JSONB,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                next_retry_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_compensation_queue_req_ext ON compensation_queue (request_id, external_service)")
+
+        conn.commit()
 
 
 @app.post("/api/vault/referral-revive", response_model=ReferralReviveResponse)

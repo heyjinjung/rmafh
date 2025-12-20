@@ -1,24 +1,36 @@
-export default function handler(_req, res) {
-  const now = new Date();
-  const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000); // +3 days
-  const remainingMs = Math.max(0, expiresAt.getTime() - now.getTime());
+function getBaseUrl(req) {
+  // Docker(서버 사이드): http://api:8000
+  // 로컬(브라우저): 프록시를 통해서만 접근하므로 여기서는 서버에서 호출 가능해야 함
+  return process.env.NEXT_PUBLIC_API_BASE || process.env.API_BASE || 'http://localhost:18000';
+}
 
-  const payload = {
-    gold_status: 'UNLOCKED',
-    platinum_status: 'LOCKED',
-    diamond_status: 'LOCKED',
-    platinum_attendance_days: 1,
-    platinum_deposit_done: false,
-    diamond_deposit_current: 120000,
-    expires_at: expiresAt.toISOString(),
-    now: now.toISOString(),
-    loss_total: 130000,
-    loss_breakdown: { GOLD: 10000, PLATINUM: 30000, DIAMOND: 100000, BONUS: 0 },
-    ms_countdown: { enabled: remainingMs < 60 * 60 * 1000, remaining_ms: remainingMs },
-    referral_revive_available: true,
-    social_proof: { vault_type: 'PLATINUM', claimed_last_24h: 4231 },
-    curation_tier: 'PLATINUM_BIASED',
-  };
 
-  res.status(200).json(payload);
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method Not Allowed' } });
+  }
+
+  try {
+    const base = getBaseUrl(req);
+    const upstream = await fetch(`${base}/api/vault/status`, {
+      method: 'GET',
+      headers: {
+        accept: 'application/json',
+      },
+    });
+
+    const contentType = upstream.headers.get('content-type') || '';
+    const body = contentType.includes('application/json') ? await upstream.json() : await upstream.text();
+
+    res.status(upstream.status);
+    if (typeof body === 'string') {
+      return res.send(body);
+    }
+    return res.json(body);
+  } catch (e) {
+    return res.status(502).json({
+      error: { code: 'UPSTREAM_ERROR', message: e?.message || 'Upstream request failed' },
+    });
+  }
 }
