@@ -1,3 +1,6 @@
+## 변경 이력(Changelog)
+- 2025-12-20: `98-497`(Desktop code layer) 메타데이터를 추가로 확인했고, 해당 노드가 현재 MCP 컨텍스트 기준으로는 비어있는 컨테이너(placeholder)임을 명시했습니다.
+
 이 1개의 디자인을 Figma에서 구현하세요. [모든 뷰포트용 레이아웃]
 @https://www.figma.com/design/vTESGchw1bzOuJp8SRMmQq/%EC%94%A8%EC%94%A8001?node-id=64-388&m=dev
 
@@ -26,6 +29,12 @@
 @https://www.figma.com/design/vTESGchw1bzOuJp8SRMmQq/%EC%94%A8%EC%94%A8001?node-id=64-361&m=dev
 
 
+추가 참고(메인 메타데이터로 전달된 노드)
+- Desktop Code layer(메타데이터):
+	- @https://www.figma.com/design/vTESGchw1bzOuJp8SRMmQq/%EC%94%A8%EC%94%A8001?node-id=98-497&m=dev
+	- 현재 MCP `get_design_context` 기준으로는 `overflow-x-hidden size-full` 컨테이너만 반환되어(실내용 UI 없음) “완전체/메인/사이드바/푸터” 구현 기준으로는 `64:*` 노드들을 우선 사용해야 합니다.
+
+
 프론트는 완전히 이렇게 진행할건데
 1) 피그마 MCP활용할것
 1-1) 먼저 본 소스와 내용을 문서화 할것 
@@ -33,7 +42,8 @@
 2) 우리 백앤드 개발요소에 맞추어 본 프론트앤드 디자인을 변경할것
 3)  즉 API/스키마/테이블은 우리 백앤드를 활용할것
 4) 기타 디자인 에 필요한 스택은 현재 구현된 피그마의 기준을 따를 것 
-
+즉 컬러/컨셉/스타일/컴포넌트/css 값 / 애니메이션/레이아웃/ 라인/ 폰트 모두 다 피그마의 디자인을 따를것
+5) 기존 작성되었던 어드민페이지의 디자인과 중복되지 않게 할것
 
 Figma 접근: MCP로 연동 가능한지, 토큰/파일 접근 권한을 알려주세요.
 ㄴ 니가 현재 상태 알아봐봐

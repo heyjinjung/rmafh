@@ -23,9 +23,6 @@ export default function Home() {
     <>
       <Head>
         <title>CC Casino - 신규회원 전용금고</title>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
       </Head>
 
       <div style={styles.page} className="page">

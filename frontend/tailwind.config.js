@@ -7,6 +7,11 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // CC Casino (Figma) primitives
+        cc: {
+          accent2: '#282D1A',
+          textSub: '#CBCBCB',
+        },
         // Gold tier
         gold: {
           primary: '#D2FD9C',
@@ -36,6 +41,8 @@ module.exports = {
       },
       fontFamily: {
         sans: ['Noto Sans KR', 'sans-serif'],
+        ibm: ['IBM Plex Sans', 'sans-serif'],
+        ibmKr: ['IBM Plex Sans KR', 'sans-serif'],
       },
       animation: {
         shimmer: 'shimmer 2s linear infinite',
