@@ -36,3 +36,4 @@
 - figma:react import 오류: VS Code 확장 업데이트 또는 재설치
 - 폰트 불일치: 웹폰트 로드 시점을 `document.head` 삽입 또는 CSS @import로 선행
 - 성능: drop-shadow/blur가 과하면 퍼포먼스 저하 → box-shadow 대체 검토
+
