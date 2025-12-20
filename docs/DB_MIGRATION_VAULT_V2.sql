@@ -1,6 +1,13 @@
 -- Vault v2.0 DB migration (PostgreSQL dialect)
 -- Run in a transaction per section where possible.
 
+-- A) user_identity (external_user_id -> internal user_id mapping)
+CREATE TABLE IF NOT EXISTS user_identity (
+  user_id BIGSERIAL PRIMARY KEY,
+  external_user_id TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- 0) Baseline vault_status (for fresh environments)
 CREATE TABLE IF NOT EXISTS vault_status (
   user_id BIGINT PRIMARY KEY,

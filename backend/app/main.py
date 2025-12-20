@@ -51,7 +51,7 @@ async def health():
 
 
 @app.get("/api/vault/status")
-async def vault_status(user_id: int = 1):
+async def vault_status(user_id: int | None = None, external_user_id: str | None = None):
     """Return vault status snapshot for the given user (default demo user).
 
     This mirrors the FE contract in docs/API_SPEC_VAULT_V2.md and uses
@@ -60,6 +60,7 @@ async def vault_status(user_id: int = 1):
     now = _now()
     with db.get_conn() as conn:
         cur = conn.cursor()
+        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
         cur.execute(
             """
             SELECT expires_at,
@@ -108,7 +109,7 @@ async def vault_status(user_id: int = 1):
 
 
 @app.post("/api/vault/claim", response_model=ClaimResponse)
-async def claim_vault(body: ClaimRequest, user_id: int = 1):
+async def claim_vault(body: ClaimRequest, user_id: int | None = None, external_user_id: str | None = None):
     vault_type = body.vault_type.upper()
     if vault_type not in {"GOLD", "PLATINUM", "DIAMOND"}:
         raise HTTPException(status_code=400, detail="INVALID_VAULT_TYPE")
@@ -119,6 +120,7 @@ async def claim_vault(body: ClaimRequest, user_id: int = 1):
 
     with db.get_conn() as conn:
         cur = conn.cursor()
+        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
         cur.execute(
             """
             SELECT expires_at, gold_status, platinum_status, diamond_status
@@ -181,10 +183,11 @@ async def claim_vault(body: ClaimRequest, user_id: int = 1):
 
 
 @app.post("/api/vault/attendance", response_model=AttendanceResponse)
-async def attendance(user_id: int = 1):
+async def attendance(user_id: int | None = None, external_user_id: str | None = None):
     now = _now()
     with db.get_conn() as conn:
         cur = conn.cursor()
+        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
         cur.execute(
             """
             SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
@@ -250,6 +253,90 @@ def _now():
     return datetime.now(timezone.utc)
 
 
+def _normalize_external_user_id(value: str | None) -> str | None:
+    if value is None:
+        return None
+    v = str(value).strip()
+    return v or None
+
+
+def _get_user_id_by_external_user_id(cur, external_user_id: str) -> int | None:
+    cur.execute(
+        """
+        SELECT user_id
+          FROM user_identity
+         WHERE external_user_id=%s
+        """,
+        (external_user_id,),
+    )
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+def _get_or_create_user_id_by_external_user_id(cur, external_user_id: str) -> int:
+    cur.execute(
+        """
+        INSERT INTO user_identity (external_user_id)
+        VALUES (%s)
+        ON CONFLICT (external_user_id) DO NOTHING
+        RETURNING user_id
+        """,
+        (external_user_id,),
+    )
+    row = cur.fetchone()
+    if row:
+        return int(row[0])
+    user_id = _get_user_id_by_external_user_id(cur, external_user_id)
+    if user_id is None:
+        raise RuntimeError("failed to resolve user_id for external_user_id")
+    return user_id
+
+
+def _resolve_user_id(
+    cur,
+    *,
+    user_id: int | None,
+    external_user_id: str | None,
+    default_user_id: int | None,
+    create_if_missing: bool,
+) -> int:
+    ext = _normalize_external_user_id(external_user_id)
+    if ext:
+        if create_if_missing:
+            return _get_or_create_user_id_by_external_user_id(cur, ext)
+        resolved = _get_user_id_by_external_user_id(cur, ext)
+        if resolved is None:
+            raise HTTPException(status_code=404, detail="EXTERNAL_USER_NOT_FOUND")
+        return resolved
+
+    if user_id is not None:
+        return int(user_id)
+    if default_user_id is None:
+        raise HTTPException(status_code=400, detail="USER_REQUIRED")
+    return int(default_user_id)
+
+
+def _resolve_user_ids_by_external_user_ids(cur, external_user_ids: list[str]) -> list[int]:
+    cleaned = [str(v).strip() for v in (external_user_ids or []) if str(v).strip()]
+    if not cleaned:
+        return []
+
+    cur.execute(
+        """
+        SELECT external_user_id, user_id
+          FROM user_identity
+         WHERE external_user_id = ANY(%s)
+        """,
+        (cleaned,),
+    )
+    rows = cur.fetchall() or []
+    mapping = {str(ext): int(uid) for ext, uid in rows}
+    missing = [ext for ext in cleaned if ext not in mapping]
+    if missing:
+        raise HTTPException(status_code=404, detail="EXTERNAL_USER_IDS_NOT_FOUND")
+    return [mapping[ext] for ext in cleaned]
+
+
 def _ensure_schema():
     """Best-effort schema bootstrap for local/dev.
 
@@ -257,6 +344,16 @@ def _ensure_schema():
     """
     with db.get_conn() as conn:
         cur = conn.cursor()
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_identity (
+                user_id BIGSERIAL PRIMARY KEY,
+                external_user_id TEXT NOT NULL UNIQUE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
 
         cur.execute(
             """
@@ -351,10 +448,11 @@ def _ensure_schema():
 
 
 @app.post("/api/vault/referral-revive", response_model=ReferralReviveResponse)
-async def referral_revive(body: ReferralReviveRequest, user_id: int):
+async def referral_revive(body: ReferralReviveRequest, user_id: int | None = None, external_user_id: str | None = None):
     """만료 D-1 구간에서 24h 연장 (1회 제한)."""
     with db.get_conn() as conn:
         cur = conn.cursor()
+        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=None, create_if_missing=True)
         cur.execute(
             """
             SELECT expires_at, expiry_extend_count
@@ -404,7 +502,7 @@ async def extend_expiry(body: ExtendExpiryRequest):
     """운영/프로모션 만료 연장. shadow=true면 미적용 프리뷰."""
     if body.scope not in {"ALL_ACTIVE", "USER_IDS"}:
         raise HTTPException(status_code=400, detail="INVALID_SCOPE")
-    if body.scope == "USER_IDS" and not body.user_ids:
+    if body.scope == "USER_IDS" and not (body.user_ids or body.external_user_ids):
         raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
     if not (1 <= body.extend_hours <= 72):
         raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
@@ -413,6 +511,9 @@ async def extend_expiry(body: ExtendExpiryRequest):
         cur = conn.cursor()
         now = _now()
         if body.scope == "USER_IDS":
+            user_ids = body.user_ids
+            if not user_ids and body.external_user_ids:
+                user_ids = _resolve_user_ids_by_external_user_ids(cur, list(body.external_user_ids))
             cur.execute(
                 """
                 SELECT user_id, expires_at
@@ -420,7 +521,7 @@ async def extend_expiry(body: ExtendExpiryRequest):
                  WHERE user_id = ANY(%s)
                    AND (gold_status!='CLAIMED' OR platinum_status!='CLAIMED' OR diamond_status!='CLAIMED')
                 """,
-                (body.user_ids,),
+                (user_ids,),
             )
             rows = cur.fetchall()
         else:
@@ -471,7 +572,7 @@ async def extend_expiry(body: ExtendExpiryRequest):
 async def notify(body: NotifyRequest):
     if body.type not in config.ALLOWED_NOTIFY_TYPES:
         raise HTTPException(status_code=400, detail="INVALID_NOTIFY_TYPE")
-    if not body.user_ids:
+    if not (body.user_ids or body.external_user_ids):
         raise HTTPException(status_code=400, detail="EMPTY_USER_IDS")
     if body.variant_id and body.variant_id not in config.ALLOWED_VARIANT_IDS:
         raise HTTPException(status_code=400, detail="VARIANT_NOT_FOUND")
@@ -481,7 +582,10 @@ async def notify(body: NotifyRequest):
     inserted = 0
     with db.get_conn() as conn:
         cur = conn.cursor()
-        for uid in body.user_ids:
+        user_ids = body.user_ids
+        if not user_ids and body.external_user_ids:
+            user_ids = _resolve_user_ids_by_external_user_ids(cur, list(body.external_user_ids))
+        for uid in user_ids or []:
             dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{now.date()}"
             cur.execute(
                 """
@@ -502,6 +606,9 @@ async def notify(body: NotifyRequest):
 async def compensation_enqueue(body: CompensationEnqueueRequest):
     with db.get_conn() as conn:
         cur = conn.cursor()
+        user_id = body.user_id
+        if user_id is None:
+            user_id = _resolve_user_id(cur, user_id=None, external_user_id=body.external_user_id, default_user_id=None, create_if_missing=True)
         cur.execute(
             """
             INSERT INTO compensation_queue
@@ -509,7 +616,7 @@ async def compensation_enqueue(body: CompensationEnqueueRequest):
             VALUES (%s, %s, %s, %s, %s, 'PENDING', 0, NOW())
             ON CONFLICT (request_id, external_service) DO NOTHING
             """,
-            (body.user_id, body.vault_type, body.request_id, body.external_service, Json(body.payload)),
+            (user_id, body.vault_type, body.request_id, body.external_service, Json(body.payload)),
         )
         conn.commit()
     return JSONResponse(status_code=202, content={"enqueued": True})

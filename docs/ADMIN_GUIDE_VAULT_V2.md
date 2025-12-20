@@ -27,22 +27,22 @@
 
 ## 어드민 UI 동작
 - [frontend/pages/admin.jsx](frontend/pages/admin.jsx)
-  - `user_id` 입력값을 쿼리스트링으로 전달: `?user_id=...`
+  - `external_user_id` 입력값을 쿼리스트링으로 전달: `?external_user_id=...`
   - 버튼들은 Next API Routes를 호출
 
 ## 어드민 사용법(쉬운 입력 폼)
 어드민은 “JSON을 직접 쓰는 방식”이 아니라, 체크박스/숫자/드롭다운/목록 입력으로 요청 내용을 만들어요.
 
 ### 1) 상태 조회(Status)
-- “회원 번호(user_id)”를 입력한 뒤 “상태 조회”를 누르면 `/api/vault/status/`를 호출해요.
+- “외부 아이디(external_user_id)”를 입력한 뒤 “상태 조회”를 누르면 `/api/vault/status/`를 호출해요.
 
 ### 2) 만료 시간 늘리기(extend-expiry)
 - **대상 범위(scope)**
   - `ALL_ACTIVE`: 지금 활성인 전체 대상
   - `USER_IDS`: 특정 회원만(아래에 회원 번호 목록 입력)
-- **대상 회원 번호(목록)**
+- **대상 외부 아이디(목록)**
   - 쉼표(,) 또는 띄어쓰기로 여러 명 입력 가능
-  - 비워두면 위의 “회원 번호(user_id)”를 사용해요
+  - 비워두면 위의 “외부 아이디(external_user_id)”를 사용해요
 - **늘릴 시간(extend_hours)**: 1~72 사이 숫자
 - **사유(reason)**: 운영/프로모션/관리 중 선택
 - **shadow(미리보기 모드)**
@@ -52,11 +52,11 @@
 
 ### 3) 알림 요청 넣기(notify)
 - **알림 종류(type)**: 드롭다운에서 선택
-- **대상 회원 번호(목록)**: 쉼표/띄어쓰기로 입력, 비워두면 `user_id` 사용
+- **대상 외부 아이디(목록)**: 쉼표/띄어쓰기로 입력, 비워두면 `external_user_id` 사용
 - **추가 옵션(variant_id)**: 필요할 때만 숫자로 입력(비워도 됨)
 
 ### 4) 추천 revive(referral-revive)
-- 이 요청은 **쿼리스트링 `user_id`가 필수**예요(위의 회원 번호 입력을 꼭 채워주세요).
+- 이 요청은 **쿼리스트링 `external_user_id`가 필수**예요(위의 외부 아이디 입력을 꼭 채워주세요).
 - **채널(channel)**, **초대코드(invite_code)**를 입력해 실행해요.
 
 ## 프록시 라우트(Next → FastAPI)

@@ -3,6 +3,14 @@ from datetime import timedelta
 
 def test_referral_revive_allows_once(client, db_conn):
     cur = db_conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO user_identity (user_id, external_user_id)
+        VALUES (%s, %s)
+        ON CONFLICT (external_user_id) DO UPDATE SET user_id = EXCLUDED.user_id
+        """,
+        (1401, "ext-1401"),
+    )
     # reset test user window in D-1 to D-2 range
     cur.execute(
         """
@@ -19,7 +27,7 @@ def test_referral_revive_allows_once(client, db_conn):
     db_conn.commit()
 
     payload = {"request_id": "test-ref-001", "channel": "kakao", "invite_code": "TESTCODE"}
-    resp = client.post("/api/vault/referral-revive", params={"user_id": 1401}, json=payload)
+    resp = client.post("/api/vault/referral-revive", params={"external_user_id": "ext-1401"}, json=payload)
     assert resp.status_code == 200
     body = resp.json()
     assert body.get("revived") is True
@@ -29,5 +37,5 @@ def test_referral_revive_allows_once(client, db_conn):
     assert extend_count == 1
 
     # second attempt should hit EXTENSION_LIMIT
-    resp_limit = client.post("/api/vault/referral-revive", params={"user_id": 1401}, json=payload)
+    resp_limit = client.post("/api/vault/referral-revive", params={"external_user_id": "ext-1401"}, json=payload)
     assert resp_limit.status_code in {403, 409}

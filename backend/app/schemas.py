@@ -34,6 +34,7 @@ class ExtendExpiryRequest(BaseModel):
     request_id: str
     scope: str  # ALL_ACTIVE | USER_IDS
     user_ids: Optional[List[int]] = None
+    external_user_ids: Optional[List[str]] = None
     extend_hours: int
     reason: str  # OPS | PROMO | ADMIN
     shadow: bool = False
@@ -49,7 +50,8 @@ class ExtendExpiryResponse(BaseModel):
 
 class NotifyRequest(BaseModel):
     type: str
-    user_ids: List[int]
+    user_ids: Optional[List[int]] = None
+    external_user_ids: Optional[List[str]] = None
     variant_id: Optional[str] = None
 
 
@@ -58,7 +60,8 @@ class NotifyResponse(BaseModel):
 
 
 class CompensationEnqueueRequest(BaseModel):
-    user_id: int
+    user_id: Optional[int] = None
+    external_user_id: Optional[str] = None
     vault_type: str
     request_id: str
     external_service: str

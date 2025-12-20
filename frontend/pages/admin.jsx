@@ -36,30 +36,29 @@ function generateRequestId(prefix) {
   return `${prefix}-${Date.now()}-${rand}`;
 }
 
-function parseUserIdsText(text) {
+function parseExternalUserIdsText(text) {
   const raw = String(text || '')
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const ids = raw.map((v) => Number(v));
-  if (ids.some((n) => !Number.isFinite(n) || !Number.isInteger(n) || n <= 0)) {
-    const err = new Error('회원 번호 목록에 숫자가 아닌 값이 섞여 있어요. 예: 1, 2, 3');
-    throw err;
+  const ids = raw;
+  if (ids.some((v) => v.length > 128)) {
+    throw new Error('외부 아이디가 너무 길어요(128자 이하로 입력해주세요).');
   }
   return ids;
 }
 
-function tryParseUserIdsText(text) {
+function tryParseExternalUserIdsText(text) {
   try {
-    return { ok: true, ids: parseUserIdsText(text), message: '' };
+    return { ok: true, ids: parseExternalUserIdsText(text), message: '' };
   } catch (e) {
-    return { ok: false, ids: [], message: e?.message || '회원 번호 목록을 확인해주세요.' };
+    return { ok: false, ids: [], message: e?.message || '외부 아이디 목록을 확인해주세요.' };
   }
 }
 
 export default function AdminPage() {
-  const [memberId, setMemberId] = useState('');
+  const [externalUserId, setExternalUserId] = useState('');
   const [busyKey, setBusyKey] = useState('');
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -84,10 +83,10 @@ export default function AdminPage() {
 
   const qs = useMemo(() => {
     const params = new URLSearchParams();
-    if (memberId) params.set('user_id', memberId);
+    if (externalUserId) params.set('external_user_id', externalUserId);
     const s = params.toString();
     return s ? `?${s}` : '';
-  }, [memberId]);
+  }, [externalUserId]);
 
   async function callApi(key, path, init) {
     setBusyKey(key);
@@ -109,12 +108,18 @@ export default function AdminPage() {
     }
   }
 
-  const cardBase = 'bg-black/50 backdrop-blur-md border border-white/10 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)]';
-  const inputBase = 'w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 outline-none focus:border-white/20';
+  const cardBase = 'bg-black/70 backdrop-blur-md border border-white/20 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.55)]';
+  const inputBase = 'w-full bg-black/50 border border-white/20 rounded-xl px-4 py-3 text-white placeholder:text-white/50 outline-none focus:border-white/40';
   const selectBase = `${inputBase} appearance-none`;
 
-  const extendIdsParsed = useMemo(() => tryParseUserIdsText(extendUserIdsText || memberId), [extendUserIdsText, memberId]);
-  const notifyIdsParsed = useMemo(() => tryParseUserIdsText(notifyUserIdsText || memberId), [notifyUserIdsText, memberId]);
+  const extendIdsParsed = useMemo(
+    () => tryParseExternalUserIdsText(extendUserIdsText || externalUserId),
+    [extendUserIdsText, externalUserId]
+  );
+  const notifyIdsParsed = useMemo(
+    () => tryParseExternalUserIdsText(notifyUserIdsText || externalUserId),
+    [notifyUserIdsText, externalUserId]
+  );
 
   const extendPayload = useMemo(() => {
     const scope = extendScope;
@@ -126,7 +131,7 @@ export default function AdminPage() {
       shadow: Boolean(extendShadow),
     };
     if (scope === 'USER_IDS') {
-      payload.user_ids = extendIdsParsed.ids;
+      payload.external_user_ids = extendIdsParsed.ids;
     }
     return payload;
   }, [extendScope, extendRequestId, extendHours, extendReason, extendShadow, extendIdsParsed.ids]);
@@ -134,7 +139,7 @@ export default function AdminPage() {
   const notifyPayload = useMemo(() => {
     const payload = {
       type: notifyType,
-      user_ids: notifyIdsParsed.ids,
+      external_user_ids: notifyIdsParsed.ids,
     };
     if (notifyVariantId && String(notifyVariantId).trim()) {
       payload.variant_id = String(notifyVariantId).trim();
@@ -180,7 +185,7 @@ export default function AdminPage() {
             <p className="mt-2 text-sm md:text-base" style={{ color: TOKENS.textSub }}>
               이 페이지는 <strong>확인/점검용</strong>이에요. 버튼을 누르면 서버에 바로 요청이 갑니다.
               <br />
-              잘 모르겠으면 먼저 “미리보기(드라이런)”부터 눌러주세요.
+              잘 모르겠으면 먼저 “미리보기(shadow)”부터 눌러주세요.
             </p>
           </div>
 
@@ -188,29 +193,28 @@ export default function AdminPage() {
             <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-semibold mb-2" style={{ color: TOKENS.accent1 }}>
-                  회원 번호( user_id )
+                  외부 아이디( external_user_id )
                 </label>
                 <input
                   className={inputBase}
-                  value={memberId}
-                  onChange={(e) => setMemberId(e.target.value)}
-                  inputMode="numeric"
-                  placeholder="예: 123"
+                  value={externalUserId}
+                  onChange={(e) => setExternalUserId(e.target.value)}
+                  placeholder="예: ext-123"
                 />
                 <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
-                  팁: 회원 번호를 넣으면 그 사람 기준으로 상태를 볼 수 있어요.
+                  팁: 외부 아이디를 넣으면 그 사람 기준으로 상태를 볼 수 있어요.
                 </p>
               </div>
               <div className="flex gap-2">
                 <button
-                  className="px-4 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                  className="px-4 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
                   disabled={!!busyKey}
                   onClick={() => callApi('status', '/api/vault/status/', { method: 'GET' })}
                 >
                   상태 보기
                 </button>
                 <button
-                  className="px-4 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                  className="px-4 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
                   disabled={!!busyKey}
                   onClick={() => setResult(null) || setError(null)}
                 >
@@ -240,7 +244,7 @@ export default function AdminPage() {
                   <div>
                     <label className="block text-sm font-semibold mb-2">적용 방식</label>
                     <select className={selectBase} value={extendScope} onChange={(e) => setExtendScope(e.target.value)}>
-                      <option value="USER_IDS">특정 회원만</option>
+                      <option value="USER_IDS">특정 아이디만</option>
                       <option value="ALL_ACTIVE">전체(진행 중인 회원)</option>
                     </select>
                     <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
@@ -266,18 +270,18 @@ export default function AdminPage() {
 
                   {extendScope === 'USER_IDS' && (
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-semibold mb-2">대상 회원 번호(여러 명 가능)</label>
+                      <label className="block text-sm font-semibold mb-2">대상 외부 아이디(여러 명 가능)</label>
                       <input
                         className={inputBase}
                         value={extendUserIdsText}
                         onChange={(e) => setExtendUserIdsText(e.target.value)}
-                        placeholder={memberId ? `예: ${memberId}` : '예: 1, 2, 3'}
+                        placeholder={externalUserId ? `예: ${externalUserId}` : '예: ext-1, ext-2'}
                       />
                       <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
-                        쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 회원 번호(user_id)를 사용해요.
+                        쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 외부 아이디(external_user_id)를 사용해요.
                       </p>
                       {!extendIdsParsed.ok ? (
-                        <p className="mt-2 text-xs" style={{ color: '#F97935' }}>
+                        <p className="mt-2 text-xs" style={{ color: TOKENS.accent1 }}>
                           {extendIdsParsed.message}
                         </p>
                       ) : null}
@@ -295,7 +299,7 @@ export default function AdminPage() {
 
                   <div>
                     <label className="block text-sm font-semibold mb-2">미리보기(적용 안 함)</label>
-                    <div className="flex items-center gap-3 bg-black/30 border border-white/10 rounded-xl px-4 py-3">
+                    <div className="flex items-center gap-3 bg-black/50 border border-white/20 rounded-xl px-4 py-3">
                       <input
                         id="extendShadow"
                         type="checkbox"
@@ -333,7 +337,7 @@ export default function AdminPage() {
                         const hours = Number(extendHours);
                         if (!Number.isFinite(hours) || hours < 1 || hours > 72) throw new Error('늘릴 시간은 1~72 사이 숫자여야 해요.');
                         if (extendScope === 'USER_IDS' && !extendIdsParsed.ok) throw new Error(extendIdsParsed.message);
-                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ids.length) throw new Error('대상 회원 번호가 비어 있어요.');
+                        if (extendScope === 'USER_IDS' && !extendIdsParsed.ids.length) throw new Error('대상 외부 아이디가 비어 있어요.');
                         const body = extendPayload;
                         return callApi('extend-expiry', '/api/vault/extend-expiry/', {
                           method: 'POST',
@@ -396,18 +400,18 @@ export default function AdminPage() {
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-2">대상 회원 번호(여러 명 가능)</label>
+                    <label className="block text-sm font-semibold mb-2">대상 외부 아이디(여러 명 가능)</label>
                     <input
                       className={inputBase}
                       value={notifyUserIdsText}
                       onChange={(e) => setNotifyUserIdsText(e.target.value)}
-                      placeholder={memberId ? `예: ${memberId}` : '예: 1, 2, 3'}
+                      placeholder={externalUserId ? `예: ${externalUserId}` : '예: ext-1, ext-2'}
                     />
                     <p className="mt-2 text-xs" style={{ color: TOKENS.textSub }}>
-                      쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 회원 번호(user_id)를 사용해요.
+                      쉼표(,)나 띄어쓰기로 구분해요. 비워두면 위의 외부 아이디(external_user_id)를 사용해요.
                     </p>
                     {!notifyIdsParsed.ok ? (
-                      <p className="mt-2 text-xs" style={{ color: '#F97935' }}>
+                      <p className="mt-2 text-xs" style={{ color: TOKENS.accent1 }}>
                         {notifyIdsParsed.message}
                       </p>
                     ) : null}
@@ -416,12 +420,12 @@ export default function AdminPage() {
 
                 <div className="mt-3 flex justify-end">
                   <button
-                    className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                    className="px-5 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
                     disabled={!!busyKey}
                     onClick={() => {
                       try {
                         if (!notifyIdsParsed.ok) throw new Error(notifyIdsParsed.message);
-                        if (!notifyIdsParsed.ids.length) throw new Error('대상 회원 번호가 비어 있어요.');
+                        if (!notifyIdsParsed.ids.length) throw new Error('대상 외부 아이디가 비어 있어요.');
                         const body = notifyPayload;
                         return callApi('notify', '/api/vault/notify/', {
                           method: 'POST',
@@ -494,11 +498,11 @@ export default function AdminPage() {
                   </div>
 
                   <button
-                    className="px-5 py-3 rounded-xl font-bold border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-60"
+                    className="px-5 py-3 rounded-xl font-bold border border-white/20 bg-white/10 hover:bg-white/15 disabled:opacity-60"
                     disabled={!!busyKey}
                     onClick={() => {
                       try {
-                        if (!memberId) throw new Error('회원 번호(user_id)를 먼저 적어주세요.');
+                        if (!externalUserId) throw new Error('외부 아이디(external_user_id)를 먼저 적어주세요.');
                         if (!reviveRequestId) throw new Error('요청번호가 비어 있어요. “요청번호 새로 만들기”를 눌러주세요.');
                         if (!String(reviveChannel || '').trim()) throw new Error('채널을 적어주세요.');
                         if (!String(reviveInviteCode || '').trim()) throw new Error('초대 코드를 적어주세요.');

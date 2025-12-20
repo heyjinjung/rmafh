@@ -4,9 +4,19 @@ from datetime import datetime, timezone
 def test_notify_enqueues(client, db_conn):
     cur = db_conn.cursor()
     cur.execute("DELETE FROM notifications_queue")
+    cur.execute(
+        """
+        INSERT INTO user_identity (user_id, external_user_id)
+        VALUES
+          (%s, %s),
+          (%s, %s)
+        ON CONFLICT (external_user_id) DO UPDATE SET user_id = EXCLUDED.user_id
+        """,
+        (1101, "ext-1101", 1102, "ext-1102"),
+    )
     db_conn.commit()
 
-    body = {"type": "EXPIRY_D2", "user_ids": [1101, 1102], "variant_id": "A"}
+    body = {"type": "EXPIRY_D2", "external_user_ids": ["ext-1101", "ext-1102"], "variant_id": "A"}
     resp = client.post("/api/vault/notify", json=body)
     assert resp.status_code == 200
     data = resp.json()
@@ -32,6 +42,6 @@ def test_notify_variant_validation(client):
 
 
 def test_notify_requires_users(client):
-    resp = client.post("/api/vault/notify", json={"type": "EXPIRY_D2", "user_ids": []})
+    resp = client.post("/api/vault/notify", json={"type": "EXPIRY_D2", "external_user_ids": []})
     assert resp.status_code == 400
     assert resp.json().get("detail") == "EMPTY_USER_IDS"
