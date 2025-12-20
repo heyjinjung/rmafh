@@ -2,6 +2,7 @@
 
 ## 1. 만료 배치
 - 입력: enable_expiry_batch, enable_shadow_expiry
+- 현재 상태: 스케줄러/잡 자체는 아직 미구현(문서 설계 단계)
 - shadow=true: 대상 집계만, vault_status 미변경, Slack 리포트
 - shadow=false: expires_at < now AND status!=CLAIMED → EXPIRED 업데이트 (idempotent WHERE)
 

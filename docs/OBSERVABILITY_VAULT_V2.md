@@ -6,6 +6,10 @@
 - 작성일: 2025-12-20
 - 대상: SRE/백엔드/데이터
 
+## 1.1 현재 구현 상태(2025-12-20)
+- 이벤트 로그/메트릭/트레이싱은 문서 설계 수준이며, 코드에 체계적인 수집(StatsD/Prometheus/OTel)은 아직 미연동입니다.
+- 현재는 API/워커가 DB 테이블 기반으로 기능 동작을 우선 보장하는 단계입니다.
+
 ## 2. 로그 스키마 (핵심 이벤트)
 - VAULT_UNLOCKED, VAULT_CLAIMED, VAULT_EXPIRED, ALERT_SENT, ATTENDANCE_MARKED, DEPOSIT_RECORDED, EXPIRY_EXTENDED, REFERRAL_REVIVED, COMPENSATION_ENQUEUED
 - 공통 필드: ts, event, user_id, vault_type, req_id, env

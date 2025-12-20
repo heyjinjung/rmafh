@@ -75,9 +75,10 @@
 	- LOCKED=보관 중, UNLOCKED=해금 가능, CLAIMED=수령 완료, EXPIRED=소멸
 
 ## 9. 갭 분석 (2025-12-19)
-- DB: vault_status 테이블 미구현
-- BE: 3단계 미션 트랙/출석/충전 훅/만료 배치 미구현
-- FE: 금고 UI/타이머/게이지/완성 보너스 미구현
+## 9. 갭 분석 (업데이트: 2025-12-20)
+- DB: 로컬/테스트는 `_ensure_schema()`로 최소 스키마 자동 보강(운영 기준은 마이그레이션 적용 권장)
+- BE: status/claim/attendance + notify/referral-revive/extend-expiry/compensation-enqueue 구현됨. deposit-hook/만료 배치(스케줄러)는 미구현
+- FE: 금고 메인 UI(사이드바/푸터/3카드/타이머/CTA/완성 보너스) 구현됨. 손실 배너/토스트/모달은 미구현
 
 ## 10. 단계별 계획
 - Phase 1: DB 마이그레이션 및 모델 작성 → 상태 조회 API

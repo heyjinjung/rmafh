@@ -6,9 +6,10 @@
 
 ## 2. API
 - GET /api/vault/status: loss_total, loss_breakdown, ms_countdown, referral_revive_available, social_proof, curation_tier 반환
-- POST /api/vault/claim: 외부 지급 실패 시 202 + compensation_queue enqueue
+- POST /api/vault/claim: (현재) UNLOCKED만 수령 가능, 응답은 claimed/vault_type/now/expires_at
+- POST /api/vault/claim: (추가 구현 예정) 외부 지급 실패 시 202 + compensation_queue enqueue
 - POST /api/vault/attendance: 중복/만료 가드
-- POST /api/vault/deposit-hook: tx_id 멱등, 단일 50k/누적 500k 반영
+- POST /api/vault/deposit-hook: (현재 미구현)
 - POST /api/vault/referral-revive: 만료 D-1(24~48h), expiry_extend_count=0, request_id 멱등, expires_at +=24h, log insert(reason=REFERRAL)
 - POST /api/vault/extend-expiry (admin): scope ALL_ACTIVE|USER_IDS, extend_hours 1~72, reason OPS|PROMO|ADMIN, shadow 지원(미적용 프리뷰)
 - POST /api/vault/notify: variant_id 검증, type = EXPIRY_D2/D0, ATTENDANCE_D2, TICKET_ZERO, SOCIAL_PROOF, REFERRAL_REVIVE

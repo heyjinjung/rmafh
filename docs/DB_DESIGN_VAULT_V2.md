@@ -6,6 +6,13 @@
 - 작성일: 2025-12-20
 - 대상: 백엔드/DBA
 
+## 1.1 현재 구현 상태(2025-12-20)
+- 운영 기준 스키마는 [docs/DB_MIGRATION_VAULT_V2.sql](DB_MIGRATION_VAULT_V2.sql) 적용을 권장합니다.
+- 로컬/테스트에서는 `backend/app/main.py`의 `_ensure_schema()`가 최소 동작을 위한 스키마를 자동 보강하며,
+  - ENUM 대신 TEXT,
+  - 일부 컬럼(`expires_initial_at` 등)은 생략
+  형태로 단순화되어 있을 수 있습니다.
+
 ## 2. 테이블: vault_status
 - 목적: 유저별 금고 상태/진행률/만료 관리
 - 스키마

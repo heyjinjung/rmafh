@@ -13,6 +13,10 @@
 - 만료 배치 shadow 모드: 스케줄러 플래그 shadow=true 시 상태 변경 없이 대상/카운트만 리포트 (Slack)
 - 부활권 큐잉: 만료 D-1(24~48h) 사용자 대상으로 referral_revive CTA 알림 큐잉
 
+### 2.1 현재 상태
+- `/api/vault/notify` 엔드포인트와 `notifications_queue` 적재는 구현됨
+- 만료 배치/알림 배치(스케줄러로 주기 실행)는 아직 미구현(문서 설계 단계)
+
 ## 3. 알림 타입
 - EXPIRY_D2: 만료 D-2 사용자 대상, "보관된 금액이 소멸 예정"
 - EXPIRY_D0: 만료 당일 경고, 강한 긴급 카피
