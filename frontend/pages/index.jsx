@@ -1041,7 +1041,9 @@ const styles = {
     right: 10,
     bottom: 0,
     left: 362,
-    overflow: 'hidden',
+    overflowX: 'hidden',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
   },
 };
 
