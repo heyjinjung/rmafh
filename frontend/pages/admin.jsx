@@ -113,7 +113,7 @@ export default function AdminPage() {
       </Head>
 
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto w-full max-w-[1280px] px-4 lg:px-0">
+        <div className="mx-auto w-full max-w-none px-4 lg:px-6">
           <div className="flex flex-col lg:flex-row">
             {/* Left: Sidebar + Footer (Figma layout) */}
             <div className="flex flex-col lg:w-[356px]">
@@ -291,7 +291,7 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 gap-6">
                   {activeSection === 'status' ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <StatusViewer statusData={statusData} cardBase={cardBase} />
+                      <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
                       <ResponseViewer
                         title="상태 조회 결과"
                         loading={statusLoading}
