@@ -68,22 +68,22 @@ export default function AdminPage() {
     return body;
   }
 
-  const cardBase = 'rounded-[8px] border border-gold-primary/30 bg-black';
+  const cardBase = 'rounded-[8px] border border-admin-border bg-admin-surface';
   const inputBase =
-    'w-full rounded-[4px] border border-gold-primary/30 bg-black px-3 py-2 text-sm text-white placeholder:text-cc-textSub outline-none focus:ring-1 focus:ring-gold-primary';
+    'w-full rounded-[12px] border border-admin-border2 bg-admin-input px-5 py-4 text-sm text-admin-text placeholder:text-admin-muted outline-none transition-all hover:brightness-[1.03] focus:ring-2 focus:ring-admin-green focus:border-admin-green focus:bg-admin-surface focus:placeholder-transparent';
   const selectBase = `${inputBase} pr-8`;
   const buttonBase =
-    'px-4 py-2 rounded-[4px] text-sm font-semibold border border-gold-primary bg-gold-primary text-black hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed';
+    'inline-flex items-center px-5 py-3 rounded-[6px] text-sm font-semibold border border-transparent bg-admin-green text-white hover:bg-admin-greenDark focus:outline-none focus:ring-2 focus:ring-admin-green focus:ring-offset-2 focus:ring-offset-admin-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
   const buttonGhost =
-    'px-4 py-2 rounded-[4px] text-sm font-semibold border border-gold-primary/30 bg-black text-white hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed';
+    'px-4 py-2 rounded-[6px] text-sm font-semibold border border-admin-border2 bg-admin-surface text-admin-text hover:brightness-[1.05] disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
 
   const sectionButtonClass = (key) => {
     const isActive = activeSection === key;
     return [
       'px-3 py-2 rounded-[4px] text-sm font-semibold border',
       isActive
-        ? 'border-gold-primary bg-gold-primary text-black'
-        : 'border-gold-primary/30 bg-black text-white hover:bg-gold-dark',
+        ? 'border-admin-neon text-admin-neon bg-admin-bg'
+        : 'border-transparent text-admin-muted hover:text-admin-text hover:border-admin-border2',
       'disabled:opacity-50 disabled:cursor-not-allowed',
     ].join(' ');
   };
@@ -113,11 +113,10 @@ export default function AdminPage() {
       </Head>
 
       <div className="min-h-screen bg-black text-white">
-        <div className="mx-auto w-full max-w-none px-4 lg:px-6">
-          <div className="flex flex-col lg:flex-row">
-            {/* Left: Sidebar + Footer (Figma layout) */}
-            <div className="flex flex-col lg:w-[300px]">
-              <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:ml-[8px] lg:w-[345px]">
+        <div className="mx-auto w-full max-w-none px-4 lg:px-0">
+          <div className="relative min-h-screen lg:h-screen lg:overflow-hidden">
+            {/* Left: Sidebar (match / layout on desktop) */}
+            <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:absolute lg:left-[8px] lg:top-0 lg:w-[345px]">
                 <nav className="flex items-start justify-between">
                   <div className="flex items-center gap-[5px] w-[184px]">
                     <div className="h-[27px] w-[26px] shrink-0 rounded-[18px] overflow-hidden">
@@ -182,38 +181,37 @@ export default function AdminPage() {
                 </div>
               </aside>
 
-              <footer className="bg-cc-accent2 px-[20px] py-[24px] lg:w-[300px]">
-                <div className="flex flex-col gap-[12.639px] items-start">
-                  <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
-                  <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
-                    <p>CC고객센터 텔레그램</p>
-                    <p>CC카지노 바로가기</p>
-                    <p>CC카지노 공식 탤래채널</p>
-                  </div>
+            {/* Footer (match / layout on desktop) */}
+            <footer className="bg-cc-accent2 px-[20px] py-[24px] mt-6 lg:mt-0 lg:absolute lg:left-0 lg:bottom-0 lg:w-[356px] lg:h-[222px] lg:flex lg:items-end lg:py-[31px]">
+              <div className="flex flex-col gap-[12.639px] items-start">
+                <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
+                <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
+                  <p>CC고객센터 텔레그램</p>
+                  <p>CC카지노 바로가기</p>
+                  <p>CC카지노 공식 탤래채널</p>
                 </div>
-              </footer>
-            </div>
+              </div>
+            </footer>
 
-            {/* Right: Admin tools */}
-            <div className="flex-1 lg:w-[908px] py-6 lg:py-0 lg:pr-[10px]">
-              <div className="pt-4 lg:pt-[32px]">
-                <div className="mb-4">
-                  <h1 className="text-[32px] sm:text-[36px] font-medium tracking-[-0.84px] leading-[1.058]">
-                    <span className="text-white">관리자</span>{' '}
-                    <span className="text-gold-primary">도구</span>
+            {/* Right/Main (match / layout on desktop) */}
+            <main className="bg-admin-bg text-admin-text lg:absolute lg:top-[-14px] lg:right-[10px] lg:bottom-0 lg:left-[362px] lg:overflow-y-auto lg:overflow-x-hidden">
+              <div className="py-5 px-[25px] lg:py-0">
+                <div className="pt-3 lg:pt-5">
+                <div className="mb-3">
+                  <h1 className="text-[28px] sm:text-[32px] font-medium tracking-[-0.84px] leading-[1.058]">
+                    <span className="text-admin-text">관리자</span>{' '}
+                    <span className="text-admin-neon">도구</span>
                   </h1>
-                  <p className="mt-2 text-sm text-cc-textSub">
-                    운영자가 빠르게 처리할 수 있게, 필요한 입력만 남긴 도구예요.
-                    <br />
-                    영향이 큰 작업은 먼저 <strong className="text-white">미리보기(shadow)</strong>로 확인 후 실행하세요.
+                  <p className="mt-2 text-sm text-admin-muted">
+                    필요한 입력만 남겼어요. 영향이 큰 작업은 먼저 <strong className="text-admin-text">미리보기(shadow)</strong>로 확인 후 실행하세요.
                   </p>
                 </div>
 
-                <div className={`${cardBase} p-4 md:p-5 mb-4`}>
+                <div className={`${cardBase} p-3 md:p-4 mb-3`}>
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
                       <div className="flex-1">
-                        <label className="block text-sm font-semibold mb-2 text-white">
+                        <label className="block text-sm font-semibold mb-2 text-admin-text">
                           외부 아이디 (external_user_id)
                         </label>
                         <input
@@ -222,7 +220,7 @@ export default function AdminPage() {
                           onChange={(e) => setExternalUserId(e.target.value)}
                           placeholder="예: ext-123"
                         />
-                        <p className="mt-2 text-xs text-white/80">
+                        <p className="mt-2 text-xs text-admin-muted">
                           비워도 동작할 수 있지만, 대부분의 작업은 외부 아이디를 넣는 게 안전해요.
                         </p>
                       </div>
@@ -266,7 +264,7 @@ export default function AdminPage() {
                     </div>
 
                     <div>
-                      <div className="text-xs mb-2 text-cc-textSub">작업 선택</div>
+                      <div className="text-xs mb-2 text-admin-muted">작업 선택</div>
                       <div className="flex flex-wrap gap-2">
                         <button className={sectionButtonClass('status')} disabled={!!busyKey} onClick={() => setActiveSection('status')}>
                           상태
@@ -288,9 +286,9 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6">
+                <div className="grid grid-cols-1 gap-4">
                   {activeSection === 'status' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
                       <ResponseViewer
                         title="상태 조회 결과"
@@ -305,8 +303,8 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'csv' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className={`${cardBase} p-4 md:p-6`}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className={`${cardBase} p-3 md:p-4`}>
                         <CsvUploader
                           onUpload={(data) => {
                             (async () => {
@@ -351,8 +349,8 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'extend' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className={`${cardBase} p-4 md:p-6`}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className={`${cardBase} p-3 md:p-4`}>
                         <ExpiryExtensionForm
                           externalUserId={externalUserId}
                           onSubmit={(payload) => {
@@ -400,8 +398,8 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'notify' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className={`${cardBase} p-4 md:p-6`}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className={`${cardBase} p-3 md:p-4`}>
                         <NotificationForm
                           externalUserId={externalUserId}
                           onSubmit={(payload) => {
@@ -448,8 +446,8 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'revive' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className={`${cardBase} p-4 md:p-6`}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className={`${cardBase} p-3 md:p-4`}>
                         <ReferralReviveForm
                           externalUserId={externalUserId}
                           onSubmit={(payload) => {
@@ -503,6 +501,7 @@ export default function AdminPage() {
                 </div>
               </div>
             </div>
+            </main>
           </div>
         </div>
       </div>

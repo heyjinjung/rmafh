@@ -27,39 +27,39 @@ function vaultTitle(tier) {
 }
 
 function statusLabel(status) {
-  if (status === 'UNLOCKED') return { text: '활성', className: 'text-green-400' };
+  if (status === 'UNLOCKED') return { text: '활성', className: 'text-admin-neon' };
   if (status === 'LOCKED') return { text: '비활성', className: 'text-cc-textSub' };
   if (!status) return { text: '-', className: 'text-cc-textSub' };
   return { text: String(status), className: 'text-cc-textSub' };
 }
 
 function ConditionRow({ ok, children }) {
-  return <li className={ok ? 'text-green-400' : 'text-cc-textSub'}>{children}</li>;
+  return <li className={ok ? 'text-admin-neon' : 'text-admin-muted'}>{children}</li>;
 }
 
 function VaultCard({ tier, status, amountWon, expiresAt, conditions, cardBase }) {
   const st = statusLabel(status);
   return (
     <div className="mt-4">
-      <div className="text-base font-bold text-gold-primary">{vaultTitle(tier)}</div>
-      <div className="mt-3 bg-black border border-gold-primary/30 rounded-[8px] p-4">
+      <div className="text-base font-bold text-admin-neon">{vaultTitle(tier)}</div>
+      <div className="mt-3 bg-admin-bg border border-admin-border rounded-[8px] p-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <div className="text-xs text-cc-textSub">상태</div>
+            <div className="text-xs text-admin-muted">상태</div>
             <div className={`text-sm font-semibold ${st.className}`}>{st.text}</div>
           </div>
           <div>
-            <div className="text-xs text-cc-textSub">금액</div>
-            <div className="text-sm font-semibold text-white">{formatWon(amountWon)}</div>
+            <div className="text-xs text-admin-muted">금액</div>
+            <div className="text-sm font-semibold text-admin-text">{formatWon(amountWon)}</div>
           </div>
           {expiresAt ? (
             <div className="sm:col-span-2">
-              <div className="text-xs text-cc-textSub">만료일</div>
-              <div className="text-sm font-semibold text-white">{formatKoDateTime(expiresAt)}</div>
+              <div className="text-xs text-admin-muted">만료일</div>
+              <div className="text-sm font-semibold text-admin-text">{formatKoDateTime(expiresAt)}</div>
             </div>
           ) : null}
           <div className="sm:col-span-2">
-            <div className="text-xs text-cc-textSub">해금 조건</div>
+            <div className="text-xs text-admin-muted">해금 조건</div>
             {conditions?.length ? (
               <ul className="mt-1 list-disc pl-5 text-sm space-y-1">
                 {conditions.map((c, idx) => (
@@ -69,7 +69,7 @@ function VaultCard({ tier, status, amountWon, expiresAt, conditions, cardBase })
                 ))}
               </ul>
             ) : (
-              <div className="text-sm text-white">현재 없음</div>
+              <div className="text-sm text-admin-text">현재 없음</div>
             )}
           </div>
         </div>
@@ -125,22 +125,22 @@ export function StatusSummary({ statusData, externalUserId }) {
       <h2 className="text-lg font-bold">상태 정보</h2>
 
       <div className="mt-4">
-        <div className="text-base font-bold text-green-400">사용자 정보</div>
-        <div className="mt-3 border-t border-gold-primary/20 pt-3">
+        <div className="text-base font-bold text-admin-neon">사용자 정보</div>
+        <div className="mt-3 border-t border-admin-border pt-3">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div className="text-cc-textSub">사용자 ID</div>
-            <div className="sm:col-span-2 font-semibold text-white">-</div>
-            <div className="text-cc-textSub">외부 ID</div>
-            <div className="sm:col-span-2 font-semibold text-white">{externalUserId || '-'}</div>
-            <div className="text-cc-textSub">생성일</div>
-            <div className="sm:col-span-2 font-semibold text-white">{formatKoDateTime(nowAt)}</div>
+            <div className="text-admin-muted">사용자 ID</div>
+            <div className="sm:col-span-2 font-semibold text-admin-text">-</div>
+            <div className="text-admin-muted">외부 ID</div>
+            <div className="sm:col-span-2 font-semibold text-admin-text">{externalUserId || '-'}</div>
+            <div className="text-admin-muted">생성일</div>
+            <div className="sm:col-span-2 font-semibold text-admin-text">{formatKoDateTime(nowAt)}</div>
           </div>
         </div>
       </div>
 
       <div className="mt-6">
-        <div className="text-base font-bold text-green-400">금고 정보</div>
-        <div className="mt-3 border-t border-gold-primary/20 pt-3">
+        <div className="text-base font-bold text-admin-neon">금고 정보</div>
+        <div className="mt-3 border-t border-admin-border pt-3">
           <VaultCard
             tier="GOLD"
             status={goldStatus}

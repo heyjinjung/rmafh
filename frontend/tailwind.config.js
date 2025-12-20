@@ -38,6 +38,20 @@ module.exports = {
           orange: '#F97935',
           yellow: '#FFBC42',
         },
+
+        // Admin main palette (from provided reference code)
+        admin: {
+          bg: '#1c1c1e',
+          surface: '#2c2c2e',
+          input: '#3a3a3c',
+          border: '#3a3a3c',
+          border2: '#48484a',
+          text: '#f2f2f7',
+          muted: '#8e8e93',
+          green: '#2DAA48',
+          greenDark: '#1A512E',
+          neon: '#9AFF00',
+        },
       },
       fontFamily: {
         sans: ['Noto Sans KR', 'sans-serif'],
