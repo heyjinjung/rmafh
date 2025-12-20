@@ -1,5 +1,8 @@
 # ADMIN_GUIDE_VAULT_V2
 
+## Changelog
+- 2025-12-20 v0.1: 골드 기본 UNLOCKED(데모) 및 telegram_ok 문구 정합화, 업로드 기반 진행률을 기본 플로우로 명시
+
 ## 목적
 - 운영/개발 환경에서 **유저 단위 상태 조회** 및 **ops 엔드포인트 실행**을 최소 UX로 제공
 - FE/BE/Worker/DB가 분리된 구조에서, “전역 동기화(특히 타이머/만료)”를 안전하게 확인/운영
@@ -50,7 +53,8 @@
   - `vault_status`에 누적입금/텔레그램 조건을 반영해요
 
 #### 조건 반영(현재 구현)
-- `telegram_ok=true`이면 GOLD가 `LOCKED → UNLOCKED`로 전이될 수 있어요.
+- (데모) GOLD는 기본적으로 `UNLOCKED`입니다.
+- `telegram_ok`는 운영 스냅샷에 저장되는 필드이며, 추후 “채널 인증 후 골드 해금” 같은 조건 강제 시에 사용할 수 있어요.
 - `deposit_total >= 500000`이면 DIAMOND가 `LOCKED → UNLOCKED`로 전이될 수 있어요.
 
 ### 1) 상태 조회(Status)

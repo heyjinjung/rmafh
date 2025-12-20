@@ -7,6 +7,9 @@
 - 대상: 백엔드/프론트엔드 개발자
 - 범위: 금고 상태 조회/수령, 출석, 입금 훅, 알림 트리거
 
+## Changelog
+- 2025-12-20 v0.2: status 응답에 `platinum_review_done` 반영, PLATINUM 금액 20,000 기준으로 예시/문구 정합화
+
 ## 2. 공통
 - Base URL: /api
 - Auth: (현재 로컬/데모 구현은 미적용, 기본 user_id=1)
@@ -41,17 +44,22 @@
 	"diamond_status": "LOCKED",
 	"platinum_attendance_days": 1,
 	"platinum_deposit_done": false,
+	"platinum_review_done": false,
 	"diamond_deposit_current": 120000,
 	"expires_at": "2025-12-26T00:00:00Z",
 	"now": "2025-12-20T12:00:00Z",
 	"loss_total": 130000,
-	"loss_breakdown": {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 100000, "BONUS": 0},
+	"loss_breakdown": {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 100000, "BONUS": 0},
 	"ms_countdown": {"enabled": true, "remaining_ms": 3578123},
 	"referral_revive_available": true,
 	"social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
 	"curation_tier": "PLATINUM_BIASED"
 }
 ```
+
+#### 필드 메모
+- `platinum_review_done`: 운영/리뷰 확인 완료 여부(리뷰 키). 플래티넘 해금 조건의 일부로 사용.
+- `loss_total`, `loss_breakdown`: 로컬/데모 구현에서는 금고 상태 기준으로 loss_total을 breakdown 합계로 계산합니다(미수령: 포함 / CLAIMED·EXPIRED: 제외).
 
 ### 4.2 POST /api/vault/claim
 - 설명: 금고별 수령 처리 (골드/플래티넘/다이아)

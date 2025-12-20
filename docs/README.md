@@ -8,6 +8,7 @@
 
 ## 1.1 Changelog
 - 2025-12-20 v2.0.1: 현재 구현 상태/실행 방법/갭 업데이트
+- 2025-12-20 v2.0.2: 플래티넘 20,000 기준 정합화, 유저 출석 CTA 제거(출석 API는 데모/QA 성격) 반영
 
 ## 2. 목표
 - 신규 유저 전용 손실 회피형 금고 시스템을 7일 내 경험·과금·리텐션 트랙으로 구현
@@ -26,15 +27,15 @@
 
 ## 5. 금고 구조(고정)
 - 골드: 10,000원, CC/공지 채널 추가 미션, 즉시 Aha 제공
-- 플래티넘: 30,000원, 단일 50,000원 충전 + 3일 출석
+- 플래티넘: 20,000원, 단일 50,000원 충전 + 3일 연속 조건(운영 업로드 기반 진행)
 - 다이아: 쿠폰 100,000원, 누적 500,000원 충전
 - 완성 보너스: 가입 7일 내 3개 모두 클리어 시 추가 보상
 
 ## 6. 현재 구현 상태(요약, 2025-12-20)
 - Docker Compose: db(5432), api(호스트 18000→컨테이너 8000), web(호스트 3002→컨테이너 3000), worker
-- FE: 단일 페이지(사이드바+푸터+메인 금고 카드 3종) 구현, 상태 조회/출석/수령 버튼 연동
+- FE: 단일 페이지(사이드바+푸터+메인 금고 카드 3종) 구현, 상태 조회/수령 버튼 연동 (유저 출석 CTA 없음)
 - FE→BE 연동: Next API Routes가 `/api/vault/*`를 백엔드로 프록시
-- BE: `/api/vault/status`, `/api/vault/claim`, `/api/vault/attendance` 및 ops용 `/referral-revive`, `/extend-expiry`, `/notify`, `/compensation-enqueue` 구현
+- BE: `/api/vault/status`, `/api/vault/claim`, (참고) `/api/vault/attendance` 및 ops용 `/referral-revive`, `/extend-expiry`, `/notify`, `/compensation-enqueue`, `/api/vault/user-daily-import` 구현
 - DB: 로컬/테스트에서는 API 스타트업 시 `_ensure_schema()`가 최소 스키마를 자동 보강
 
 ## 7. 현재 갭(요약, 실제 TODO)
@@ -42,6 +43,10 @@
 - BE: `deposit-hook`, 만료 배치(batch_expire) 엔드포인트/스케줄러는 아직 없음(문서에는 설계로 존재)
 - 공통: 인증(JWT)·실유저 식별(user_id) 연동은 데모 수준(기본 user_id=1)
 - 관측성: 구조화 로그/메트릭/트레이싱은 아직 문서 수준(구현 TODO)
+
+### 참고(운영 기본 플로우)
+- 플래티넘의 “연속 3일” 진행은 기본적으로 운영 업로드(`/api/vault/user-daily-import`)로 계산/갱신됩니다.
+- `/api/vault/attendance`는 데모/QA 성격이며, 유저 UI에서 직접 호출하는 플로우는 기본 제공하지 않습니다.
 
 ## 8. 실행 방법(로컬)
 - 전체 기동: `docker-compose up -d --build`

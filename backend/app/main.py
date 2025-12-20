@@ -108,6 +108,15 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
 
+    reward_amounts = {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 100000, "BONUS": 0}
+    status_by_type = {"GOLD": gold_status, "PLATINUM": platinum_status, "DIAMOND": diamond_status}
+    loss_breakdown = {
+        k: (0 if status_by_type[k] in {"CLAIMED", "EXPIRED"} else reward_amounts[k])
+        for k in ("GOLD", "PLATINUM", "DIAMOND")
+    }
+    loss_breakdown["BONUS"] = 0
+    loss_total = int(sum(loss_breakdown.values()))
+
     return {
         "gold_status": gold_status,
         "platinum_status": platinum_status,
@@ -118,8 +127,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "diamond_deposit_current": diamond_deposit_current,
         "expires_at": expires_at.isoformat(),
         "now": now.isoformat(),
-        "loss_total": 120000,
-        "loss_breakdown": {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 100000, "BONUS": 0},
+        "loss_total": loss_total,
+        "loss_breakdown": loss_breakdown,
         "ms_countdown": ms_countdown,
         "referral_revive_available": True,
         "social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},

@@ -1,11 +1,14 @@
 # Vault v2.0 프런트엔드 구현 순서
 
+## Changelog
+- 2025-12-20 v0.1: 현재 구현 상태에 맞춰 출석 CTA 제거/수령 중심 UX로 정합화
+
 ## 0. 현재 구현 상태(2025-12-20)
 - 구현 위치: `frontend/pages/index.jsx`
 - 데이터 패칭: `react-query` 대신 `fetch + useState/useEffect` 기반
-- API 호출: Next 설정(`trailingSlash: true`)에 맞춰 `/api/vault/status/`, `/api/vault/attendance/`, `/api/vault/claim/` 형태로 호출
+- API 호출: Next 설정(`trailingSlash: true`)에 맞춰 `/api/vault/status/`, `/api/vault/claim/` 형태로 호출
 - 프록시: `frontend/pages/api/vault/*`가 백엔드(`NEXT_PUBLIC_API_BASE`, 기본 `http://api:8000`)로 프록시
-- UI: 3개 금고 카드 + 카운트다운 + CTA(출석/수령) + 완성 보너스(프론트 계산)까지 구현
+- UI: 3개 금고 카드 + 카운트다운 + CTA(수령) + 완성 보너스(프론트 계산)까지 구현
 - 미구현: 손실 플로팅 배너/사회적 증거 토스트/부활권 모달/티켓0 모달/개인화 배너
 
 ## 1. 스타일/토큰
@@ -16,7 +19,7 @@
 ## 2. 상태/데이터 페칭
 - (추가 구현 예정) react-query 도입 시
 	- query: ["vault","status"] (staleTime 15s)
-	- mutation: claim, attendance, referral-revive; 성공 시 status invalidate
+	- mutation: claim, referral-revive; 성공 시 status invalidate
 
 ## 3. 컴포넌트
 - VaultCard: 네온 그라디언트 헤더/배지, 진행률 바, CTA 버튼 shine

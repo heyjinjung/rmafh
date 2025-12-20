@@ -6,6 +6,9 @@
 - 작성일: 2025-12-20
 - 대상: 백엔드/프론트엔드/기획자
 
+## Changelog
+- 2025-12-20 v0.2: 플래티넘 진행률은 운영 업로드 기반을 기본으로 정합화(수동 attendance는 참고/데모)
+
 ## 2. 시퀀스: 입금 훅
 - Actor: PaymentSystem → API /api/vault/deposit-hook → VaultService
 - 현재 상태: 아직 미구현(문서 설계만 존재)
@@ -16,13 +19,20 @@
   4) amount >= 50,000 → platinum_deposit_done=true
   5) 조건 충족 시 상태 UNLOCKED 전이 + 알림 enqueue
 
-## 3. 시퀀스: 출석
-- Actor: FE → /api/vault/attendance
-- 플로우:
-  1) Auth 유저 검증, expires_at 확인
-  2) 중복 출석 체크 (일자별 락)
-  3) platinum_attendance_days += 1 (최대 3)
-  4) (출석 3 AND 50,000 단일 충전) → 플래티넘 UNLOCKED + 알림 enqueue
+## 3. 시퀀스: 플래티넘 진행률(운영 업로드 기반)
+- Actor: Admin/OPS → /api/vault/user-daily-import → VaultService
+- 기본 전제: 유저 UI는 출석 버튼으로 진행률을 만들지 않고, 운영 업로드(누적입금/리뷰OK 등)로 진행률이 갱신됩니다.
+- 플로우(요약):
+  1) Admin/OPS → user-daily-import(rows: external_user_id, deposit_total, last_deposit_at, review_ok, telegram_ok 등)
+  2) Service: external_user_id → user_id 매핑 생성/해결
+  3) Service: user_admin_snapshot 업서트
+  4) Service: deposit_total 델타/날짜 기준으로 연속일수(platinum_attendance_days) 계산 갱신
+  5) review_ok + 연속일수 조건 충족 시 platinum_status=UNLOCKED
+
+### 3.1 참고: 수동 출석(데모/QA)
+- Actor: FE/QA → /api/vault/attendance
+- 용도: 로컬/데모에서만 진행률을 수동으로 올려보기 위한 엔드포인트
+- 주의: 기본 운영 플로우(업로드 기반)와 혼용하지 않는 것을 권장
 
 ## 4. 시퀀스: 만료 배치
 - Actor: Scheduler → VaultService.batch_expire
