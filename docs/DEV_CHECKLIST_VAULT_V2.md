@@ -11,7 +11,7 @@
 - [x] Postgres 16 컨테이너 헬스체크 설정
 - [x] API/Worker 이미지 빌드 (Python 3.11-slim)
 - [x] web(frontend) 서비스 추가 (Next.js) 후 compose 통합 (호스트 3002)
-- [ ] `docker-compose.yml`의 `version` 필드 제거(Compose 경고 제거)
+- [x] `docker-compose.yml`의 `version` 필드 제거(Compose 경고 제거)
 
 ## 데이터베이스
 - [x] DB 마이그레이션 스크립트 준비: docs/DB_MIGRATION_VAULT_V2.sql
@@ -20,7 +20,7 @@
 - [x] compensation_queue 생성 및 인덱스
 - [x] vault_expiry_extension_log 생성 및 인덱스
 - [x] 마이그레이션 적용 완료 (rmarh-db-1 컨테이너)
-- [ ] 운영 데이터 백업/복구 전략 문서화
+- [x] 운영 데이터 백업/복구 전략 문서화: docs/OPERATIONS_BACKUP_RECOVERY_VAULT_V2.md
 
 ## 백엔드 API (FastAPI)
 - [x] /health 헬스체크

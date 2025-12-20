@@ -343,6 +343,52 @@ def _select_import_date(last_deposit_at: datetime | None) -> datetime.date:
     return _now().date()
 
 
+def _require_non_empty(value: str | None, *, code: str) -> str:
+    v = (value or "").strip()
+    if not v:
+        raise HTTPException(status_code=400, detail=code)
+    return v
+
+
+def _validate_request_id(value: str | None) -> str:
+    request_id = _require_non_empty(value, code="INVALID_REQUEST_ID")
+    # Keep it strict enough for ops usage, but not overly opinionated.
+    if len(request_id) > 128:
+        raise HTTPException(status_code=400, detail="INVALID_REQUEST_ID")
+    return request_id
+
+
+def _dedupe_int_list(values: list[int] | None, *, max_items: int) -> list[int]:
+    out: list[int] = []
+    seen: set[int] = set()
+    for v in values or []:
+        try:
+            iv = int(v)
+        except (TypeError, ValueError):
+            continue
+        if iv <= 0 or iv in seen:
+            continue
+        seen.add(iv)
+        out.append(iv)
+        if len(out) >= max_items:
+            break
+    return out
+
+
+def _dedupe_str_list(values: list[str] | None, *, max_items: int) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for v in values or []:
+        sv = str(v).strip()
+        if not sv or sv in seen:
+            continue
+        seen.add(sv)
+        out.append(sv)
+        if len(out) >= max_items:
+            break
+    return out
+
+
 @app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
 async def user_daily_import(body: DailyUserImportRequest):
     """일일 엑셀/CSV 업로드 데이터로 운영 스냅샷 + 조건을 갱신.
@@ -797,9 +843,30 @@ def _ensure_schema():
 @app.post("/api/vault/referral-revive", response_model=ReferralReviveResponse)
 async def referral_revive(body: ReferralReviveRequest, user_id: int | None = None, external_user_id: str | None = None):
     """만료 D-1 구간에서 24h 연장 (1회 제한)."""
+    request_id = _validate_request_id(getattr(body, "request_id", None))
+    channel = _require_non_empty(getattr(body, "channel", None), code="INVALID_CHANNEL")
+    invite_code = _require_non_empty(getattr(body, "invite_code", None), code="INVALID_INVITE_CODE")
     with db.get_conn() as conn:
         cur = conn.cursor()
         user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=None, create_if_missing=True)
+
+        # Idempotency: if we already processed this request_id, return the recorded result.
+        cur.execute(
+            """
+            SELECT new_expires_at
+              FROM vault_expiry_extension_log
+             WHERE request_id=%s
+               AND reason='REFERRAL'
+               AND shadow=false
+             ORDER BY id DESC
+             LIMIT 1
+            """,
+            (request_id,),
+        )
+        idem = cur.fetchone()
+        if idem and idem[0] is not None:
+            return ReferralReviveResponse(revived=True, expires_at=idem[0].isoformat())
+
         cur.execute(
             """
             SELECT expires_at, expiry_extend_count
@@ -838,7 +905,7 @@ async def referral_revive(body: ReferralReviveRequest, user_id: int | None = Non
             VALUES (%s, %s, %s, %s, %s, false, jsonb_build_object('channel', %s, 'invite_code', %s))
             ON CONFLICT (request_id) DO NOTHING
             """,
-            (user_id, expires_at, new_expires, "REFERRAL", body.request_id, body.channel, body.invite_code),
+            (user_id, expires_at, new_expires, "REFERRAL", request_id, channel, invite_code),
         )
         conn.commit()
         return ReferralReviveResponse(revived=True, expires_at=new_expires.isoformat())
@@ -847,9 +914,14 @@ async def referral_revive(body: ReferralReviveRequest, user_id: int | None = Non
 @app.post("/api/vault/extend-expiry", response_model=ExtendExpiryResponse)
 async def extend_expiry(body: ExtendExpiryRequest):
     """운영/프로모션 만료 연장. shadow=true면 미적용 프리뷰."""
+    request_id = _validate_request_id(getattr(body, "request_id", None))
     if body.scope not in {"ALL_ACTIVE", "USER_IDS"}:
         raise HTTPException(status_code=400, detail="INVALID_SCOPE")
-    if body.scope == "USER_IDS" and not (body.user_ids or body.external_user_ids):
+    if body.reason not in {"OPS", "PROMO", "ADMIN"}:
+        raise HTTPException(status_code=400, detail="INVALID_REASON")
+    user_ids = _dedupe_int_list(list(body.user_ids) if body.user_ids else None, max_items=10000)
+    external_user_ids = _dedupe_str_list(list(body.external_user_ids) if body.external_user_ids else None, max_items=10000)
+    if body.scope == "USER_IDS" and not (user_ids or external_user_ids):
         raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
     if not (1 <= body.extend_hours <= 72):
         raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
@@ -857,10 +929,27 @@ async def extend_expiry(body: ExtendExpiryRequest):
     with db.get_conn() as conn:
         cur = conn.cursor()
         now = _now()
+
+        # Best-effort idempotency on request_id (for ops retries).
+        # Older rows may have metadata=NULL; this only guarantees idempotency for runs after this change.
+        if not body.shadow:
+            cur.execute(
+                """
+                SELECT 1
+                  FROM vault_expiry_extension_log
+                 WHERE metadata->>'base_request_id'=%s
+                   AND shadow=false
+                 LIMIT 1
+                """,
+                (request_id,),
+            )
+            if cur.fetchone() is not None:
+                return ExtendExpiryResponse(shadow=False, updated=0)
+
         if body.scope == "USER_IDS":
-            user_ids = body.user_ids
-            if not user_ids and body.external_user_ids:
-                user_ids = _resolve_user_ids_by_external_user_ids(cur, list(body.external_user_ids))
+            resolved_user_ids = user_ids
+            if not resolved_user_ids and external_user_ids:
+                resolved_user_ids = _resolve_user_ids_by_external_user_ids(cur, external_user_ids)
             cur.execute(
                 """
                 SELECT user_id, expires_at
@@ -868,7 +957,7 @@ async def extend_expiry(body: ExtendExpiryRequest):
                  WHERE user_id = ANY(%s)
                    AND (gold_status!='CLAIMED' OR platinum_status!='CLAIMED' OR diamond_status!='CLAIMED')
                 """,
-                (user_ids,),
+                (resolved_user_ids,),
             )
             rows = cur.fetchall()
         else:
@@ -905,10 +994,23 @@ async def extend_expiry(body: ExtendExpiryRequest):
                 """
                 INSERT INTO vault_expiry_extension_log
                     (user_id, prev_expires_at, new_expires_at, reason, request_id, shadow, metadata)
-                VALUES (%s, %s, %s, %s, %s, false, NULL)
+                VALUES (%s, %s, %s, %s, %s, false, %s)
                 ON CONFLICT (request_id) DO NOTHING
                 """,
-                (user_id, expires_at, new_expires, body.reason, body.request_id),
+                (
+                    user_id,
+                    expires_at,
+                    new_expires,
+                    body.reason,
+                    f"{request_id}:{user_id}",
+                    Json(
+                        {
+                            "base_request_id": request_id,
+                            "scope": body.scope,
+                            "extend_hours": body.extend_hours,
+                        }
+                    ),
+                ),
             )
             updated += 1
         conn.commit()
@@ -919,7 +1021,10 @@ async def extend_expiry(body: ExtendExpiryRequest):
 async def notify(body: NotifyRequest):
     if body.type not in config.ALLOWED_NOTIFY_TYPES:
         raise HTTPException(status_code=400, detail="INVALID_NOTIFY_TYPE")
-    if not (body.user_ids or body.external_user_ids):
+
+    user_ids = _dedupe_int_list(list(body.user_ids) if body.user_ids else None, max_items=10000)
+    external_user_ids = _dedupe_str_list(list(body.external_user_ids) if body.external_user_ids else None, max_items=10000)
+    if not (user_ids or external_user_ids):
         raise HTTPException(status_code=400, detail="EMPTY_USER_IDS")
     if body.variant_id and body.variant_id not in config.ALLOWED_VARIANT_IDS:
         raise HTTPException(status_code=400, detail="VARIANT_NOT_FOUND")
@@ -929,10 +1034,10 @@ async def notify(body: NotifyRequest):
     inserted = 0
     with db.get_conn() as conn:
         cur = conn.cursor()
-        user_ids = body.user_ids
-        if not user_ids and body.external_user_ids:
-            user_ids = _resolve_user_ids_by_external_user_ids(cur, list(body.external_user_ids))
-        for uid in user_ids or []:
+        resolved_user_ids = user_ids
+        if not resolved_user_ids and external_user_ids:
+            resolved_user_ids = _resolve_user_ids_by_external_user_ids(cur, external_user_ids)
+        for uid in resolved_user_ids or []:
             dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{now.date()}"
             cur.execute(
                 """
