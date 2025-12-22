@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function formatKoDateTime(value) {
+function formatKoDate(value) {
   if (!value) return '-';
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '-';
@@ -9,8 +9,6 @@ function formatKoDateTime(value) {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour: 'numeric',
-    minute: '2-digit',
   }).format(d);
 }
 
@@ -119,7 +117,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                   <td className="px-3 py-2 text-admin-neon font-mono">{user.external_user_id}</td>
                   <td className="px-3 py-2 text-admin-text">{user.nickname || '-'}</td>
                   <td className="px-3 py-2 text-admin-text">
-                    {user.joined_date ? formatKoDateTime(user.joined_date) : formatKoDateTime(user.created_at)}
+                    {user.joined_date ? formatKoDate(user.joined_date) : formatKoDate(user.created_at)}
                   </td>
                   <td className="px-3 py-2">{statusBadge(user.gold_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.platinum_status)}</td>
@@ -133,11 +131,11 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                     )}
                   </td>
                   <td className="px-3 py-2 text-admin-text">
-                    {user.platinum_deposit_done ? '✓' : '-'}
+                    {(user.deposit_total || 0) >= 50000 ? '✓' : '-'}
                   </td>
                   <td className="px-3 py-2 text-admin-text">{user.telegram_ok ? '✓' : '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{user.review_ok ? '✓' : '-'}</td>
-                  <td className="px-3 py-2 text-admin-text">{formatKoDateTime(user.expires_at)}</td>
+                  <td className="px-3 py-2 text-admin-text">{formatKoDate(user.expires_at)}</td>
                 </tr>
               ))}
             </tbody>

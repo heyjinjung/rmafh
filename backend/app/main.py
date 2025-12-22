@@ -205,6 +205,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         )
         row = cur.fetchone()
 
+        # CSV 업로드된 회원만 접근 가능
         cur.execute(
             """
             SELECT COALESCE(review_ok, false)
@@ -214,6 +215,13 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
             (user_id,),
         )
         review_row = cur.fetchone()
+        
+        # user_admin_snapshot에 없으면 접근 불가
+        if not review_row:
+            raise HTTPException(
+                status_code=403,
+                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 금고에 접근할 수 있습니다."
+            )
 
     # Fallback defaults if user row not found
     expires_at = row[0] if row else now + timedelta(hours=72)
@@ -271,6 +279,18 @@ async def claim_vault(body: ClaimRequest, user_id: int | None = None, external_u
     with db.get_conn() as conn:
         cur = conn.cursor()
         user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
+        
+        # CSV 업로드된 회원만 금고 수령 가능
+        cur.execute(
+            "SELECT 1 FROM user_admin_snapshot WHERE user_id=%s",
+            (user_id,)
+        )
+        if not cur.fetchone():
+            raise HTTPException(
+                status_code=403,
+                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 금고를 수령할 수 있습니다."
+            )
+        
         cur.execute(
             """
             SELECT expires_at, gold_status, platinum_status, diamond_status
@@ -338,6 +358,18 @@ async def attendance(user_id: int | None = None, external_user_id: str | None = 
     with db.get_conn() as conn:
         cur = conn.cursor()
         user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
+        
+        # CSV 업로드된 회원만 출석 체크 가능
+        cur.execute(
+            "SELECT 1 FROM user_admin_snapshot WHERE user_id=%s",
+            (user_id,)
+        )
+        if not cur.fetchone():
+            raise HTTPException(
+                status_code=403,
+                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 출석체크를 할 수 있습니다."
+            )
+        
         cur.execute(
             """
             SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
@@ -1284,7 +1316,7 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
                 uas.joined_date
             FROM user_identity ui
             LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
-            LEFT JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
+            INNER JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
             ORDER BY ui.user_id DESC
             LIMIT 1000
             """
