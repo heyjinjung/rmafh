@@ -103,14 +103,14 @@ export default function Home() {
           <div style={styles.offerings}>
             <h3 style={styles.offeringsTitle} className="cc-offeringsTitle">게임 바로가기</h3>
             <div style={styles.modules} className="modules">
-              <a href="#" style={styles.navCard} className="nav-card">
+              <a href="https://ccc-001.com" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
                 <img src={ICON_GAME} alt="" style={styles.navCardIcon} />
                 <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>바로가기</span>
                 </div>
               </a>
-              <a href="#" style={styles.navCard} className="nav-card">
+              <a href="https://t.me/+IE0NYpuze_k1YWZk" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
                 <img src={ICON_TELEGRAM} alt="" style={styles.navCardIcon} />
                 <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
@@ -131,9 +131,9 @@ export default function Home() {
           <div style={styles.footerContent}>
             <p style={styles.contactTitle}>Contact</p>
             <div style={styles.contactLinks}>
-              <span>CC고객센터 텔레그램</span>
-              <span>CC카지노 바로가기</span>
-              <span>CC카지노 공식 탤래채널</span>
+              <a href="https://t.me/CCCS1009" target="_blank" rel="noreferrer">CC고객센터 텔레그램</a>
+              <a href="https://ccc-001.com" target="_blank" rel="noreferrer">CC카지노 바로가기</a>
+              <a href="https://t.me/+IE0NYpuze_k1YWZk" target="_blank" rel="noreferrer">CC카지노 공식 텔레채널</a>
             </div>
           </div>
         </footer>
