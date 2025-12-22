@@ -31,12 +31,14 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [total, setTotal] = useState(0);
+  const [query, setQuery] = useState('');
 
   const handleFetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch('/api/vault/users-list', {
+      const qs = query ? `?query=${encodeURIComponent(query)}` : '';
+      const response = await fetch(`/api/vault/users-list${qs}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +63,8 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
 
   const handleRowClick = (externalUserId) => {
     if (onSelectUser) {
-      onSelectUser(externalUserId);
+      const found = users.find((u) => u.external_user_id === externalUserId);
+      onSelectUser(found || { external_user_id: externalUserId });
     }
   };
 
@@ -72,10 +75,21 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <button onClick={handleFetchUsers} disabled={loading} className={btnBase}>
-          {loading ? '조회 중...' : '전체 회원 조회'}
-        </button>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex-1 flex gap-2">
+          <input
+            className={inputBase}
+            placeholder="외부 아이디 또는 닉네임으로 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleFetchUsers();
+            }}
+          />
+          <button onClick={handleFetchUsers} disabled={loading} className={btnBase}>
+            {loading ? '조회 중...' : '검색'}
+          </button>
+        </div>
         {total > 0 && (
           <div className="text-sm text-admin-text">
             총 <span className="font-bold text-admin-neon">{total}</span>명
@@ -131,7 +145,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                     )}
                   </td>
                   <td className="px-3 py-2 text-admin-text">
-                    {(user.deposit_total || 0) >= 50000 ? '✓' : '-'}
+                    {user.platinum_deposit_done ? '플래티넘 완료' : '-'}
                   </td>
                   <td className="px-3 py-2 text-admin-text">{user.telegram_ok ? '✓' : '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{user.review_ok ? '✓' : '-'}</td>

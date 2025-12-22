@@ -15,6 +15,12 @@ from app.schemas import (
     ClaimRequest,
     ClaimResponse,
     CompensationEnqueueRequest,
+    AdminAttendanceAdjustRequest,
+    AdminAttendanceAdjustResponse,
+    AdminDepositUpdateRequest,
+    AdminDepositUpdateResponse,
+    AdminStatusUpdateRequest,
+    AdminStatusUpdateResponse,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
     HealthResponse,
@@ -458,6 +464,19 @@ def _parse_int(value, default: int = 0) -> int:
         return default
 
 
+def _validate_status(value: str | None, field: str) -> str:
+    v = (value or "").strip().upper()
+    if not v:
+        raise HTTPException(status_code=400, detail=f"INVALID_{field.upper()}")
+    if v not in {"LOCKED", "UNLOCKED", "CLAIMED", "EXPIRED"}:
+        raise HTTPException(status_code=400, detail=f"INVALID_{field.upper()}")
+    return v
+
+
+def _clamp_attendance_days(value: int) -> int:
+    return max(0, min(365, value))
+
+
 def _parse_iso_datetime(value: str | None) -> datetime | None:
     s = str(value or "").strip()
     if not s:
@@ -475,6 +494,53 @@ def _parse_iso_datetime(value: str | None) -> datetime | None:
         return dt.astimezone(timezone.utc)
     except ValueError:
         return None
+
+
+def _get_or_create_vault_row(cur, user_id: int, now: datetime):
+    cur.execute(
+        """
+        SELECT expires_at,
+               gold_status,
+               platinum_status,
+               diamond_status,
+               platinum_attendance_days,
+               platinum_deposit_done,
+               diamond_deposit_current
+          FROM vault_status
+         WHERE user_id=%s
+         FOR UPDATE
+        """,
+        (user_id,),
+    )
+    row = cur.fetchone()
+    if row:
+        return row
+
+    expires_at = now + timedelta(hours=72)
+    cur.execute(
+        """
+        INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
+        VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        (user_id, expires_at),
+    )
+    cur.execute(
+        """
+        SELECT expires_at,
+               gold_status,
+               platinum_status,
+               diamond_status,
+               platinum_attendance_days,
+               platinum_deposit_done,
+               diamond_deposit_current
+          FROM vault_status
+         WHERE user_id=%s
+         FOR UPDATE
+        """,
+        (user_id,),
+    )
+    return cur.fetchone()
 
 
 def _parse_joined_date(value: str | None):
@@ -1217,11 +1283,11 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
 
 
 @app.get("/api/vault/admin/users")
-async def get_all_users(_auth: str = Depends(verify_admin_password)):
+async def get_all_users(query: str | None = None, _auth: str = Depends(verify_admin_password)):
     """전체 회원 리스트와 각 회원의 금고 상태 조회"""
     with db.get_conn() as conn:
         cur = conn.cursor()
-        cur.execute(
+        sql = [
             """
             SELECT 
                 ui.user_id,
@@ -1242,10 +1308,16 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
             FROM user_identity ui
             LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
             INNER JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
-            ORDER BY ui.user_id DESC
-            LIMIT 1000
             """
-        )
+        ]
+        params = []
+        if query:
+            sql.append("WHERE ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s")
+            like = f"%{query}%"
+            params.extend([like, like])
+
+        sql.append("ORDER BY ui.user_id DESC LIMIT 1000")
+        cur.execute("\n".join(sql), params)
         rows = cur.fetchall()
         
         from datetime import date
@@ -1284,6 +1356,241 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
             })
         
         return {"users": users, "total": len(users)}
+
+
+@app.post("/api/vault/admin/users/{user_id}/vault/status", response_model=AdminStatusUpdateResponse)
+async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    now = _now()
+    updates = {}
+    if body.gold_status is not None:
+        updates["gold_status"] = _validate_status(body.gold_status, "gold_status")
+    if body.platinum_status is not None:
+        updates["platinum_status"] = _validate_status(body.platinum_status, "platinum_status")
+    if body.diamond_status is not None:
+        updates["diamond_status"] = _validate_status(body.diamond_status, "diamond_status")
+    if not updates:
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '10s'")
+
+        cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+
+        row = _get_or_create_vault_row(cur, user_id, now)
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        expires_at, gold_status, platinum_status, diamond_status, *_ = row
+        current = {
+            "gold_status": gold_status,
+            "platinum_status": platinum_status,
+            "diamond_status": diamond_status,
+        }
+
+        # CLAIMED은 되돌리지 않음
+        for key, new_val in updates.items():
+            if current.get(key) == "CLAIMED" and new_val != "CLAIMED":
+                raise HTTPException(status_code=409, detail="CANNOT_MODIFY_CLAIMED")
+
+        set_clauses = []
+        params = []
+        for col in ("gold_status", "platinum_status", "diamond_status"):
+            if col in updates:
+                set_clauses.append(f"{col}=%s")
+                params.append(updates[col])
+        set_clauses.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"""
+            UPDATE vault_status
+               SET {', '.join(set_clauses)}
+             WHERE user_id=%s
+            """,
+            params,
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_STATUS_UPDATE",
+            endpoint=f"/api/vault/admin/users/{user_id}/vault/status",
+            target_user_ids=[user_id],
+            request_id=None,
+            request_body=updates,
+            response_status="SUCCESS",
+            response_summary={"updated": True},
+        )
+
+        conn.commit()
+
+        return AdminStatusUpdateResponse(
+            updated=True,
+            gold_status=updates.get("gold_status", gold_status),
+            platinum_status=updates.get("platinum_status", platinum_status),
+            diamond_status=updates.get("diamond_status", diamond_status),
+            expires_at=expires_at.isoformat() if expires_at else None,
+        )
+
+
+@app.post("/api/vault/admin/users/{user_id}/vault/attendance", response_model=AdminAttendanceAdjustResponse)
+async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    if body.delta_days is None and body.set_days is None:
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    delta_days = int(body.delta_days or 0)
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '10s'")
+
+        cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
+        snap_row = cur.fetchone()
+        review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        row = _get_or_create_vault_row(cur, user_id, _now())
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, _diamond_deposit_current = row
+        current_days = int(attendance_days or 0)
+
+        if body.set_days is not None:
+            target_days = _clamp_attendance_days(int(body.set_days))
+        else:
+            target_days = _clamp_attendance_days(current_days + delta_days)
+
+        new_platinum_status = platinum_status
+        if platinum_status not in {"CLAIMED", "EXPIRED"}:
+            if target_days >= 3 and bool(platinum_deposit_done) and review_ok:
+                new_platinum_status = "UNLOCKED"
+
+        now = _now()
+        cur.execute(
+            """
+            UPDATE vault_status
+               SET platinum_attendance_days=%s,
+                   last_attended_at=%s,
+                   platinum_status=%s,
+                   updated_at=%s
+             WHERE user_id=%s
+            """,
+            (target_days, now, new_platinum_status, now, user_id),
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_ATTENDANCE_ADJUST",
+            endpoint=f"/api/vault/admin/users/{user_id}/vault/attendance",
+            target_user_ids=[user_id],
+            request_id=None,
+            request_body={"delta_days": body.delta_days, "set_days": body.set_days},
+            response_status="SUCCESS",
+            response_summary={"platinum_attendance_days": target_days, "platinum_status": new_platinum_status},
+        )
+
+        conn.commit()
+
+        return AdminAttendanceAdjustResponse(
+            platinum_attendance_days=target_days,
+            platinum_status=new_platinum_status,
+            last_attended_at=now.isoformat(),
+            expires_at=expires_at.isoformat() if expires_at else None,
+        )
+
+
+@app.post("/api/vault/admin/users/{user_id}/vault/deposit", response_model=AdminDepositUpdateResponse)
+async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    if body.platinum_deposit_done is None and body.diamond_deposit_current is None:
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '10s'")
+
+        cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
+        snap_row = cur.fetchone()
+        review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        row = _get_or_create_vault_row(cur, user_id, _now())
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current = row
+        new_platinum_deposit_done = bool(body.platinum_deposit_done) if body.platinum_deposit_done is not None else bool(platinum_deposit_done)
+        new_diamond_deposit_current = int(body.diamond_deposit_current) if body.diamond_deposit_current is not None else int(diamond_deposit_current or 0)
+
+        new_platinum_status = platinum_status
+        if platinum_status not in {"CLAIMED", "EXPIRED"}:
+            if new_platinum_deposit_done and int(attendance_days or 0) >= 3 and review_ok:
+                new_platinum_status = "UNLOCKED"
+
+        new_diamond_status = diamond_status
+        if diamond_status not in {"CLAIMED", "EXPIRED"}:
+            if new_diamond_deposit_current >= 500000:
+                new_diamond_status = "UNLOCKED"
+
+        now = _now()
+        cur.execute(
+            """
+            UPDATE vault_status
+               SET platinum_deposit_done=%s,
+                   diamond_deposit_current=%s,
+                   platinum_status=%s,
+                   diamond_status=%s,
+                   updated_at=%s
+             WHERE user_id=%s
+            """,
+            (
+                new_platinum_deposit_done,
+                new_diamond_deposit_current,
+                new_platinum_status,
+                new_diamond_status,
+                now,
+                user_id,
+            ),
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_DEPOSIT_UPDATE",
+            endpoint=f"/api/vault/admin/users/{user_id}/vault/deposit",
+            target_user_ids=[user_id],
+            request_id=None,
+            request_body={
+                "platinum_deposit_done": body.platinum_deposit_done,
+                "diamond_deposit_current": body.diamond_deposit_current,
+            },
+            response_status="SUCCESS",
+            response_summary={
+                "platinum_status": new_platinum_status,
+                "diamond_status": new_diamond_status,
+            },
+        )
+
+        conn.commit()
+
+        return AdminDepositUpdateResponse(
+            platinum_deposit_done=new_platinum_deposit_done,
+            diamond_deposit_current=new_diamond_deposit_current,
+            platinum_status=new_platinum_status,
+            diamond_status=new_diamond_status,
+            expires_at=expires_at.isoformat() if expires_at else None,
+        )
 
 
 @app.post("/api/vault/compensation-enqueue")

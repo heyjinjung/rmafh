@@ -872,21 +872,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
               )}
 
               {vault.tier === 'platinum' && (
-                <div className="px-4 pb-2">
-                  <div className="bg-black/30 border border-white/10 rounded-lg px-3 py-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-white/80 font-medium">연속 진행</span>
-                      <span className="text-white font-bold">{Math.min(3, vault.meta?.attendanceDays ?? 0)}/3</span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs">
-                      <span className="text-white/60">리뷰 키</span>
-                      <span className="text-white/80 font-semibold">{vault.meta?.reviewDone ? '1/1 (완료)' : '0/1 (필요)'}</span>
-                    </div>
-                    <div className="mt-2 text-xs text-white/60">
-                      오늘 조건을 채우면 +1, 하루라도 건너뛰면 1일부터 다시 시작돼요.
-                    </div>
-                  </div>
-                </div>
+                null
               )}
 
               <div className="p-4 flex-grow">

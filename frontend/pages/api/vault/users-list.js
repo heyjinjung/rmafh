@@ -1,23 +1,36 @@
-// GET 전체 회원 리스트 조회 프록시
-export default async function handler(req, res) {
-  const API_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+// GET 전체 회원 리스트 조회 프록시 (검색 지원)
+function getBaseUrl() {
+  return process.env.NEXT_PUBLIC_API_BASE || process.env.API_BASE || 'http://localhost:18000';
+}
 
-  // 메서드 검증
+function buildQuery(req) {
+  const params = new URLSearchParams();
+  const query = req?.query || {};
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) params.append(key, String(v));
+    } else {
+      params.set(key, String(value));
+    }
+  }
+  const s = params.toString();
+  return s ? `?${s}` : '';
+}
+
+export default async function handler(req, res) {
   if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // 백엔드 호출
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const backendUrl = `${API_BASE}/api/vault/admin/users`;
-    const headers = {
-      'Content-Type': 'application/json',
-    };
+    const backendUrl = `${getBaseUrl()}/api/vault/admin/users${buildQuery(req)}`;
+    const headers = { 'Content-Type': 'application/json' };
 
-    // x-admin-password 헤더 전달
     if (req.headers['x-admin-password']) {
       headers['x-admin-password'] = req.headers['x-admin-password'];
     }

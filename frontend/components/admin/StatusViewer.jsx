@@ -9,165 +9,90 @@ function formatKoDateTime(value) {
     day: '2-digit',
     hour: 'numeric',
     minute: '2-digit',
-    second: '2-digit',
   }).format(d);
 }
 
-function formatWon(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '-';
-  return `${n.toLocaleString('ko-KR')} 원`;
+function statusBadge(status) {
+  const base = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border';
+  if (status === 'UNLOCKED') return <span className={`${base} border-admin-neon text-admin-neon`}>활성</span>;
+  if (status === 'LOCKED') return <span className={`${base} border-admin-border text-admin-muted`}>비활성</span>;
+  if (status === 'CLAIMED') return <span className={`${base} border-blue-400/60 text-blue-300`}>수령완료</span>;
+  if (status === 'EXPIRED') return <span className={`${base} border-red-500/60 text-red-400`}>만료</span>;
+  return <span className={`${base} border-admin-border text-admin-muted`}>{status || '-'}</span>;
 }
 
-function vaultTitle(tier) {
-  if (tier === 'GOLD') return '골드 금고';
-  if (tier === 'PLATINUM') return '플래티넘 금고';
-  if (tier === 'DIAMOND') return '다이아 금고';
-  return `${tier} 금고`;
-}
-
-function statusLabel(status) {
-  if (status === 'UNLOCKED') return { text: '활성', className: 'text-admin-neon' };
-  if (status === 'LOCKED') return { text: '비활성', className: 'text-cc-textSub' };
-  if (!status) return { text: '-', className: 'text-cc-textSub' };
-  return { text: String(status), className: 'text-cc-textSub' };
-}
-
-function ConditionRow({ ok, children }) {
-  return <li className={ok ? 'text-admin-neon' : 'text-admin-muted'}>{children}</li>;
-}
-
-function VaultCard({ tier, status, amountWon, expiresAt, conditions, cardBase }) {
-  const st = statusLabel(status);
+function InfoRow({ label, value }) {
   return (
-    <div className="mt-4">
-      <div className="text-base font-bold text-admin-neon">{vaultTitle(tier)}</div>
-      <div className="mt-3 bg-admin-bg border border-admin-border rounded-[8px] p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <div className="text-xs text-admin-muted">상태</div>
-            <div className={`text-sm font-semibold ${st.className}`}>{st.text}</div>
-          </div>
-          <div>
-            <div className="text-xs text-admin-muted">금액</div>
-            <div className="text-sm font-semibold text-admin-text">{formatWon(amountWon)}</div>
-          </div>
-          {expiresAt ? (
-            <div className="sm:col-span-2">
-              <div className="text-xs text-admin-muted">만료일</div>
-              <div className="text-sm font-semibold text-admin-text">{formatKoDateTime(expiresAt)}</div>
-            </div>
-          ) : null}
-          <div className="sm:col-span-2">
-            <div className="text-xs text-admin-muted">해금 조건</div>
-            {conditions?.length ? (
-              <ul className="mt-1 list-disc pl-5 text-sm space-y-1">
-                {conditions.map((c, idx) => (
-                  <ConditionRow key={`${tier}-${idx}`} ok={!!c.ok}>
-                    {c.label}
-                  </ConditionRow>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-sm text-admin-text">현재 없음</div>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="grid grid-cols-3 gap-2 text-sm">
+      <div className="text-admin-muted">{label}</div>
+      <div className="col-span-2 font-semibold text-admin-text">{value}</div>
     </div>
   );
 }
 
-export function StatusSummary({ statusData, externalUserId }) {
-  if (!statusData) {
-    return (
-      <>
-        <h2 className="text-lg font-bold">상태 정보</h2>
-        <p className="mt-2 text-sm text-cc-textSub">외부 아이디를 입력하고 상태 조회를 실행하세요.</p>
-      </>
-    );
-  }
-
-  const goldStatus = statusData?.gold_status;
-  const platinumStatus = statusData?.platinum_status;
-  const expiresAt = statusData?.expires_at;
-  const nowAt = statusData?.now;
-
-  const lossBreakdown = statusData?.loss_breakdown || {};
-  const goldAmount = lossBreakdown?.GOLD;
-  const platinumAmount = lossBreakdown?.PLATINUM;
-
-  const platinumDays = Number(statusData?.platinum_attendance_days || 0);
-  const platinumDepositDone = !!statusData?.platinum_deposit_done;
-  const platinumReviewDone = !!statusData?.platinum_review_done;
-
-  const platinumConditions = [
-    {
-      ok: Number.isFinite(platinumAmount) ? platinumAmount >= 20000 : false,
-      label: '금고금액 2만원',
-    },
-    {
-      ok: platinumDays >= 3,
-      label: `연속 3일 이용하기 (현재 ${platinumDays}/3)`,
-    },
-    {
-      ok: platinumDepositDone,
-      label: '1일 5만원 이상 이용하기',
-    },
-    {
-      ok: platinumReviewDone,
-      label: '리뷰 1회 이상 작성하기',
-    },
-  ];
-
+function VaultRow({ title, status, children }) {
   return (
-    <>
-      <h2 className="text-lg font-bold">상태 정보</h2>
-
-      <div className="mt-4">
-        <div className="text-base font-bold text-admin-neon">사용자 정보</div>
-        <div className="mt-3 border-t border-admin-border pt-3">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-            <div className="text-admin-muted">사용자 ID</div>
-            <div className="sm:col-span-2 font-semibold text-admin-text">-</div>
-            <div className="text-admin-muted">외부 ID</div>
-            <div className="sm:col-span-2 font-semibold text-admin-text">{externalUserId || '-'}</div>
-            <div className="text-admin-muted">생성일</div>
-            <div className="sm:col-span-2 font-semibold text-admin-text">{formatKoDateTime(nowAt)}</div>
-          </div>
-        </div>
+    <div className="border border-admin-border rounded-[8px] p-3 bg-admin-bg">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-bold text-admin-neon">{title}</div>
+        {statusBadge(status)}
       </div>
-
-      <div className="mt-6">
-        <div className="text-base font-bold text-admin-neon">금고 정보</div>
-        <div className="mt-3 border-t border-admin-border pt-3">
-          <VaultCard
-            tier="GOLD"
-            status={goldStatus}
-            amountWon={goldAmount}
-            expiresAt={goldStatus === 'UNLOCKED' ? expiresAt : null}
-            conditions={[]}
-            cardBase={null}
-          />
-
-          <VaultCard
-            tier="PLATINUM"
-            status={platinumStatus}
-            amountWon={platinumAmount}
-            expiresAt={platinumStatus === 'UNLOCKED' ? expiresAt : null}
-            conditions={platinumConditions}
-            cardBase={null}
-          />
-        </div>
-      </div>
-    </>
+      {children ? <div className="mt-3 text-sm text-admin-text space-y-1">{children}</div> : null}
+    </div>
   );
 }
 
 export function StatusViewer({ statusData, cardBase, externalUserId }) {
+  if (!statusData) {
+    return (
+      <div className={`${cardBase} p-4 md:p-6`}>
+        <h2 className="text-lg font-bold">상태 정보</h2>
+        <p className="mt-2 text-sm text-cc-textSub">외부 아이디를 입력하고 상태 조회를 실행하세요.</p>
+      </div>
+    );
+  }
+
+  const joined = statusData.joined_date || statusData.created_at;
+  const expires = statusData.expires_at;
+
   return (
     <div className={`${cardBase} p-4 md:p-6`}>
-      <StatusSummary statusData={statusData} externalUserId={externalUserId} />
+      <h2 className="text-lg font-bold">상태 정보</h2>
+
+      <div className="mt-4 space-y-2">
+        <div className="text-base font-bold text-admin-neon">사용자 정보</div>
+        <InfoRow label="외부 ID" value={statusData.external_user_id || externalUserId || '-'} />
+        <InfoRow label="닉네임" value={statusData.nickname || '-'} />
+        <InfoRow label="가입일" value={formatKoDateTime(joined)} />
+        <InfoRow label="등록일" value={formatKoDateTime(statusData.created_at)} />
+        <InfoRow
+          label="텔레그램 / 리뷰"
+          value={`${statusData.telegram_ok ? '✓' : '-'} / ${statusData.review_ok ? '✓' : '-'}`}
+        />
+      </div>
+
+      <div className="mt-6 space-y-3">
+        <div className="text-base font-bold text-admin-neon">금고 정보</div>
+
+        <VaultRow title="골드 금고" status={statusData.gold_status}>
+          <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
+        </VaultRow>
+
+        <VaultRow title="플래티넘 금고" status={statusData.platinum_status}>
+          <div>
+            출석: {statusData.platinum_attendance_days ?? 0}
+            {statusData.max_attendance_days != null ? ` / ${statusData.max_attendance_days}` : ''}일
+          </div>
+          <div>입금: {statusData.platinum_deposit_done ? '완료' : '미완료'}</div>
+          <div>리뷰: {statusData.review_ok ? '완료' : '미완료'}</div>
+          <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
+        </VaultRow>
+
+        <VaultRow title="다이아 금고" status={statusData.diamond_status}>
+          <div>누적 입금: {(statusData.diamond_deposit_current ?? 0).toLocaleString('ko-KR')} 원</div>
+          <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
+        </VaultRow>
+      </div>
     </div>
   );
 }

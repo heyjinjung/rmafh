@@ -61,6 +61,45 @@ class HealthResponse(BaseModel):
     status: str
 
 
+class AdminStatusUpdateRequest(BaseModel):
+    gold_status: Optional[str] = None
+    platinum_status: Optional[str] = None
+    diamond_status: Optional[str] = None
+
+
+class AdminStatusUpdateResponse(BaseModel):
+    updated: bool
+    gold_status: str
+    platinum_status: str
+    diamond_status: str
+    expires_at: Optional[str] = None
+
+
+class AdminAttendanceAdjustRequest(BaseModel):
+    delta_days: Optional[int] = Field(None, description="변경할 출석 증감값(+/-). set_days가 없을 때만 사용")
+    set_days: Optional[int] = Field(None, description="출석일수를 특정 값으로 설정")
+
+
+class AdminAttendanceAdjustResponse(BaseModel):
+    platinum_attendance_days: int
+    platinum_status: str
+    last_attended_at: Optional[str]
+    expires_at: Optional[str]
+
+
+class AdminDepositUpdateRequest(BaseModel):
+    platinum_deposit_done: Optional[bool] = None
+    diamond_deposit_current: Optional[int] = None
+
+
+class AdminDepositUpdateResponse(BaseModel):
+    platinum_deposit_done: bool
+    diamond_deposit_current: int
+    platinum_status: str
+    diamond_status: str
+    expires_at: Optional[str]
+
+
 class UserIdentityBulkRequest(BaseModel):
     external_user_ids: List[str]
 

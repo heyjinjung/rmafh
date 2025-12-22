@@ -21,6 +21,7 @@ export default function AdminPage() {
   const [externalUserId, setExternalUserId] = useState('');
   const [activeSection, setActiveSection] = useState('status');
   const [busyKey, setBusyKey] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   // 페이지 로드 시 sessionStorage에서 비밀번호 복원
   useEffect(() => {
@@ -68,6 +69,15 @@ export default function AdminPage() {
   const [csvError, setCsvError] = useState(null);
   const [csvLastCall, setCsvLastCall] = useState(null);
 
+  const [actionResponse, setActionResponse] = useState(null);
+  const [actionError, setActionError] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLastCall, setActionLastCall] = useState(null);
+  const [actionKey, setActionKey] = useState(null);
+  const [statusForm, setStatusForm] = useState({ gold_status: '', platinum_status: '', diamond_status: '' });
+  const [attendanceForm, setAttendanceForm] = useState({ delta_days: '', set_days: '' });
+  const [depositForm, setDepositForm] = useState({ platinum_deposit_done: '', diamond_deposit_current: '' });
+
   const qs = useMemo(() => {
     const params = new URLSearchParams();
     if (externalUserId) params.set('external_user_id', externalUserId);
@@ -75,17 +85,18 @@ export default function AdminPage() {
     return s ? `?${s}` : '';
   }, [externalUserId]);
 
-  async function callApiRaw(path, init, { key, setLastCall }) {
+  async function callApiRaw(path, init, { key, setLastCall, includeExternalQuery = true }) {
     setBusyKey(key);
     const method = (init?.method || 'GET').toUpperCase();
-    setLastCall({ key, method, path: `${path}${qs}`, at: new Date().toISOString() });
+    const pathWithQs = includeExternalQuery ? `${path}${qs}` : path;
+    setLastCall({ key, method, path: pathWithQs, at: new Date().toISOString() });
 
     const headers = { ...(init?.headers || {}) };
     if (isAuthenticated && adminPassword) {
       headers['x-admin-password'] = adminPassword;
     }
 
-    const res = await fetch(`${path}${qs}`, { ...init, headers });
+    const res = await fetch(pathWithQs, { ...init, headers });
     const ct = res.headers.get('content-type') || '';
     const body = ct.includes('application/json') ? await res.json() : await res.text();
     if (!res.ok) {
@@ -104,6 +115,7 @@ export default function AdminPage() {
     'inline-flex items-center px-5 py-3 rounded-[6px] text-sm font-semibold border border-transparent bg-admin-green text-white hover:bg-admin-greenDark focus:outline-none focus:ring-2 focus:ring-admin-green focus:ring-offset-2 focus:ring-offset-admin-surface disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
   const buttonGhost =
     'px-4 py-2 rounded-[6px] text-sm font-semibold border border-admin-border2 bg-admin-surface text-admin-text hover:brightness-[1.05] disabled:opacity-50 disabled:cursor-not-allowed transition-colors';
+  const statusOptions = ['', 'LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
   const sectionButtonClass = (key) => {
     const isActive = activeSection === key;
@@ -120,6 +132,7 @@ export default function AdminPage() {
     setStatusError(null);
     setStatusData(null);
     setStatusLastCall(null);
+    setSelectedUserId(null);
     setExtendError(null);
     setExtendResponse(null);
     setExtendLastCall(null);
@@ -129,6 +142,85 @@ export default function AdminPage() {
     setCsvError(null);
     setCsvResponse(null);
     setCsvLastCall(null);
+    setActionError(null);
+    setActionResponse(null);
+    setActionLastCall(null);
+    setActionKey(null);
+  };
+
+  const fetchUserStatus = async ({ skipBusy = false } = {}) => {
+    if (!externalUserId && !selectedUserId) {
+      setStatusError({ 응답: { message: '외부 아이디를 입력하거나 목록에서 사용자를 선택하세요.' } });
+      return;
+    }
+
+    setStatusLoading(true);
+    setStatusError(null);
+    setStatusData(null);
+    if (!skipBusy) setBusyKey('status');
+
+    const q = externalUserId ? `?query=${encodeURIComponent(externalUserId)}` : '';
+    setStatusLastCall({ key: 'status', method: 'GET', path: `/api/vault/users-list${q}`, at: new Date().toISOString() });
+
+    try {
+      const response = await fetch(`/api/vault/users-list${q}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': adminPassword,
+        },
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw { payload: data };
+      }
+
+      const user = Array.isArray(data?.users) ? data.users[0] : null;
+      if (!user) {
+        throw { payload: { 응답: { message: '해당 사용자를 찾지 못했어요.' }, 상태코드: 404 } };
+      }
+
+      setStatusData(user);
+      setSelectedUserId(user.user_id);
+      if (user.external_user_id) setExternalUserId(user.external_user_id);
+    } catch (e) {
+      setStatusError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+    } finally {
+      setStatusLoading(false);
+      if (!skipBusy) setBusyKey('');
+    }
+  };
+
+  const runAdminAction = async (action, body) => {
+    if (!selectedUserId) {
+      setActionError({ 응답: { message: '먼저 사용자 상태를 조회하거나 목록에서 선택하세요.' } });
+      return;
+    }
+
+    setActionLoading(true);
+    setActionError(null);
+    setActionResponse(null);
+    setActionKey(action);
+
+    try {
+      const resp = await callApiRaw(
+        `/api/vault/admin/users/${selectedUserId}/vault/${action}`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        { key: action, setLastCall: setActionLastCall, includeExternalQuery: false }
+      );
+      setActionResponse(resp);
+      await fetchUserStatus({ skipBusy: true });
+    } catch (e) {
+      setActionError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+    } finally {
+      setActionLoading(false);
+      setBusyKey('');
+    }
   };
 
   return (
@@ -330,9 +422,21 @@ export default function AdminPage() {
                 <div className="flex flex-col gap-[12.639px] items-start">
                   <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">Contact</p>
                   <div className="font-medium leading-[1.15] text-[20px] text-gold-primary">
-                    <p>CC고객센터 텔레그램</p>
-                    <p>CC카지노 바로가기</p>
-                    <p>CC카지노 공식 탤래채널</p>
+                    <p>
+                      <a href="https://t.me/CCCS1009" target="_blank" rel="noreferrer" className="underline">
+                        CC고객센터 텔레그램
+                      </a>
+                    </p>
+                    <p>
+                      <a href="https://ccc-001.com" target="_blank" rel="noreferrer" className="underline">
+                        CC카지노 바로가기
+                      </a>
+                    </p>
+                    <p>
+                      <a href="https://t.me/+IE0NYpuze_k1YWZk" target="_blank" rel="noreferrer" className="underline">
+                        CC카지노 공식 텔레채널
+                      </a>
+                    </p>
                   </div>
                 </div>
               </footer>
@@ -375,23 +479,7 @@ export default function AdminPage() {
                           disabled={!!busyKey}
                           onClick={() => {
                             setActiveSection('status');
-                            (async () => {
-                              setStatusLoading(true);
-                              setStatusError(null);
-                              try {
-                                const body = await callApiRaw(
-                                  '/api/vault/status/',
-                                  { method: 'GET' },
-                                  { key: 'status', setLastCall: setStatusLastCall }
-                                );
-                                setStatusData(body);
-                              } catch (e) {
-                                setStatusError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
-                              } finally {
-                                setStatusLoading(false);
-                                setBusyKey('');
-                              }
-                            })();
+                            fetchUserStatus();
                           }}
                         >
                           상태 조회
@@ -439,8 +527,10 @@ export default function AdminPage() {
                       </div>
                       <UsersListViewer
                         adminPassword={adminPassword}
-                        onSelectUser={(userId) => {
-                          setExternalUserId(userId);
+                        onSelectUser={(user) => {
+                          setExternalUserId(user.external_user_id || '');
+                          setSelectedUserId(user.user_id || null);
+                          setStatusData(user);
                           setActiveSection('status');
                         }}
                       />
@@ -448,18 +538,167 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'status' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
-                      <ResponseViewer
-                        title="상태 조회 결과"
-                        loading={statusLoading}
-                        error={statusError}
-                        response={statusData}
-                        lastCall={statusLastCall}
-                        cardBase={cardBase}
-                        actionKey="status"
-                      />
-                    </div>
+                    <>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
+                        <ResponseViewer
+                          title="상태 조회 결과"
+                          loading={statusLoading}
+                          error={statusError}
+                          response={statusData}
+                          lastCall={statusLastCall}
+                          cardBase={cardBase}
+                          actionKey="status"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                        <div className={`${cardBase} p-3 md:p-4 space-y-4`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-lg font-semibold text-admin-neon">관리 액션</h3>
+                              <p className="text-sm text-admin-muted">선택된 사용자: {selectedUserId ?? '없음'}</p>
+                            </div>
+                            <button
+                              className={buttonGhost}
+                              onClick={() => fetchUserStatus()}
+                              disabled={!!busyKey}
+                            >
+                              상태 새로고침
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="text-sm font-semibold text-admin-text">금고 상태 변경</div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                              {['gold_status', 'platinum_status', 'diamond_status'].map((field) => (
+                                <select
+                                  key={field}
+                                  className={selectBase}
+                                  value={statusForm[field]}
+                                  onChange={(e) => setStatusForm((prev) => ({ ...prev, [field]: e.target.value }))}
+                                  disabled={!!busyKey}
+                                >
+                                  {statusOptions.map((opt) => (
+                                    <option key={opt || 'none'} value={opt}>
+                                      {opt || `${field.replace('_status', '').toUpperCase()} 유지`}
+                                    </option>
+                                  ))}
+                                </select>
+                              ))}
+                            </div>
+                            <button
+                              className={buttonBase}
+                              disabled={!!busyKey || actionLoading}
+                              onClick={() => {
+                                const payload = {};
+                                if (statusForm.gold_status) payload.gold_status = statusForm.gold_status;
+                                if (statusForm.platinum_status) payload.platinum_status = statusForm.platinum_status;
+                                if (statusForm.diamond_status) payload.diamond_status = statusForm.diamond_status;
+                                if (Object.keys(payload).length === 0) {
+                                  setActionError({ 응답: { message: '변경할 상태를 선택하세요.' } });
+                                  return;
+                                }
+                                runAdminAction('status', payload);
+                              }}
+                            >
+                              상태 변경
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="text-sm font-semibold text-admin-text">출석 조정</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <input
+                                type="number"
+                                className={inputBase}
+                                placeholder="delta_days (증가/감소)"
+                                value={attendanceForm.delta_days}
+                                onChange={(e) => setAttendanceForm((prev) => ({ ...prev, delta_days: e.target.value }))}
+                                disabled={!!busyKey}
+                              />
+                              <input
+                                type="number"
+                                className={inputBase}
+                                placeholder="set_days (지정)"
+                                value={attendanceForm.set_days}
+                                onChange={(e) => setAttendanceForm((prev) => ({ ...prev, set_days: e.target.value }))}
+                                disabled={!!busyKey}
+                              />
+                            </div>
+                            <button
+                              className={buttonBase}
+                              disabled={!!busyKey || actionLoading}
+                              onClick={() => {
+                                const delta = attendanceForm.delta_days === '' ? null : Number(attendanceForm.delta_days);
+                                const setDays = attendanceForm.set_days === '' ? null : Number(attendanceForm.set_days);
+                                if (delta === null && setDays === null) {
+                                  setActionError({ 응답: { message: 'delta_days 또는 set_days를 입력하세요.' } });
+                                  return;
+                                }
+                                runAdminAction('attendance', { delta_days: delta, set_days: setDays });
+                              }}
+                            >
+                              출석 조정
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="text-sm font-semibold text-admin-text">입금/누적 업데이트</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <select
+                                className={selectBase}
+                                value={depositForm.platinum_deposit_done}
+                                onChange={(e) => setDepositForm((prev) => ({ ...prev, platinum_deposit_done: e.target.value }))}
+                                disabled={!!busyKey}
+                              >
+                                <option value="">플래티넘 입금 상태 유지</option>
+                                <option value="true">완료로 표시</option>
+                                <option value="false">미완료로 표시</option>
+                              </select>
+                              <input
+                                type="number"
+                                className={inputBase}
+                                placeholder="다이아 누적 입금 (원)"
+                                value={depositForm.diamond_deposit_current}
+                                onChange={(e) => setDepositForm((prev) => ({ ...prev, diamond_deposit_current: e.target.value }))}
+                                disabled={!!busyKey}
+                              />
+                            </div>
+                            <button
+                              className={buttonBase}
+                              disabled={!!busyKey || actionLoading}
+                              onClick={() => {
+                                const payload = {};
+                                if (depositForm.platinum_deposit_done !== '') {
+                                  payload.platinum_deposit_done = depositForm.platinum_deposit_done === 'true';
+                                }
+                                if (depositForm.diamond_deposit_current !== '') {
+                                  payload.diamond_deposit_current = Number(depositForm.diamond_deposit_current || 0);
+                                }
+                                if (Object.keys(payload).length === 0) {
+                                  setActionError({ 응답: { message: '적용할 입금 값을 입력하세요.' } });
+                                  return;
+                                }
+                                runAdminAction('deposit', payload);
+                              }}
+                            >
+                              입금/누적 업데이트
+                            </button>
+                          </div>
+                        </div>
+
+                        <ResponseViewer
+                          title="최근 액션 응답"
+                          loading={actionLoading}
+                          error={actionError}
+                          response={actionResponse}
+                          lastCall={actionLastCall}
+                          cardBase={cardBase}
+                          actionKey={actionKey}
+                        />
+                      </div>
+                    </>
                   ) : null}
 
                   {activeSection === 'csv' ? (
