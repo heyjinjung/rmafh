@@ -27,9 +27,19 @@ export default async function handler(req, res) {
 
   try {
     const base = getBaseUrl();
+    const headers = {
+      'content-type': 'application/json',
+      accept: 'application/json',
+    };
+    
+    // 어드민 인증 헤더 전달
+    if (req.headers['x-admin-password']) {
+      headers['x-admin-password'] = req.headers['x-admin-password'];
+    }
+    
     const upstream = await fetch(`${base}/api/vault/extend-expiry${buildQuery(req)}`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      headers,
       body: JSON.stringify(req.body || {}),
     });
 
