@@ -79,7 +79,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
         <div className="flex-1 flex gap-2">
           <input
             className={inputBase}
-            placeholder="외부 아이디 또는 닉네임으로 검색"
+            placeholder="외부 아이디 또는 닉네임으로 검색 (비우면 전체)"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
@@ -87,7 +87,17 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
             }}
           />
           <button onClick={handleFetchUsers} disabled={loading} className={btnBase}>
-            {loading ? '조회 중...' : '검색'}
+            {loading ? '조회 중...' : '검색/조회'}
+          </button>
+          <button
+            onClick={() => {
+              setQuery('');
+              handleFetchUsers();
+            }}
+            disabled={loading}
+            className={btnBase}
+          >
+            {loading ? '조회 중...' : '전체 회원 조회'}
           </button>
         </div>
         {total > 0 && (
