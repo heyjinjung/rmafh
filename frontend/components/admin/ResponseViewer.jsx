@@ -154,6 +154,21 @@ function actionSummary(actionKey, response) {
     return [{ label: '알림 등록', value: enqueued != null ? `${enqueued}건` : '완료' }];
   }
 
+  if (actionKey === 'user-create') {
+    return [
+      { label: '생성', value: response?.user_id ? `user_id ${response.user_id}` : '완료' },
+      { label: '외부 ID', value: response?.external_user_id || '-' },
+    ];
+  }
+
+  if (actionKey === 'user-update') {
+    return [{ label: '수정', value: response?.user_id ? `user_id ${response.user_id}` : '완료' }];
+  }
+
+  if (actionKey === 'user-delete') {
+    return [{ label: '삭제', value: response?.user_id ? `user_id ${response.user_id}` : '완료' }];
+  }
+
   if (actionKey === 'extend-expiry') {
     const shadow = Boolean(response.shadow);
     if (shadow) {

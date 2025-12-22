@@ -26,7 +26,7 @@ function statusBadge(status) {
   return <span className="text-cc-textSub">{status || '-'}</span>;
 }
 
-export default function UsersListViewer({ adminPassword, onSelectUser }) {
+export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
@@ -58,6 +58,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
       setError(err.message);
     } finally {
       setLoading(false);
+      if (onRefresh) onRefresh();
     }
   };
 

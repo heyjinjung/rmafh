@@ -74,6 +74,8 @@ export default function AdminPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionLastCall, setActionLastCall] = useState(null);
   const [actionKey, setActionKey] = useState(null);
+  const [userForm, setUserForm] = useState({ external_user_id: '', nickname: '', joined_date: '' });
+  const [userUpdateForm, setUserUpdateForm] = useState({ nickname: '', joined_date: '', deposit_total: '', telegram_ok: '', review_ok: '' });
   const [statusForm, setStatusForm] = useState({ gold_status: '', platinum_status: '', diamond_status: '' });
   const [attendanceForm, setAttendanceForm] = useState({ delta_days: '', set_days: '' });
   const [depositForm, setDepositForm] = useState({ platinum_deposit_done: '', diamond_deposit_current: '' });
@@ -502,6 +504,9 @@ export default function AdminPage() {
                         <button className={sectionButtonClass('status')} disabled={!!busyKey} onClick={() => setActiveSection('status')}>
                           상태
                         </button>
+                        <button className={sectionButtonClass('user-manage')} disabled={!!busyKey} onClick={() => setActiveSection('user-manage')}>
+                          사용자 관리
+                        </button>
                         <button className={sectionButtonClass('csv')} disabled={!!busyKey} onClick={() => setActiveSection('csv')}>
                           엑셀 업로드
                         </button>
@@ -533,7 +538,210 @@ export default function AdminPage() {
                           setStatusData(user);
                           setActiveSection('status');
                         }}
+                        onRefresh={() => setStatusData((prev) => prev)}
                       />
+                    </div>
+                  ) : null}
+
+                  {activeSection === 'user-manage' ? (
+                    <div className={`${cardBase} p-3 md:p-4 space-y-4`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-lg font-semibold text-admin-neon">사용자 관리</h2>
+                          <p className="text-sm text-admin-muted">생성 / 편집 / 삭제 (선택 사용자 기준)</p>
+                        </div>
+                        <button
+                          className={buttonGhost}
+                          disabled={!!busyKey}
+                          onClick={() => {
+                            setUserForm({ external_user_id: '', nickname: '', joined_date: '' });
+                            setUserUpdateForm({ nickname: '', joined_date: '', deposit_total: '', telegram_ok: '', review_ok: '' });
+                          }}
+                        >
+                          초기화
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div className="space-y-3">
+                          <div className="text-sm font-semibold text-admin-text">신규 생성</div>
+                          <input
+                            className={inputBase}
+                            placeholder="외부 아이디"
+                            value={userForm.external_user_id}
+                            onChange={(e) => setUserForm((p) => ({ ...p, external_user_id: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <input
+                            className={inputBase}
+                            placeholder="닉네임 (선택)"
+                            value={userForm.nickname}
+                            onChange={(e) => setUserForm((p) => ({ ...p, nickname: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <input
+                            className={inputBase}
+                            placeholder="가입일 YYYY-MM-DD (선택)"
+                            value={userForm.joined_date}
+                            onChange={(e) => setUserForm((p) => ({ ...p, joined_date: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <button
+                            className={buttonBase}
+                            disabled={!!busyKey || !userForm.external_user_id}
+                            onClick={async () => {
+                              setBusyKey('user-create');
+                              setActionError(null);
+                              setActionResponse(null);
+                              try {
+                                const body = {
+                                  external_user_id: userForm.external_user_id,
+                                  nickname: userForm.nickname || undefined,
+                                  joined_date: userForm.joined_date || undefined,
+                                };
+                                const resp = await callApiRaw(
+                                  '/api/vault/admin/users',
+                                  {
+                                    method: 'POST',
+                                    headers: { 'content-type': 'application/json' },
+                                    body: JSON.stringify(body),
+                                  },
+                                  { key: 'user-create', setLastCall: setActionLastCall, includeExternalQuery: false }
+                                );
+                                setActionResponse(resp);
+                                setActionKey('user-create');
+                                setSelectedUserId(resp?.user_id || null);
+                                setExternalUserId(resp?.external_user_id || '');
+                                await fetchUserStatus({ skipBusy: true });
+                              } catch (e) {
+                                setActionError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+                              } finally {
+                                setBusyKey('');
+                              }
+                            }}
+                          >
+                            사용자 생성
+                          </button>
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm font-semibold text-admin-text">편집 / 삭제</div>
+                            <div className="text-xs text-admin-muted">선택 사용자: {selectedUserId ?? '없음'}</div>
+                          </div>
+                          <input
+                            className={inputBase}
+                            placeholder="닉네임 (선택)"
+                            value={userUpdateForm.nickname}
+                            onChange={(e) => setUserUpdateForm((p) => ({ ...p, nickname: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <input
+                            className={inputBase}
+                            placeholder="가입일 YYYY-MM-DD (선택)"
+                            value={userUpdateForm.joined_date}
+                            onChange={(e) => setUserUpdateForm((p) => ({ ...p, joined_date: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <input
+                            className={inputBase}
+                            placeholder="총 입금액 (선택)"
+                            type="number"
+                            value={userUpdateForm.deposit_total}
+                            onChange={(e) => setUserUpdateForm((p) => ({ ...p, deposit_total: e.target.value }))}
+                            disabled={!!busyKey}
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              className={selectBase}
+                              value={userUpdateForm.telegram_ok}
+                              onChange={(e) => setUserUpdateForm((p) => ({ ...p, telegram_ok: e.target.value }))}
+                              disabled={!!busyKey}
+                            >
+                              <option value="">텔레그램 유지</option>
+                              <option value="true">텔레그램 완료</option>
+                              <option value="false">미완료</option>
+                            </select>
+                            <select
+                              className={selectBase}
+                              value={userUpdateForm.review_ok}
+                              onChange={(e) => setUserUpdateForm((p) => ({ ...p, review_ok: e.target.value }))}
+                              disabled={!!busyKey}
+                            >
+                              <option value="">리뷰 유지</option>
+                              <option value="true">리뷰 완료</option>
+                              <option value="false">미완료</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              className={buttonBase}
+                              disabled={!!busyKey || !selectedUserId}
+                              onClick={async () => {
+                                const payload = {};
+                                if (userUpdateForm.nickname !== '') payload.nickname = userUpdateForm.nickname;
+                                if (userUpdateForm.joined_date !== '') payload.joined_date = userUpdateForm.joined_date;
+                                if (userUpdateForm.deposit_total !== '') payload.deposit_total = Number(userUpdateForm.deposit_total);
+                                if (userUpdateForm.telegram_ok !== '') payload.telegram_ok = userUpdateForm.telegram_ok === 'true';
+                                if (userUpdateForm.review_ok !== '') payload.review_ok = userUpdateForm.review_ok === 'true';
+                                if (Object.keys(payload).length === 0) {
+                                  setActionError({ 응답: { message: '변경할 값을 입력하세요.' } });
+                                  return;
+                                }
+                                setBusyKey('user-update');
+                                setActionError(null);
+                                setActionResponse(null);
+                                try {
+                                  const resp = await callApiRaw(
+                                    `/api/vault/admin/users/${selectedUserId}`,
+                                    {
+                                      method: 'PATCH',
+                                      headers: { 'content-type': 'application/json' },
+                                      body: JSON.stringify(payload),
+                                    },
+                                    { key: 'user-update', setLastCall: setActionLastCall, includeExternalQuery: false }
+                                  );
+                                  setActionKey('user-update');
+                                  setActionResponse(resp);
+                                  await fetchUserStatus({ skipBusy: true });
+                                } catch (e) {
+                                  setActionError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+                                } finally {
+                                  setBusyKey('');
+                                }
+                              }}
+                            >
+                              사용자 수정
+                            </button>
+                            <button
+                              className="px-4 py-3 rounded-[6px] text-sm font-semibold border border-red-500 text-red-300 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                              disabled={!!busyKey || !selectedUserId}
+                              onClick={async () => {
+                                setBusyKey('user-delete');
+                                setActionError(null);
+                                setActionResponse(null);
+                                try {
+                                  const resp = await callApiRaw(
+                                    `/api/vault/admin/users/${selectedUserId}`,
+                                    { method: 'DELETE' },
+                                    { key: 'user-delete', setLastCall: setActionLastCall, includeExternalQuery: false }
+                                  );
+                                  setActionKey('user-delete');
+                                  setActionResponse(resp);
+                                  setSelectedUserId(null);
+                                  setStatusData(null);
+                                } catch (e) {
+                                  setActionError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+                                } finally {
+                                  setBusyKey('');
+                                }
+                              }}
+                            >
+                              사용자 삭제
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : null}
 

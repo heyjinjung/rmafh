@@ -100,6 +100,31 @@ class AdminDepositUpdateResponse(BaseModel):
     expires_at: Optional[str]
 
 
+class AdminUserCreateRequest(BaseModel):
+    external_user_id: str
+    nickname: Optional[str] = None
+    joined_date: Optional[str] = Field(None, description="YYYY-MM-DD")
+    deposit_total: Optional[int] = 0
+    telegram_ok: Optional[bool] = False
+    review_ok: Optional[bool] = False
+
+
+class AdminUserUpdateRequest(BaseModel):
+    nickname: Optional[str] = None
+    joined_date: Optional[str] = Field(None, description="YYYY-MM-DD")
+    deposit_total: Optional[int] = None
+    telegram_ok: Optional[bool] = None
+    review_ok: Optional[bool] = None
+
+
+class AdminUserResponse(BaseModel):
+    user_id: int
+    external_user_id: str
+    nickname: Optional[str]
+    joined_date: Optional[str]
+    created_at: Optional[str]
+
+
 class UserIdentityBulkRequest(BaseModel):
     external_user_ids: List[str]
 

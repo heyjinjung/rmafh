@@ -21,6 +21,9 @@ from app.schemas import (
     AdminDepositUpdateResponse,
     AdminStatusUpdateRequest,
     AdminStatusUpdateResponse,
+    AdminUserCreateRequest,
+    AdminUserUpdateRequest,
+    AdminUserResponse,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
     HealthResponse,
@@ -833,6 +836,20 @@ def _get_or_create_user_id_by_external_user_id(cur, external_user_id: str) -> in
     return user_id
 
 
+def _parse_joined_date(value: str | None):
+    if value is None:
+        return None
+    v = str(value).strip()
+    if not v:
+        return None
+    try:
+        from datetime import date
+
+        return date.fromisoformat(v)
+    except Exception:
+        raise HTTPException(status_code=400, detail="INVALID_JOINED_DATE")
+
+
 def _resolve_user_id(
     cur,
     *,
@@ -1360,6 +1377,224 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
             })
         
         return {"users": users, "total": len(users)}
+
+
+@app.post("/api/vault/admin/users", response_model=AdminUserResponse)
+async def admin_create_user(body: AdminUserCreateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    ext = _normalize_external_user_id(body.external_user_id)
+    if not ext:
+        raise HTTPException(status_code=400, detail="EXTERNAL_USER_ID_REQUIRED")
+
+    joined_date = _parse_joined_date(body.joined_date)
+    nickname = (body.nickname or "").strip() or None
+    deposit_total = int(body.deposit_total or 0)
+    telegram_ok = bool(body.telegram_ok)
+    review_ok = bool(body.review_ok)
+
+    now = _now()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                INSERT INTO user_identity (external_user_id, created_at)
+                VALUES (%s, %s)
+                ON CONFLICT (external_user_id) DO NOTHING
+                RETURNING user_id, created_at
+                """,
+                (ext, now),
+            )
+            row = cur.fetchone()
+            if not row:
+                cur.execute(
+                    "SELECT user_id, created_at FROM user_identity WHERE external_user_id=%s",
+                    (ext,),
+                )
+                row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=500, detail="USER_CREATE_FAILED")
+
+            user_id, created_at = int(row[0]), row[1]
+
+            cur.execute(
+                """
+                INSERT INTO user_admin_snapshot (user_id, nickname, joined_date, deposit_total, telegram_ok, review_ok)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                ON CONFLICT (user_id) DO UPDATE SET
+                    nickname = EXCLUDED.nickname,
+                    joined_date = EXCLUDED.joined_date,
+                    deposit_total = EXCLUDED.deposit_total,
+                    telegram_ok = EXCLUDED.telegram_ok,
+                    review_ok = EXCLUDED.review_ok,
+                    updated_at = NOW()
+                """,
+                (user_id, nickname, joined_date, deposit_total, telegram_ok, review_ok),
+            )
+
+            cur.execute(
+                """
+                INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
+                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+                ON CONFLICT (user_id) DO NOTHING
+                """,
+                (user_id, now + timedelta(hours=72)),
+            )
+
+            admin_user = request.client.host if request.client else "unknown"
+            _log_admin_action(
+                conn=conn,
+                admin_user=admin_user,
+                action="ADMIN_USER_CREATE",
+                endpoint="/api/vault/admin/users",
+                target_user_ids=[user_id],
+                request_id=None,
+                request_body={
+                    "external_user_id": ext,
+                    "nickname": nickname,
+                    "joined_date": body.joined_date,
+                    "deposit_total": deposit_total,
+                    "telegram_ok": telegram_ok,
+                    "review_ok": review_ok,
+                },
+                response_status="SUCCESS",
+                response_summary={"created": True},
+            )
+
+            conn.commit()
+            return AdminUserResponse(
+                user_id=user_id,
+                external_user_id=ext,
+                nickname=nickname,
+                joined_date=joined_date.isoformat() if joined_date else None,
+                created_at=created_at.isoformat() if created_at else None,
+            )
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as e:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail="ADMIN_USER_CREATE_ERROR") from e
+
+
+@app.patch("/api/vault/admin/users/{user_id}", response_model=AdminUserResponse)
+async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    if all(
+        getattr(body, field) is None
+        for field in ("nickname", "joined_date", "deposit_total", "telegram_ok", "review_ok")
+    ):
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    nickname = None if body.nickname is None else (body.nickname or "").strip() or None
+    joined_date = _parse_joined_date(body.joined_date) if body.joined_date is not None else None
+    deposit_total = None if body.deposit_total is None else int(body.deposit_total)
+    telegram_ok = None if body.telegram_ok is None else bool(body.telegram_ok)
+    review_ok = None if body.review_ok is None else bool(body.review_ok)
+
+    now = _now()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT external_user_id, created_at FROM user_identity WHERE user_id=%s", (user_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+        external_user_id, created_at = row[0], row[1]
+
+        set_parts = []
+        params = []
+        if nickname is not None:
+            set_parts.append("nickname=%s")
+            params.append(nickname)
+        if joined_date is not None:
+            set_parts.append("joined_date=%s")
+            params.append(joined_date)
+        if deposit_total is not None:
+            set_parts.append("deposit_total=%s")
+            params.append(deposit_total)
+        if telegram_ok is not None:
+            set_parts.append("telegram_ok=%s")
+            params.append(telegram_ok)
+        if review_ok is not None:
+            set_parts.append("review_ok=%s")
+            params.append(review_ok)
+        set_parts.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"""
+            UPDATE user_admin_snapshot
+               SET {', '.join(set_parts)}
+             WHERE user_id=%s
+            """,
+            params,
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="SNAPSHOT_NOT_FOUND")
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_USER_UPDATE",
+            endpoint=f"/api/vault/admin/users/{user_id}",
+            target_user_ids=[user_id],
+            request_id=None,
+            request_body=body.dict(),
+            response_status="SUCCESS",
+            response_summary={"updated": True},
+        )
+
+        conn.commit()
+
+        cur.execute(
+            """
+            SELECT nickname, joined_date
+              FROM user_admin_snapshot
+             WHERE user_id=%s
+            """,
+            (user_id,),
+        )
+        snap = cur.fetchone()
+
+        return AdminUserResponse(
+            user_id=user_id,
+            external_user_id=external_user_id,
+            nickname=snap[0] if snap else nickname,
+            joined_date=snap[1].isoformat() if snap and snap[1] else (joined_date.isoformat() if joined_date else None),
+            created_at=created_at.isoformat() if created_at else None,
+        )
+
+
+@app.delete("/api/vault/admin/users/{user_id}")
+async def admin_delete_user(user_id: int, request: Request, _auth: str = Depends(verify_admin_password)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT external_user_id FROM user_identity WHERE user_id=%s", (user_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+        external_user_id = row[0]
+
+        # 삭제 순서: 종속 데이터 -> 스냅샷 -> status -> identity
+        cur.execute("DELETE FROM vault_status WHERE user_id=%s", (user_id,))
+        cur.execute("DELETE FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
+        cur.execute("DELETE FROM user_identity WHERE user_id=%s", (user_id,))
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_USER_DELETE",
+            endpoint=f"/api/vault/admin/users/{user_id}",
+            target_user_ids=[user_id],
+            request_id=None,
+            request_body={"user_id": user_id, "external_user_id": external_user_id},
+            response_status="SUCCESS",
+            response_summary={"deleted": True},
+        )
+
+        conn.commit()
+        return {"deleted": True, "user_id": user_id, "external_user_id": external_user_id}
 
 
 @app.post("/api/vault/admin/users/{user_id}/vault/status", response_model=AdminStatusUpdateResponse)
