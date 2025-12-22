@@ -48,7 +48,6 @@ export function NotificationForm({
             <option value="ATTENDANCE_D2">출석 2일 차</option>
             <option value="TICKET_ZERO">티켓 0개</option>
             <option value="SOCIAL_PROOF">인기/후기(표시용)</option>
-            <option value="REFERRAL_REVIVE">추천 되살리기 안내</option>
           </select>
         </div>
 

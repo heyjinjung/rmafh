@@ -175,15 +175,6 @@ function actionSummary(actionKey, response) {
     ];
   }
 
-  if (actionKey === 'referral-revive') {
-    const revived = response.revived;
-    const expiresAt = response.expires_at;
-    return [
-      { label: '추천 리바이브', value: revived ? '성공' : '미적용' },
-      { label: '만료일', value: formatKoDateTime(expiresAt) },
-    ];
-  }
-
   if (actionKey === 'user-daily-import') {
     const rows = asNumber(response.total_rows) ?? asNumber(response.rows) ?? asNumber(response.imported_rows);
     const updated = asNumber(response.updated);

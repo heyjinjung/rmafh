@@ -19,17 +19,6 @@ class AttendanceResponse(BaseModel):
     expires_at: str
 
 
-class ReferralReviveRequest(BaseModel):
-    request_id: str = Field(..., description="멱등키")
-    channel: str
-    invite_code: str
-
-
-class ReferralReviveResponse(BaseModel):
-    revived: bool
-    expires_at: str
-
-
 class ExtendExpiryRequest(BaseModel):
     request_id: str
     scope: str  # ALL_ACTIVE | USER_IDS

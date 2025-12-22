@@ -20,7 +20,6 @@ def test_status_returns_contract_fields(client):
         "loss_total",
         "loss_breakdown",
         "ms_countdown",
-        "referral_revive_available",
         "social_proof",
         "curation_tier",
     ):

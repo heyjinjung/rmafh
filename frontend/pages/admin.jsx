@@ -5,7 +5,6 @@ import {
   CsvUploader,
   ExpiryExtensionForm,
   NotificationForm,
-  ReferralReviveForm,
   ResponseViewer,
   StatusViewer,
   UsersListViewer,
@@ -63,11 +62,6 @@ export default function AdminPage() {
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [notifyError, setNotifyError] = useState(null);
   const [notifyLastCall, setNotifyLastCall] = useState(null);
-
-  const [reviveResponse, setReviveResponse] = useState(null);
-  const [reviveLoading, setReviveLoading] = useState(false);
-  const [reviveError, setReviveError] = useState(null);
-  const [reviveLastCall, setReviveLastCall] = useState(null);
 
   const [csvResponse, setCsvResponse] = useState(null);
   const [csvLoading, setCsvLoading] = useState(false);
@@ -132,9 +126,6 @@ export default function AdminPage() {
     setNotifyError(null);
     setNotifyResponse(null);
     setNotifyLastCall(null);
-    setReviveError(null);
-    setReviveResponse(null);
-    setReviveLastCall(null);
     setCsvError(null);
     setCsvResponse(null);
     setCsvLastCall(null);
@@ -432,9 +423,6 @@ export default function AdminPage() {
                         <button className={sectionButtonClass('notify')} disabled={!!busyKey} onClick={() => setActiveSection('notify')}>
                           알림
                         </button>
-                        <button className={sectionButtonClass('revive')} disabled={!!busyKey} onClick={() => setActiveSection('revive')}>
-                          추천 revive
-                        </button>
                       </div>
                     </div>
                   </div>
@@ -617,53 +605,6 @@ export default function AdminPage() {
                     </div>
                   ) : null}
 
-                  {activeSection === 'revive' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <div className={`${cardBase} p-3 md:p-4`}>
-                        <ReferralReviveForm
-                          externalUserId={externalUserId}
-                          onSubmit={(payload) => {
-                            (async () => {
-                              setReviveLoading(true);
-                              setReviveError(null);
-                              setReviveResponse(null);
-                              try {
-                                const body = await callApiRaw(
-                                  '/api/vault/referral-revive/',
-                                  {
-                                    method: 'POST',
-                                    headers: { 'content-type': 'application/json' },
-                                    body: JSON.stringify(payload),
-                                  },
-                                  { key: 'referral-revive', setLastCall: setReviveLastCall }
-                                );
-                                setReviveResponse(body);
-                              } catch (e) {
-                                setReviveError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
-                              } finally {
-                                setReviveLoading(false);
-                                setBusyKey('');
-                              }
-                            })();
-                          }}
-                          loading={reviveLoading || !!busyKey}
-                          inputBase={inputBase}
-                          buttonBase={buttonBase}
-                          buttonGhost={buttonGhost}
-                        />
-                      </div>
-
-                      <ResponseViewer
-                        title="추천 revive 결과"
-                        loading={reviveLoading}
-                        error={reviveError}
-                        response={reviveResponse}
-                        lastCall={reviveLastCall}
-                        cardBase={cardBase}
-                        actionKey="referral-revive"
-                      />
-                    </div>
-                  ) : null}
                 </div>
 
                 {busyKey ? <div className="mt-6 text-sm text-cc-textSub">처리 중이에요: {busyKey}</div> : null}
