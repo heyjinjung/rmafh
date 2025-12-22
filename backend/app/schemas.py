@@ -84,13 +84,16 @@ class UserIdentityBulkResponse(BaseModel):
 
 
 class DailyUserImportRow(BaseModel):
-    external_user_id: str
-    nickname: Optional[str] = None
-    joined_at: Optional[str] = None
-    deposit_total: int = 0
-    last_deposit_at: Optional[str] = None
-    telegram_ok: bool = False
-    review_ok: bool = False
+    external_user_id: str = Field(..., alias="아이디")
+    nickname: Optional[str] = Field(None, alias="닉네임")
+    joined_at: Optional[str] = Field(None, alias="가입일")
+    deposit_total: int = Field(0, alias="입금액")
+    last_deposit_at: Optional[str] = Field(None, alias="입금일")
+    telegram_ok: bool = Field(False, alias="텔레그램")
+    review_ok: bool = Field(False, alias="리뷰")
+
+    class Config:
+        populate_by_name = True  # 한글/영문 둘 다 허용
 
 
 class DailyUserImportRequest(BaseModel):
