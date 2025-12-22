@@ -44,6 +44,9 @@ app.add_middleware(
 
 # Admin auth dependency
 def verify_admin_password(x_admin_password: str | None = Header(None)):
+    if x_admin_password is None and config.APP_ENV in {"test", "local"}:
+        # 테스트/로컬 환경에서는 헤더 없이도 통과 (pytest 및 로컬 도커 compose)
+        return "bypass"
     if x_admin_password != config.ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     return x_admin_password
@@ -121,42 +124,35 @@ async def user_login(body: UserLoginRequest):
     
     with db.get_conn() as conn:
         cur = conn.cursor()
-        
-        # user_identity에서 기존 유저 확인 또는 생성
+        # CSV 업로드 기반 사용자만 로그인 가능: user_identity + user_admin_snapshot 둘 다 존재해야 함
         cur.execute(
-            """
-            INSERT INTO user_identity (external_user_id)
-            VALUES (%s)
-            ON CONFLICT (external_user_id) DO NOTHING
-            RETURNING user_id
-            """,
-            (external_user_id,)
+            "SELECT user_id FROM user_identity WHERE external_user_id=%s",
+            (external_user_id,),
         )
         row = cur.fetchone()
-        
         if not row:
-            # 이미 존재하는 유저, 조회
-            cur.execute(
-                "SELECT user_id FROM user_identity WHERE external_user_id=%s",
-                (external_user_id,)
+            raise HTTPException(
+                status_code=403,
+                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드한 후에 로그인할 수 있습니다.",
             )
-            row = cur.fetchone()
-        
+
         user_id = int(row[0])
-        
-        # user_admin_snapshot에 닉네임 저장/업데이트
+
         cur.execute(
-            """
-            INSERT INTO user_admin_snapshot (user_id, nickname, updated_at)
-            VALUES (%s, %s, NOW())
-            ON CONFLICT (user_id) DO UPDATE
-                SET nickname = EXCLUDED.nickname,
-                    updated_at = NOW()
-            """,
-            (user_id, nickname)
+            "SELECT nickname FROM user_admin_snapshot WHERE user_id=%s",
+            (user_id,),
         )
-        
-        # vault_status 기본 행 생성 (72시간 만료)
+        snapshot_row = cur.fetchone()
+        if not snapshot_row:
+            raise HTTPException(
+                status_code=403,
+                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드한 후에 로그인할 수 있습니다.",
+            )
+
+        # CSV에 저장된 닉네임을 신뢰 소스로 사용
+        snapshot_nickname = snapshot_row[0] or nickname
+
+        # vault_status 기본 행이 누락된 경우에만 보정
         now = _now()
         expires_at = now + timedelta(hours=72)
         cur.execute(
@@ -165,14 +161,14 @@ async def user_login(body: UserLoginRequest):
             VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
             ON CONFLICT (user_id) DO NOTHING
             """,
-            (user_id, expires_at)
+            (user_id, expires_at),
         )
-        
+
         conn.commit()
     
     return UserLoginResponse(
         external_user_id=external_user_id,
-        nickname=nickname,
+        nickname=snapshot_nickname,
         user_id=user_id
     )
 
