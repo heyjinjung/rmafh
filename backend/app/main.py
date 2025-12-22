@@ -1260,6 +1260,55 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
     return NotifyResponse(enqueued=inserted)
 
 
+@app.get("/api/vault/admin/users")
+async def get_all_users(_auth: str = Depends(verify_admin_password)):
+    """전체 회원 리스트와 각 회원의 금고 상태 조회"""
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT 
+                ui.user_id,
+                ui.external_user_id,
+                ui.created_at,
+                vs.expires_at,
+                vs.gold_status,
+                vs.platinum_status,
+                vs.diamond_status,
+                vs.platinum_attendance_days,
+                vs.platinum_deposit_done,
+                vs.diamond_deposit_current,
+                uas.review_ok,
+                uas.last_deposit_won
+            FROM user_identity ui
+            LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
+            LEFT JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
+            ORDER BY ui.user_id DESC
+            LIMIT 1000
+            """
+        )
+        rows = cur.fetchall()
+        
+        users = []
+        for row in rows:
+            users.append({
+                "user_id": row[0],
+                "external_user_id": row[1],
+                "created_at": row[2].isoformat() if row[2] else None,
+                "expires_at": row[3].isoformat() if row[3] else None,
+                "gold_status": row[4] or "UNLOCKED",
+                "platinum_status": row[5] or "LOCKED",
+                "diamond_status": row[6] or "LOCKED",
+                "platinum_attendance_days": row[7] or 0,
+                "platinum_deposit_done": row[8] or False,
+                "diamond_deposit_current": row[9] or 0,
+                "review_ok": row[10] or False,
+                "last_deposit_won": row[11] or 0,
+            })
+        
+        return {"users": users, "total": len(users)}
+
+
 @app.post("/api/vault/compensation-enqueue")
 async def compensation_enqueue(body: CompensationEnqueueRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     with db.get_conn() as conn:

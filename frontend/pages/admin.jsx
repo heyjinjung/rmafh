@@ -8,6 +8,7 @@ import {
   ReferralReviveForm,
   ResponseViewer,
   StatusViewer,
+  UsersListViewer,
 } from '../components/admin';
 
 // Figma Assets (URLs are time-limited by Figma)
@@ -195,6 +196,18 @@ export default function AdminPage() {
                   <div className="flex gap-[10px] flex-wrap">
                     <button
                       type="button"
+                      onClick={() => setActiveSection('users')}
+                      disabled={!!busyKey}
+                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <img alt="" src={ICON_STAR} className="h-[30px] w-[30px]" />
+                      <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
+                        <p className="mb-0">전체</p>
+                        <p>회원</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setActiveSection('csv')}
                       disabled={!!busyKey}
                       className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
@@ -328,6 +341,24 @@ export default function AdminPage() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
+                  {activeSection === 'users' ? (
+                    <div className={`${cardBase} p-3 md:p-4`}>
+                      <div className="mb-4">
+                        <h2 className="text-lg font-semibold text-admin-neon mb-1">전체 회원 조회</h2>
+                        <p className="text-sm text-admin-muted">
+                          전체 회원 목록과 각 회원의 금고 상태를 확인할 수 있어요. 행을 클릭하면 상세 상태 조회로 이동합니다.
+                        </p>
+                      </div>
+                      <UsersListViewer
+                        adminPassword={adminPassword}
+                        onSelectUser={(userId) => {
+                          setExternalUserId(userId);
+                          setActiveSection('status');
+                        }}
+                      />
+                    </div>
+                  ) : null}
+
                   {activeSection === 'status' ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />

@@ -18,7 +18,7 @@ function parseCsvDailyImportRows(text) {
   const headerMap = {
     external_user_id: new Set(['external_user_id', 'external_id', 'id', '아이디', '외부아이디', 'externaluserid']),
     nickname: new Set(['nickname', 'nick', '닉네임', '별명']),
-    deposit_total: new Set(['deposit_total', 'total_deposit', '누적입금액', '누적입금', '누적입금액(원)']),
+    deposit_total: new Set(['deposit_total', 'total_deposit', '입금액', '누적입금액', '누적입금', '누적입금액(원)', '총입금액']),
     joined_at: new Set(['joined_at', 'join_date', '가입일', '가입일자']),
     last_deposit_at: new Set(['last_deposit_at', 'deposit_at', '입금일', '입금일자', '최근입금일']),
     telegram_ok: new Set(['telegram_ok', 'telegram', '텔레그램', '채널확인', 'telegram_ok 처리', '텔레그램ok']),
@@ -126,7 +126,7 @@ export function CsvUploader({ onUpload, loading, inputBase, buttonBase }) {
             className={`${inputBase} font-mono text-xs`}
             rows={7}
             value={(rows.slice(0, 20) || [])
-              .map((r) => `${r.external_user_id}\t${r.deposit_total}\t${r.telegram_ok ? 'OK' : 'NO'}`)
+              .map((r) => `${r.external_user_id}\t${r.nickname || '-'}\t${r.deposit_total}\t${r.telegram_ok ? 'OK' : 'NO'}\t${r.review_ok ? 'OK' : 'NO'}`)
               .join('\n')}
             readOnly
           />
