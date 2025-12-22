@@ -118,18 +118,16 @@ WHERE expiry_extend_count IS NULL;
 -- B) user_admin_snapshot (Replaces user_snapshots in prior designs - simplified snapshot for admin operations)
 CREATE TABLE IF NOT EXISTS user_admin_snapshot (
   user_id BIGINT PRIMARY KEY,
-  external_user_id TEXT NOT NULL,
   nickname TEXT,
+  joined_date DATE,
   deposit_total BIGINT NOT NULL DEFAULT 0,
   telegram_ok BOOLEAN NOT NULL DEFAULT FALSE,
   review_ok BOOLEAN NOT NULL DEFAULT FALSE,
-  joined_at TIMESTAMPTZ,
   last_deposit_at TIMESTAMPTZ,
-  last_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_user_admin_external_user_id
-  ON user_admin_snapshot(external_user_id);
+-- 인덱스는 제거 (external_user_id 컬럼이 없음)
 
 -- ============================================
 -- PART 2: Admin Audit Log (DB_MIGRATION_AUDIT_LOG.sql)

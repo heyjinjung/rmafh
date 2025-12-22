@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { useState } from 'react';
 
 const ICON_STAR = 'https://www.figma.com/api/mcp/asset/a121fe05-b028-4a40-a525-9af8852b220d';
@@ -109,12 +110,12 @@ export default function LoginPage() {
 
           {/* 어드민 링크 */}
           <div className="text-center">
-            <a
+            <Link
               href="/admin"
               className="text-sm text-cc-textSub hover:text-gold-primary transition-colors"
             >
               관리자 페이지
-            </a>
+            </Link>
           </div>
         </div>
       </div>

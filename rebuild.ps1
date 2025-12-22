@@ -36,7 +36,7 @@ Start-Sleep -Seconds 10
 
 # Step 5: DB 마이그레이션 실행
 Write-Host "`n[5/5] Running database migration..." -ForegroundColor Yellow
-Get-Content "docs\DB_MIGRATION_COMPLETE.sql" | docker exec -i rmarh-db-1 psql -U postgres -d postgres
+Get-Content "docs\DB_MIGRATION_COMPLETE.sql" | docker exec -i rmarh-db-1 psql -U vault -d vault
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: database migration failed" -ForegroundColor Red
     exit 1
@@ -51,7 +51,7 @@ Write-Host "`nChecking container status..." -ForegroundColor Cyan
 docker ps --filter "name=rmarh" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
 Write-Host "`nChecking database tables..." -ForegroundColor Cyan
-docker exec rmarh-db-1 psql -U postgres -d postgres -c "\dt"
+docker exec rmarh-db-1 psql -U vault -d vault -c "\dt"
 
 Write-Host "`nAPI health check:" -ForegroundColor Cyan
 Start-Sleep -Seconds 3
