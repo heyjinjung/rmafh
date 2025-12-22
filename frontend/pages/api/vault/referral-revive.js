@@ -20,8 +20,14 @@ function buildQuery(req) {
 }
 
 export default async function handler(req, res) {
+  // CORS 프리플라이트 OPTIONS 요청 처리
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Allow', ['POST', 'OPTIONS']);
+    return res.status(200).end();
+  }
+  
   if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+    res.setHeader('Allow', ['POST', 'OPTIONS']);
     return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method Not Allowed' } });
   }
 
@@ -37,11 +43,18 @@ export default async function handler(req, res) {
       headers['x-admin-password'] = req.headers['x-admin-password'];
     }
     
+    // 타임아웃 설정 (30초)
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
     const upstream = await fetch(`${base}/api/vault/referral-revive${buildQuery(req)}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(req.body || {}),
+      signal: controller.signal,
     });
+    
+    clearTimeout(timeout);
 
     const contentType = upstream.headers.get('content-type') || '';
     const body = contentType.includes('application/json') ? await upstream.json() : await upstream.text();

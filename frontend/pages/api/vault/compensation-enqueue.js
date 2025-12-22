@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
     
-    const upstream = await fetch(`${base}/api/vault/extend-expiry${buildQuery(req)}`, {
+    const upstream = await fetch(`${base}/api/vault/compensation-enqueue${buildQuery(req)}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(req.body || {}),
@@ -63,6 +63,9 @@ export default async function handler(req, res) {
     if (typeof body === 'string') return res.send(body);
     return res.json(body);
   } catch (e) {
+    if (e.name === 'AbortError') {
+      return res.status(504).json({ error: { code: 'GATEWAY_TIMEOUT', message: 'Request timeout after 30 seconds' } });
+    }
     return res.status(502).json({ error: { code: 'UPSTREAM_ERROR', message: e?.message || 'Upstream request failed' } });
   }
 }
