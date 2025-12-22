@@ -572,10 +572,9 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             last_deposit_at = _parse_iso_datetime(getattr(r, "last_deposit_at", None))
             telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
             review_ok = _parse_bool(getattr(r, "review_ok", False))
-            import_date = _select_import_date(last_deposit_at)
 
             snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
-            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date))
+            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, joined_date))
 
         if not snapshot_values:
             raise HTTPException(status_code=400, detail="NO_VALID_ROWS")
@@ -624,10 +623,10 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      platinum_attendance_days = CASE
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.joined_date)
                                          )
                                          THEN CASE
-                                             WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
+                                             WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.joined_date - INTERVAL '1 day')
                                                  THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                              ELSE 1
                                          END
@@ -636,9 +635,9 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      last_attended_at = CASE
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.joined_date)
                                          )
-                                         THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
+                                         THEN (v.joined_date::timestamp AT TIME ZONE 'UTC')
                                          ELSE vs.last_attended_at
                                      END,
                                      platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
@@ -647,10 +646,10 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                              CASE
                                                  WHEN (
                                                      (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                                     AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                                     AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.joined_date)
                                                  )
                                                  THEN CASE
-                                                     WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
+                                                     WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.joined_date - INTERVAL '1 day')
                                                          THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                                      ELSE 1
                                                  END
@@ -664,7 +663,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      ELSE vs.diamond_status
                                    END,
                    updated_at = NOW()
-                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date)
+                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, joined_date)
              WHERE vs.user_id = v.user_id
             """,
             vault_update_values,
@@ -1280,7 +1279,9 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
                 vs.diamond_deposit_current,
                 uas.review_ok,
                 uas.deposit_total,
-                uas.nickname
+                uas.nickname,
+                uas.telegram_ok,
+                uas.joined_date
             FROM user_identity ui
             LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
             LEFT JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
@@ -1290,8 +1291,22 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
         )
         rows = cur.fetchall()
         
+        from datetime import date
+        today = date.today()
+        
         users = []
         for row in rows:
+            # CSV에서 업로드된 가입일 기준으로 최대 출석 가능일 계산
+            joined_date = row[14]  # uas.joined_date
+            max_attendance_days = 0
+            if joined_date:
+                days_since_join = (today - joined_date).days
+                max_attendance_days = max(0, days_since_join)
+            
+            # 실제 출석일수는 최대 출석 가능일을 초과할 수 없음
+            actual_attendance = row[7] or 0  # vs.platinum_attendance_days
+            capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
+            
             users.append({
                 "user_id": row[0],
                 "external_user_id": row[1],
@@ -1300,12 +1315,15 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
                 "gold_status": row[4] or "UNLOCKED",
                 "platinum_status": row[5] or "LOCKED",
                 "diamond_status": row[6] or "LOCKED",
-                "platinum_attendance_days": row[7] or 0,
+                "platinum_attendance_days": capped_attendance,
+                "max_attendance_days": max_attendance_days,
+                "joined_date": joined_date.isoformat() if joined_date else None,
                 "platinum_deposit_done": row[8] or False,
                 "diamond_deposit_current": row[9] or 0,
                 "review_ok": row[10] or False,
                 "deposit_total": row[11] or 0,
                 "nickname": row[12] or "",
+                "telegram_ok": row[13] or False,
             })
         
         return {"users": users, "total": len(users)}

@@ -104,6 +104,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                 <th className="px-3 py-2 text-admin-muted">다이아</th>
                 <th className="px-3 py-2 text-admin-muted">출석</th>
                 <th className="px-3 py-2 text-admin-muted">입금</th>
+                <th className="px-3 py-2 text-admin-muted">텔레그램</th>
                 <th className="px-3 py-2 text-admin-muted">리뷰</th>
                 <th className="px-3 py-2 text-admin-muted">만료일</th>
               </tr>
@@ -117,14 +118,24 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                 >
                   <td className="px-3 py-2 text-admin-neon font-mono">{user.external_user_id}</td>
                   <td className="px-3 py-2 text-admin-text">{user.nickname || '-'}</td>
-                  <td className="px-3 py-2 text-admin-text">{formatKoDateTime(user.created_at)}</td>
+                  <td className="px-3 py-2 text-admin-text">
+                    {user.joined_date ? formatKoDateTime(user.joined_date) : formatKoDateTime(user.created_at)}
+                  </td>
                   <td className="px-3 py-2">{statusBadge(user.gold_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.platinum_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.diamond_status)}</td>
-                  <td className="px-3 py-2 text-admin-text">{user.platinum_attendance_days}일</td>
+                  <td className="px-3 py-2 text-admin-text">
+                    {user.platinum_attendance_days}일
+                    {user.max_attendance_days !== undefined && (
+                      <span className="text-admin-muted text-xs ml-1">
+                        /{user.max_attendance_days}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-admin-text">
                     {user.platinum_deposit_done ? '✓' : '-'}
                   </td>
+                  <td className="px-3 py-2 text-admin-text">{user.telegram_ok ? '✓' : '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{user.review_ok ? '✓' : '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{formatKoDateTime(user.expires_at)}</td>
                 </tr>
