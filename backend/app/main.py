@@ -121,22 +121,37 @@ async def health():
 
 @app.post("/api/vault/login", response_model=UserLoginResponse)
 async def user_login(body: UserLoginRequest):
-    """유저 로그인: 닉네임으로 external_user_id 생성 및 user_id 매핑"""
+    """유저 로그인: 입력값을 external_user_id 우선으로 사용하고, 없으면 스냅샷 닉네임으로 역검색"""
     nickname = body.nickname.strip()
     if not nickname:
         raise HTTPException(status_code=400, detail="INVALID_NICKNAME")
-    
-    # external_user_id는 nickname 기반으로 생성 (실제 환경에서는 더 안전한 방식 사용)
-    external_user_id = f"user_{nickname.lower().replace(' ', '_')}"
-    
+
+    # 입력값을 external_user_id로 그대로 사용 (CSV와 일치 가정)
+    external_user_id = _normalize_external_user_id(nickname)
+
     with db.get_conn() as conn:
         cur = conn.cursor()
-        # CSV 업로드 기반 사용자만 로그인 가능: user_identity + user_admin_snapshot 둘 다 존재해야 함
+        # 1차: external_user_id 일치 검색
         cur.execute(
-            "SELECT user_id FROM user_identity WHERE external_user_id=%s",
+            "SELECT user_id, external_user_id FROM user_identity WHERE external_user_id=%s",
             (external_user_id,),
         )
         row = cur.fetchone()
+
+        # 2차: 스냅샷 닉네임으로 역검색 (CSV 닉네임과 동일한 경우)
+        if not row:
+            cur.execute(
+                """
+                SELECT ui.user_id, ui.external_user_id
+                  FROM user_admin_snapshot uas
+                  JOIN user_identity ui ON ui.user_id = uas.user_id
+                 WHERE uas.nickname = %s
+                 LIMIT 1
+                """,
+                (nickname,),
+            )
+            row = cur.fetchone()
+
         if not row:
             raise HTTPException(
                 status_code=403,
@@ -144,6 +159,7 @@ async def user_login(body: UserLoginRequest):
             )
 
         user_id = int(row[0])
+        resolved_external_user_id = row[1]
 
         cur.execute(
             "SELECT nickname FROM user_admin_snapshot WHERE user_id=%s",
@@ -172,11 +188,11 @@ async def user_login(body: UserLoginRequest):
         )
 
         conn.commit()
-    
+
     return UserLoginResponse(
-        external_user_id=external_user_id,
+        external_user_id=resolved_external_user_id,
         nickname=snapshot_nickname,
-        user_id=user_id
+        user_id=user_id,
     )
 
 
