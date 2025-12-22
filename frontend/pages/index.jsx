@@ -22,6 +22,12 @@ export default function Home() {
   const [externalUserId, setExternalUserId] = useState('');
   const [userNickname, setUserNickname] = useState('');
 
+  // 로그아웃 처리
+  const handleLogout = () => {
+    localStorage.removeItem('user');
+    window.location.href = '/login';
+  };
+
   useEffect(() => {
     // URL 쿼리 파라미터 확인
     const params = new URLSearchParams(window.location.search);
@@ -67,6 +73,18 @@ export default function Home() {
                   {userNickname}님
                 </span>
               )}
+              <button
+                onClick={handleLogout}
+                style={{
+                  ...styles.navButton,
+                  backgroundColor: '#dc2626',
+                  cursor: 'pointer',
+                  border: 'none'
+                }}
+                className="cc-navButton"
+              >
+                로그아웃
+              </button>
               <a href="#" style={styles.navButton} className="cc-navButton">금고 가이드</a>
             </div>
           </nav>
@@ -315,8 +333,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       maximumFractionDigits: 0,
     }).format(amount);
 
-  function RewardBadge({ amount, colorScheme }) {
-    const animated = useCountUp(amount, { durationMs: 800 });
+  function RewardBadge({ amount, colorScheme, shouldAnimate = false }) {
+    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: 800 });
+    const displayAmount = shouldAnimate ? animated : amount;
     return (
       <div className="relative flex justify-center w-full -mt-4 z-10">
         <div
@@ -337,7 +356,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
             <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
           </svg>
           <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
-            {formatCurrency(animated)}
+            {formatCurrency(displayAmount)}
           </span>
         </div>
       </div>
@@ -811,7 +830,11 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                   </motion.div>
                 </motion.div>
 
-                <RewardBadge amount={vault.rewardAmount} colorScheme={colorScheme} />
+                <RewardBadge 
+                  amount={vault.rewardAmount} 
+                  colorScheme={colorScheme} 
+                  shouldAnimate={vault.status === 'available'}
+                />
               </div>
 
               {vault.progress !== undefined && (

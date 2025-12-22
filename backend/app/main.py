@@ -944,6 +944,26 @@ def _ensure_schema():
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS review_ok BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()")
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id BIGSERIAL PRIMARY KEY,
+                admin_user TEXT NOT NULL,
+                action TEXT NOT NULL,
+                endpoint TEXT,
+                target_user_ids INTEGER[],
+                target_count INTEGER,
+                request_id TEXT,
+                request_body JSONB,
+                response_status TEXT,
+                response_summary JSONB,
+                error_message TEXT,
+                metadata JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'UNLOCKED'")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")

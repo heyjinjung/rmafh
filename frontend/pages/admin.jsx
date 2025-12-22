@@ -223,45 +223,111 @@ export default function AdminPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-col gap-[20px] items-start">
-                  <p className="font-medium leading-[1.15] text-[20px] text-gold-primary">
+                <div className="flex flex-col gap-[24px] items-start w-full">
+                  <p className="font-semibold text-[14px] uppercase tracking-wider text-gold-primary/80">
                     운영 바로가기
                   </p>
-                  <div className="flex gap-[10px] flex-wrap">
+                  <div className="flex flex-row gap-3 w-full">
                     <button
                       type="button"
                       onClick={() => setActiveSection('users')}
                       disabled={!!busyKey}
-                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`
+                        relative overflow-hidden
+                        bg-black
+                        border-2 transition-all duration-200
+                        rounded-lg px-3 py-5
+                        flex flex-col items-center justify-center gap-3
+                        hover:shadow-lg hover:shadow-gold-primary/30 hover:-translate-y-0.5
+                        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                        flex-1
+                        ${activeSection === 'users' 
+                          ? 'border-gold-primary bg-gold-primary/10 shadow-md shadow-gold-primary/20' 
+                          : 'border-gold-primary/60 hover:border-gold-primary'
+                        }
+                      `}
                     >
-                      <img alt="" src={ICON_STAR} className="h-[30px] w-[30px]" />
-                      <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
-                        <p className="mb-0">전체</p>
-                        <p>회원</p>
+                      <div className={`text-3xl transition-all ${
+                        activeSection === 'users' 
+                          ? 'scale-110' 
+                          : ''
+                      }`}>
+                        ⭐
+                      </div>
+                      <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${
+                        activeSection === 'users' 
+                          ? 'text-gold-primary' 
+                          : 'text-gold-primary/80'
+                      }`}>
+                        전체<br/>회원
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveSection('csv')}
                       disabled={!!busyKey}
-                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`
+                        relative overflow-hidden
+                        bg-black
+                        border-2 transition-all duration-200
+                        rounded-lg px-3 py-5
+                        flex flex-col items-center justify-center gap-3
+                        hover:shadow-lg hover:shadow-gold-primary/30 hover:-translate-y-0.5
+                        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                        flex-1
+                        ${activeSection === 'csv' 
+                          ? 'border-gold-primary bg-gold-primary/10 shadow-md shadow-gold-primary/20' 
+                          : 'border-gold-primary/60 hover:border-gold-primary'
+                        }
+                      `}
                     >
-                      <img alt="" src={ICON_GAME} className="h-[30px] w-[30px]" />
-                      <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
-                        <p className="mb-0">일일</p>
-                        <p>업로드</p>
+                      <div className={`text-3xl transition-all ${
+                        activeSection === 'csv' 
+                          ? 'scale-110' 
+                          : ''
+                      }`}>
+                        📊
+                      </div>
+                      <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${
+                        activeSection === 'csv' 
+                          ? 'text-gold-primary' 
+                          : 'text-gold-primary/80'
+                      }`}>
+                        일일<br/>업로드
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => setActiveSection('extend')}
                       disabled={!!busyKey}
-                      className="bg-black border border-gold-primary/30 text-gold-primary rounded-[4px] px-[10px] py-[18px] w-[157px] h-[99px] sm:w-[163px] sm:h-[107px] flex flex-col items-center justify-center gap-[14px] hover:bg-gold-dark disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={`
+                        relative overflow-hidden
+                        bg-black
+                        border-2 transition-all duration-200
+                        rounded-lg px-3 py-5
+                        flex flex-col items-center justify-center gap-3
+                        hover:shadow-lg hover:shadow-gold-primary/30 hover:-translate-y-0.5
+                        disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0
+                        flex-1
+                        ${activeSection === 'extend' 
+                          ? 'border-gold-primary bg-gold-primary/10 shadow-md shadow-gold-primary/20' 
+                          : 'border-gold-primary/60 hover:border-gold-primary'
+                        }
+                      `}
                     >
-                      <img alt="" src={ICON_TELEGRAM} className="h-[30px] w-[30px]" />
-                      <div className="font-medium leading-[1.15] text-[18px] sm:text-[20px] text-center">
-                        <p className="mb-0">만료</p>
-                        <p>연장</p>
+                      <div className={`text-3xl transition-all ${
+                        activeSection === 'extend' 
+                          ? 'scale-110' 
+                          : ''
+                      }`}>
+                        ⏰
+                      </div>
+                      <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${
+                        activeSection === 'extend' 
+                          ? 'text-gold-primary' 
+                          : 'text-gold-primary/80'
+                      }`}>
+                        만료<br/>연장
                       </div>
                     </button>
                   </div>
