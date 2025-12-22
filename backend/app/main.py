@@ -1335,6 +1335,10 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
             # 실제 출석일수는 최대 출석 가능일을 초과할 수 없음
             actual_attendance = row[7] or 0  # vs.platinum_attendance_days
             capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
+
+            deposit_total = int(row[11] or 0)
+            platinum_deposit_done = bool(row[8]) or deposit_total > 0
+            diamond_deposit_current = int(row[9] or 0) or deposit_total
             
             users.append({
                 "user_id": row[0],
@@ -1347,10 +1351,10 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
                 "platinum_attendance_days": capped_attendance,
                 "max_attendance_days": max_attendance_days,
                 "joined_date": joined_date.isoformat() if joined_date else None,
-                "platinum_deposit_done": row[8] or False,
-                "diamond_deposit_current": row[9] or 0,
+                "platinum_deposit_done": platinum_deposit_done,
+                "diamond_deposit_current": diamond_deposit_current,
                 "review_ok": row[10] or False,
-                "deposit_total": row[11] or 0,
+                "deposit_total": deposit_total,
                 "nickname": row[12] or "",
                 "telegram_ok": row[13] or False,
             })
