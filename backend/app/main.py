@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from typing import List
+import json
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -25,6 +26,8 @@ from app.schemas import (
     UserIdentityBulkResponse,
     DailyUserImportRequest,
     DailyUserImportResponse,
+    UserLoginRequest,
+    UserLoginResponse,
 )
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
@@ -37,6 +40,54 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Admin auth dependency
+def verify_admin_password(x_admin_password: str | None = Header(None)):
+    if x_admin_password != config.ADMIN_PASSWORD:
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
+    return x_admin_password
+
+
+def _log_admin_action(
+    conn,
+    admin_user: str,
+    action: str,
+    endpoint: str,
+    target_user_ids: list[int] | None,
+    request_id: str | None,
+    request_body: dict | None,
+    response_status: str,
+    response_summary: dict | None,
+    error_message: str | None = None,
+    metadata: dict | None = None,
+):
+    """어드민 감사 로그 기록"""
+    cur = conn.cursor()
+    target_user_ids_array = target_user_ids if target_user_ids else []
+    target_count = len(target_user_ids_array) if target_user_ids_array else 0
+    
+    cur.execute(
+        """
+        INSERT INTO admin_audit_log
+            (admin_user, action, endpoint, target_user_ids, target_count,
+             request_id, request_body, response_status, response_summary, error_message, metadata)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """,
+        (
+            admin_user,
+            action,
+            endpoint,
+            target_user_ids_array,
+            target_count,
+            request_id,
+            Json(request_body) if request_body else None,
+            response_status,
+            Json(response_summary) if response_summary else None,
+            error_message,
+            Json(metadata) if metadata else None,
+        ),
+    )
 
 
 @app.on_event("startup")
@@ -56,6 +107,74 @@ def _shutdown():
 @app.get("/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(status="ok")
+
+
+@app.post("/api/vault/login", response_model=UserLoginResponse)
+async def user_login(body: UserLoginRequest):
+    """유저 로그인: 닉네임으로 external_user_id 생성 및 user_id 매핑"""
+    nickname = body.nickname.strip()
+    if not nickname:
+        raise HTTPException(status_code=400, detail="INVALID_NICKNAME")
+    
+    # external_user_id는 nickname 기반으로 생성 (실제 환경에서는 더 안전한 방식 사용)
+    external_user_id = f"user_{nickname.lower().replace(' ', '_')}"
+    
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        
+        # user_identity에서 기존 유저 확인 또는 생성
+        cur.execute(
+            """
+            INSERT INTO user_identity (external_user_id)
+            VALUES (%s)
+            ON CONFLICT (external_user_id) DO NOTHING
+            RETURNING user_id
+            """,
+            (external_user_id,)
+        )
+        row = cur.fetchone()
+        
+        if not row:
+            # 이미 존재하는 유저, 조회
+            cur.execute(
+                "SELECT user_id FROM user_identity WHERE external_user_id=%s",
+                (external_user_id,)
+            )
+            row = cur.fetchone()
+        
+        user_id = int(row[0])
+        
+        # user_admin_snapshot에 닉네임 저장/업데이트
+        cur.execute(
+            """
+            INSERT INTO user_admin_snapshot (user_id, nickname, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE
+                SET nickname = EXCLUDED.nickname,
+                    updated_at = NOW()
+            """,
+            (user_id, nickname)
+        )
+        
+        # vault_status 기본 행 생성 (72시간 만료)
+        now = _now()
+        expires_at = now + timedelta(hours=72)
+        cur.execute(
+            """
+            INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
+            VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+            ON CONFLICT (user_id) DO NOTHING
+            """,
+            (user_id, expires_at)
+        )
+        
+        conn.commit()
+    
+    return UserLoginResponse(
+        external_user_id=external_user_id,
+        nickname=nickname,
+        user_id=user_id
+    )
 
 
 @app.get("/api/vault/status")
@@ -393,7 +512,7 @@ def _dedupe_str_list(values: list[str] | None, *, max_items: int) -> list[str]:
 
 
 @app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
-async def user_daily_import(body: DailyUserImportRequest):
+async def user_daily_import(body: DailyUserImportRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     """일일 엑셀/CSV 업로드 데이터로 운영 스냅샷 + 조건을 갱신.
 
     입력(권장): external_user_id, nickname, deposit_total(누적), joined_at, last_deposit_at, telegram_ok
@@ -552,6 +671,25 @@ async def user_daily_import(body: DailyUserImportRequest):
                         template="(%s,%s,%s,%s,%s)",
         )
         vault_rows_updated = int(cur.rowcount or 0)
+
+        # 감사 로그 기록
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="USER_DAILY_IMPORT",
+            endpoint="/api/vault/user-daily-import",
+            target_user_ids=[int(mapping[ext]) for ext in external_ids],
+            request_id=None,
+            request_body={"total_rows": len(rows)},
+            response_status="SUCCESS",
+            response_summary={
+                "total": len(rows),
+                "processed": len(snapshot_values),
+                "identity_created": identity_created,
+                "vault_rows_updated": vault_rows_updated,
+            },
+        )
 
         conn.commit()
 
@@ -847,7 +985,7 @@ def _ensure_schema():
 
 
 @app.post("/api/vault/referral-revive", response_model=ReferralReviveResponse)
-async def referral_revive(body: ReferralReviveRequest, user_id: int | None = None, external_user_id: str | None = None):
+async def referral_revive(body: ReferralReviveRequest, request: Request, user_id: int | None = None, external_user_id: str | None = None, _auth: str = Depends(verify_admin_password)):
     """만료 D-1 구간에서 24h 연장 (1회 제한)."""
     request_id = _validate_request_id(getattr(body, "request_id", None))
     channel = _require_non_empty(getattr(body, "channel", None), code="INVALID_CHANNEL")
@@ -916,12 +1054,28 @@ async def referral_revive(body: ReferralReviveRequest, user_id: int | None = Non
             """,
             (user_id, expires_at, new_expires, "REFERRAL", request_id, channel, invite_code),
         )
+        
+        # 감사 로그 기록
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="REFERRAL_REVIVE",
+            endpoint="/api/vault/referral-revive",
+            target_user_ids=[user_id],
+            request_id=request_id,
+            request_body={"channel": channel, "invite_code": invite_code},
+            response_status="SUCCESS",
+            response_summary={"revived": True, "new_expires_at": new_expires.isoformat()},
+            metadata={"external_user_id": external_user_id} if external_user_id else None,
+        )
+        
         conn.commit()
         return ReferralReviveResponse(revived=True, expires_at=new_expires.isoformat())
 
 
 @app.post("/api/vault/extend-expiry", response_model=ExtendExpiryResponse)
-async def extend_expiry(body: ExtendExpiryRequest):
+async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     """운영/프로모션 만료 연장. shadow=true면 미적용 프리뷰."""
     request_id = _validate_request_id(getattr(body, "request_id", None))
     if body.scope not in {"ALL_ACTIVE", "USER_IDS"}:
@@ -1028,12 +1182,28 @@ async def extend_expiry(body: ExtendExpiryRequest):
                 ),
             )
             updated += 1
+        
+        # 감사 로그 기록
+        admin_user = request.client.host if request.client else "unknown"
+        target_ids = [r[0] for r in rows]
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="EXTEND_EXPIRY",
+            endpoint="/api/vault/extend-expiry",
+            target_user_ids=target_ids[:1000],  # 최대 1000개만 저장 (샘플링)
+            request_id=request_id,
+            request_body={"scope": body.scope, "extend_hours": body.extend_hours, "reason": body.reason, "shadow": body.shadow},
+            response_status="SUCCESS",
+            response_summary={"updated": updated, "new_expires_at": new_expires_at.isoformat() if new_expires_at else None},
+        )
+        
         conn.commit()
         return ExtendExpiryResponse(shadow=False, updated=updated, new_expires_at=new_expires_at.isoformat() if new_expires_at else None)
 
 
 @app.post("/api/vault/notify", response_model=NotifyResponse)
-async def notify(body: NotifyRequest):
+async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     if body.type not in config.ALLOWED_NOTIFY_TYPES:
         raise HTTPException(status_code=400, detail="INVALID_NOTIFY_TYPE")
 
@@ -1071,12 +1241,27 @@ async def notify(body: NotifyRequest):
             )
             if cur.rowcount > 0:
                 inserted += 1
+        
+        # 감사 로그 기록
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="NOTIFY",
+            endpoint="/api/vault/notify",
+            target_user_ids=resolved_user_ids[:1000],  # 최대 1000개만 저장
+            request_id=None,
+            request_body={"type": body.type, "variant_id": body.variant_id},
+            response_status="SUCCESS",
+            response_summary={"enqueued": inserted, "total_targets": len(resolved_user_ids)},
+        )
+        
         conn.commit()
     return NotifyResponse(enqueued=inserted)
 
 
 @app.post("/api/vault/compensation-enqueue")
-async def compensation_enqueue(body: CompensationEnqueueRequest):
+async def compensation_enqueue(body: CompensationEnqueueRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     with db.get_conn() as conn:
         cur = conn.cursor()
         if config.APP_ENV == "test":
@@ -1094,5 +1279,21 @@ async def compensation_enqueue(body: CompensationEnqueueRequest):
             """,
             (user_id, body.vault_type, body.request_id, body.external_service, Json(body.payload)),
         )
+        
+        # 감사 로그 기록
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="COMPENSATION_ENQUEUE",
+            endpoint="/api/vault/compensation-enqueue",
+            target_user_ids=[user_id],
+            request_id=body.request_id,
+            request_body={"vault_type": body.vault_type, "external_service": body.external_service},
+            response_status="SUCCESS",
+            response_summary={"enqueued": True},
+            metadata={"external_user_id": body.external_user_id} if body.external_user_id else None,
+        )
+        
         conn.commit()
     return JSONResponse(status_code=202, content={"enqueued": True})

@@ -19,6 +19,33 @@ const TOKENS = {
 };
 
 export default function Home() {
+  const [externalUserId, setExternalUserId] = useState('');
+  const [userNickname, setUserNickname] = useState('');
+
+  useEffect(() => {
+    // URL 쿼리 파라미터 확인
+    const params = new URLSearchParams(window.location.search);
+    const extUserId = params.get('external_user_id');
+    
+    // 또는 localStorage에서 로그인 정보 확인
+    const storedUser = localStorage.getItem('user');
+    
+    if (extUserId) {
+      setExternalUserId(extUserId);
+    } else if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        setExternalUserId(user.external_user_id || '');
+        setUserNickname(user.nickname || '');
+      } catch (e) {
+        console.error('Failed to parse user data', e);
+      }
+    } else {
+      // 로그인 안 되어 있으면 로그인 페이지로
+      window.location.href = '/login';
+    }
+  }, []);
+
   return (
     <>
       <Head>
@@ -34,7 +61,14 @@ export default function Home() {
               <img src={ICON_STAR} alt="CC Casino" style={styles.logoIcon} />
               <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
-            <a href="#" style={styles.navButton} className="cc-navButton">금고 가이드</a>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {userNickname && (
+                <span style={{ fontSize: '12px', color: TOKENS.textSub }}>
+                  {userNickname}님
+                </span>
+              )}
+              <a href="#" style={styles.navButton} className="cc-navButton">금고 가이드</a>
+            </div>
           </nav>
 
           {/* Header */}
@@ -218,7 +252,16 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     setLoading(true);
     setError('');
     try {
-      const data = await apiFetch('/api/vault/status/');
+      // URL 쿼리 파라미터 또는 localStorage에서 external_user_id 가져오기
+      const params = new URLSearchParams(window.location.search);
+      const extUserId = params.get('external_user_id') || 
+        (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
+      
+      const endpoint = extUserId 
+        ? `/api/vault/status/?external_user_id=${encodeURIComponent(extUserId)}`
+        : '/api/vault/status/';
+      
+      const data = await apiFetch(endpoint);
       setStatus(data);
 
       const serverNowMs = data?.now ? Date.parse(data.now) : Date.now();
@@ -375,8 +418,17 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       setNotice('');
       setError('');
       try {
+        // URL 쿼리 파라미터 또는 localStorage에서 external_user_id 가져오기
+        const params = new URLSearchParams(window.location.search);
+        const extUserId = params.get('external_user_id') || 
+          (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
+        
         const vaultType = tier.toUpperCase();
-        const res = await apiFetch('/api/vault/claim/', {
+        const endpoint = extUserId
+          ? `/api/vault/claim/?external_user_id=${encodeURIComponent(extUserId)}`
+          : '/api/vault/claim/';
+        
+        const res = await apiFetch(endpoint, {
           method: 'POST',
           body: JSON.stringify({ vault_type: vaultType }),
         });

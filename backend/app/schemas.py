@@ -102,3 +102,13 @@ class DailyUserImportResponse(BaseModel):
     processed: int
     identity_created: int
     vault_rows_updated: int
+
+
+class UserLoginRequest(BaseModel):
+    nickname: str = Field(..., min_length=1, max_length=50, description="사용자 닉네임")
+
+
+class UserLoginResponse(BaseModel):
+    external_user_id: str
+    nickname: str
+    user_id: int

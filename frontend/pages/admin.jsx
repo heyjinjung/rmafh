@@ -16,6 +16,8 @@ const ICON_GAME = 'https://www.figma.com/api/mcp/asset/8625e6d9-bea3-4dd6-9416-8
 const ICON_TELEGRAM = 'https://www.figma.com/api/mcp/asset/01bcbc61-1f54-4542-8ffb-a7d7bdd11c9c';
 
 export default function AdminPage() {
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [externalUserId, setExternalUserId] = useState('');
   const [activeSection, setActiveSection] = useState('status');
   const [busyKey, setBusyKey] = useState('');
@@ -57,7 +59,12 @@ export default function AdminPage() {
     const method = (init?.method || 'GET').toUpperCase();
     setLastCall({ key, method, path: `${path}${qs}`, at: new Date().toISOString() });
 
-    const res = await fetch(`${path}${qs}`, init);
+    const headers = { ...(init?.headers || {}) };
+    if (isAuthenticated && adminPassword) {
+      headers['x-admin-password'] = adminPassword;
+    }
+
+    const res = await fetch(`${path}${qs}`, { ...init, headers });
     const ct = res.headers.get('content-type') || '';
     const body = ct.includes('application/json') ? await res.json() : await res.text();
     if (!res.ok) {
@@ -112,11 +119,42 @@ export default function AdminPage() {
         <title>CC Casino - 관리자 도구</title>
       </Head>
 
-      <div className="min-h-screen bg-black text-white">
+      {!isAuthenticated ? (
+        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+          <div className="w-full max-w-md space-y-6">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-admin-green mb-2">어드민 로그인</h1>
+              <p className="text-admin-muted text-sm">비밀번호를 입력하세요</p>
+            </div>
+            <div className="rounded-lg border border-admin-border bg-admin-surface p-6 space-y-4">
+              <input
+                type="password"
+                placeholder="비밀번호"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && adminPassword) {
+                    setIsAuthenticated(true);
+                  }
+                }}
+                className={inputBase}
+              />
+              <button
+                onClick={() => setIsAuthenticated(true)}
+                disabled={!adminPassword}
+                className={buttonBase + ' w-full justify-center'}
+              >
+                로그인
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <div className="min-h-screen bg-black text-white overflow-x-hidden">
         <div className="mx-auto w-full max-w-none px-4 lg:px-0">
-          <div className="relative min-h-screen lg:flex lg:items-stretch">
+          <div className="relative min-h-screen flex flex-col lg:flex-row">
             {/* Left column: Sidebar + Footer (desktop fixed width) */}
-            <div className="lg:w-[356px] lg:shrink-0 lg:flex lg:flex-col lg:min-h-screen">
+            <div className="w-full lg:w-[356px] lg:shrink-0 lg:flex lg:flex-col lg:min-h-screen">
               {/* Sidebar */}
               <aside className="flex flex-col gap-[49px] px-[5px] py-[20px] lg:ml-[8px] lg:w-[345px]">
                 <nav className="flex items-start justify-between">
@@ -197,9 +235,9 @@ export default function AdminPage() {
             </div>
 
             {/* Right/Main */}
-            <main className="bg-admin-bg text-admin-text lg:flex-1 lg:min-w-0 lg:overflow-x-hidden lg:flex lg:flex-col lg:min-h-screen lg:-mt-[14px]">
-              <div className="py-5 px-[25px] lg:py-0 lg:flex-1 lg:flex lg:flex-col">
-                <div className="pt-3 lg:pt-5 lg:flex-1">
+            <main className="w-full bg-admin-bg text-admin-text lg:flex-1 lg:min-w-0 lg:overflow-x-hidden flex flex-col min-h-screen lg:-mt-[14px]">
+              <div className="py-5 px-4 sm:px-6 lg:px-[25px] lg:py-0 flex-1 flex flex-col overflow-y-auto">
+                <div className="pt-3 lg:pt-5 flex-1 pb-6">
                 <div className="mb-3">
                   <h1 className="text-[28px] sm:text-[32px] font-medium tracking-[-0.84px] leading-[1.058]">
                     <span className="text-admin-text">관리자</span>{' '}
@@ -508,7 +546,7 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
-
+      )}
     </>
   );
 }
