@@ -1279,7 +1279,8 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
                 vs.platinum_deposit_done,
                 vs.diamond_deposit_current,
                 uas.review_ok,
-                uas.last_deposit_won
+                uas.deposit_total,
+                uas.nickname
             FROM user_identity ui
             LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
             LEFT JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
@@ -1303,7 +1304,8 @@ async def get_all_users(_auth: str = Depends(verify_admin_password)):
                 "platinum_deposit_done": row[8] or False,
                 "diamond_deposit_current": row[9] or 0,
                 "review_ok": row[10] or False,
-                "last_deposit_won": row[11] or 0,
+                "deposit_total": row[11] or 0,
+                "nickname": row[12] or "",
             })
         
         return {"users": users, "total": len(users)}

@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   CsvUploader,
   ExpiryExtensionForm,
@@ -22,6 +22,32 @@ export default function AdminPage() {
   const [externalUserId, setExternalUserId] = useState('');
   const [activeSection, setActiveSection] = useState('status');
   const [busyKey, setBusyKey] = useState('');
+
+  // 페이지 로드 시 sessionStorage에서 비밀번호 복원
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPassword = sessionStorage.getItem('adminPassword');
+      if (savedPassword) {
+        setAdminPassword(savedPassword);
+        setIsAuthenticated(true);
+      }
+    }
+  }, []);
+
+  // 로그인 시 sessionStorage에 저장
+  const handleLogin = () => {
+    if (adminPassword) {
+      sessionStorage.setItem('adminPassword', adminPassword);
+      setIsAuthenticated(true);
+    }
+  };
+
+  // 로그아웃
+  const handleLogout = () => {
+    sessionStorage.removeItem('adminPassword');
+    setAdminPassword('');
+    setIsAuthenticated(false);
+  };
 
   const [statusData, setStatusData] = useState(null);
   const [statusLoading, setStatusLoading] = useState(false);
@@ -135,13 +161,13 @@ export default function AdminPage() {
                 onChange={(e) => setAdminPassword(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && adminPassword) {
-                    setIsAuthenticated(true);
+                    handleLogin();
                   }
                 }}
                 className={inputBase}
               />
               <button
-                onClick={() => setIsAuthenticated(true)}
+                onClick={handleLogin}
                 disabled={!adminPassword}
                 className={buttonBase + ' w-full justify-center'}
               >
@@ -171,12 +197,20 @@ export default function AdminPage() {
                       CC CASINO
                     </span>
                   </div>
-                  <Link
-                    href="/"
-                    className="bg-gold-primary text-black rounded-[2.064px] px-[14px] py-[11px] text-[10px] tracking-[-0.2px] leading-[1.058] font-ibmKr"
-                  >
-                    금고 가이드
-                  </Link>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleLogout}
+                      className="bg-red-600 hover:bg-red-700 text-white rounded-[2.064px] px-[14px] py-[11px] text-[10px] tracking-[-0.2px] leading-[1.058] font-ibmKr transition-colors"
+                    >
+                      로그아웃
+                    </button>
+                    <Link
+                      href="/"
+                      className="bg-gold-primary text-black rounded-[2.064px] px-[14px] py-[11px] text-[10px] tracking-[-0.2px] leading-[1.058] font-ibmKr"
+                    >
+                      금고 가이드
+                    </Link>
+                  </div>
                 </nav>
 
                 <div className="flex flex-col gap-[20px] items-start">

@@ -97,6 +97,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
             <thead className="bg-admin-bg border-b border-admin-border">
               <tr>
                 <th className="px-3 py-2 text-admin-muted">아이디</th>
+                <th className="px-3 py-2 text-admin-muted">닉네임</th>
                 <th className="px-3 py-2 text-admin-muted">가입일</th>
                 <th className="px-3 py-2 text-admin-muted">골드</th>
                 <th className="px-3 py-2 text-admin-muted">플래티넘</th>
@@ -115,6 +116,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser }) {
                   className="border-b border-admin-border hover:bg-admin-bg/50 cursor-pointer transition-colors"
                 >
                   <td className="px-3 py-2 text-admin-neon font-mono">{user.external_user_id}</td>
+                  <td className="px-3 py-2 text-admin-text">{user.nickname || '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{formatKoDateTime(user.created_at)}</td>
                   <td className="px-3 py-2">{statusBadge(user.gold_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.platinum_status)}</td>
