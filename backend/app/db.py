@@ -32,4 +32,9 @@ def get_conn():
     try:
         yield conn
     finally:
+        # Ensure no transaction remains open; pending locks can block tests/truncates.
+        try:
+            conn.rollback()
+        except Exception:
+            pass
         _connection_pool.putconn(conn)

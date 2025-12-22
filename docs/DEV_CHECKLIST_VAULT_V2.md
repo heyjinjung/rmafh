@@ -32,7 +32,7 @@
 - [x] /api/vault/extend-expiry (shadow/real, 범위 ALL_ACTIVE/USER_IDS)
 - [x] /api/vault/notify (type/variant 검증, dedup enqueue)
 - [x] /api/vault/compensation-enqueue (202 enqueue)
-- [ ] status/claim/user-daily-import 통합 테스트/계약 테스트 추가 (attendance는 선택)
+- [x] status/claim/user-daily-import 통합 테스트/계약 테스트 추가 (attendance는 선택)
 - [x] 실제 비즈니스 로직/에러 처리 보완 (현재 단순화된 로직)
 	- [x] notify/extend-expiry에서 user_ids + external_user_ids 합집합 처리(운영 입력 편의)
 	- [x] 테스트 환경에서 DB 락/대기 무한정 멈춤 방지(lock_timeout/statement_timeout)

@@ -54,7 +54,7 @@ def db_url():
 @pytest.fixture(scope="session")
 def db_conn(db_url):
     try:
-        conn = psycopg2.connect(db_url, connect_timeout=3)
+        conn = psycopg2.connect(db_url, connect_timeout=3, application_name="pytest-db")
     except OperationalError as exc:  # pragma: no cover - skip if DB unavailable
         pytest.skip(f"database not reachable: {exc}")
     yield conn
@@ -87,21 +87,18 @@ def _reset_db_state(db_url):
     conn.autocommit = True
     try:
         with conn.cursor() as cur:
-            # Avoid hanging forever if other containers (e.g. worker) hold locks.
-            cur.execute("SET lock_timeout = '2s'")
-            cur.execute("SET statement_timeout = '10s'")
-            cur.execute(
-                """
-                TRUNCATE TABLE
-                    notifications_queue,
-                    compensation_queue,
-                    vault_expiry_extension_log,
-                    user_admin_snapshot,
-                    vault_status,
-                    user_identity
-                RESTART IDENTITY
-                """
-            )
+            # Use DELETE instead of TRUNCATE to avoid lock contention with app pool connections.
+            cur.execute("DELETE FROM notifications_queue")
+            cur.execute("DELETE FROM compensation_queue")
+            cur.execute("DELETE FROM vault_expiry_extension_log")
+            cur.execute("DELETE FROM user_admin_snapshot")
+            cur.execute("DELETE FROM vault_status")
+            cur.execute("DELETE FROM user_identity")
+            # Reset sequences manually since DELETE doesn't auto-restart them
+            cur.execute("ALTER SEQUENCE user_identity_user_id_seq RESTART WITH 1")
+            cur.execute("ALTER SEQUENCE notifications_queue_id_seq RESTART WITH 1")
+            cur.execute("ALTER SEQUENCE compensation_queue_id_seq RESTART WITH 1")
+            cur.execute("ALTER SEQUENCE vault_expiry_extension_log_id_seq RESTART WITH 1")
     except psycopg2.Error as exc:  # pragma: no cover
         conn.close()
         pytest.skip(f"database reset skipped (DB busy/locked): {exc}")

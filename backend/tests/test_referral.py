@@ -36,6 +36,7 @@ def test_referral_revive_allows_once(client, db_conn):
     extend_count = cur.fetchone()[0]
     assert extend_count == 1
 
-    # second attempt should hit EXTENSION_LIMIT
-    resp_limit = client.post("/api/vault/referral-revive", params={"external_user_id": "ext-1401"}, json=payload)
+    # second attempt with different request_id should hit EXTENSION_LIMIT
+    payload_dup = {"request_id": "test-ref-002", "channel": "kakao", "invite_code": "TESTCODE2"}
+    resp_limit = client.post("/api/vault/referral-revive", params={"external_user_id": "ext-1401"}, json=payload_dup)
     assert resp_limit.status_code in {403, 409}
