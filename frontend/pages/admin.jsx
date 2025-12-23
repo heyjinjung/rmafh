@@ -13,7 +13,7 @@ import {
 import { safeJsonPretty } from '../components/admin/utils';
 
 // Figma Assets (URLs are time-limited by Figma)
-const ICON_STAR = 'https://www.figma.com/api/mcp/asset/a121fe05-b028-4a40-a525-9af8852b220d';
+const ICON_STAR = '/logo.png';
 const ICON_GAME = 'https://www.figma.com/api/mcp/asset/8625e6d9-bea3-4dd6-9416-86f0f54cb37c';
 const ICON_TELEGRAM = 'https://www.figma.com/api/mcp/asset/01bcbc61-1f54-4542-8ffb-a7d7bdd11c9c';
 

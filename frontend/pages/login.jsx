@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useState } from 'react';
 
-const ICON_STAR = 'https://www.figma.com/api/mcp/asset/a121fe05-b028-4a40-a525-9af8852b220d';
+const ICON_STAR = '/logo.png';
 
 export default function LoginPage() {
   const router = useRouter();

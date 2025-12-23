@@ -5,6 +5,7 @@ class MyDocument extends Document {
     return (
       <Html lang="ko">
         <Head>
+          <link rel="icon" href="/logo.png" />
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
           <link
