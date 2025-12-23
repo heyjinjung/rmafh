@@ -348,7 +348,7 @@ export default function AdminPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={handleLogout}
-                      className="bg-red-600 hover:bg-red-700 text-white rounded-[2.064px] px-[14px] py-[11px] text-[10px] tracking-[-0.2px] leading-[1.058] font-ibmKr transition-colors"
+                      className="border border-gold-primary/70 bg-black/70 hover:bg-gold-primary/10 text-gold-primary rounded-[2.064px] px-[14px] py-[11px] text-[10px] tracking-[-0.2px] leading-[1.058] font-ibmKr shadow-[0_8px_20px_rgba(0,0,0,0.35)] transition-colors"
                     >
                       로그아웃
                     </button>

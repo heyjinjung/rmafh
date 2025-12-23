@@ -77,9 +77,11 @@ export default function Home() {
                 onClick={handleLogout}
                 style={{
                   ...styles.navButton,
-                  backgroundColor: '#dc2626',
-                  cursor: 'pointer',
-                  border: 'none'
+                  background: 'linear-gradient(120deg, rgba(210,253,156,0.2), rgba(210,253,156,0.05))',
+                  border: '1px solid rgba(210,253,156,0.6)',
+                  color: TOKENS.accent1,
+                  boxShadow: '0 10px 24px rgba(0,0,0,0.35)',
+                  cursor: 'pointer'
                 }}
                 className="cc-navButton"
               >
@@ -191,7 +193,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const useCountUp = (targetValue, { durationMs = 900 } = {}) => {
+  const useCountUp = (targetValue, { durationMs = 1800 } = {}) => {
     const [displayValue, setDisplayValue] = useState(0);
     const rafRef = useRef(0);
     const lastTargetRef = useRef(null);
@@ -334,7 +336,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     }).format(amount);
 
   function RewardBadge({ amount, colorScheme, shouldAnimate = false }) {
-    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: 800 });
+    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: 1800 });
     const displayAmount = shouldAnimate ? animated : amount;
     return (
       <div className="relative flex justify-center w-full -mt-4 z-10">
@@ -404,7 +406,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
         missions: [
           { id: 'p1', label: '연속 3일 달성 (일별 5만원 이상)', isDone: attendanceDays >= 3, hint: `현재 ${Math.min(3, attendanceDays)}/3 · 하루라도 건너뛰면 1일부터 다시` },
-          { id: 'p2', label: `리뷰 키 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
+          { id: 'p2', label: `리뷰 작성 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
           { id: 'p3', label: '플래티넘 금고 해금', isDone: api.platinum_status === 'UNLOCKED' || api.platinum_status === 'CLAIMED' },
           { id: 'p4', label: '수령 완료', isDone: api.platinum_status === 'CLAIMED' },
         ],
@@ -633,16 +635,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
 
-  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: 1000 });
+  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: 2000 });
 
-  const socialProofText = useMemo(() => {
-    const sp = status?.social_proof;
-    const count = Number(sp?.claimed_last_24h || 0);
-    const vt = String(sp?.vault_type || '').toUpperCase();
-    if (!count || !vt) return '';
-    const tierLabel = vt === 'PLATINUM' ? '플래티넘' : vt === 'GOLD' ? '골드' : vt === 'DIAMOND' ? '다이아' : vt;
-    return `지금 ${count.toLocaleString('ko-KR')}명이 ${tierLabel} 금고를 회수했습니다`;
-  }, [status]);
+  const socialProofText = '';
 
   return (
     <div
