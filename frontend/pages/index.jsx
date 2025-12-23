@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 
 /* ─── Figma Assets ─── */
@@ -194,55 +194,6 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const COUNTUP_SLOW_MS = 4500;
-
-  const useCountUp = (targetValue, { durationMs = COUNTUP_SLOW_MS } = {}) => {
-    const [displayValue, setDisplayValue] = useState(0);
-    const rafRef = useRef(0);
-    const lastTargetRef = useRef(null);
-    const valueRef = useRef(0);
-
-    useEffect(() => {
-      const nextTarget = Number.isFinite(Number(targetValue)) ? Number(targetValue) : 0;
-      if (lastTargetRef.current === nextTarget) return;
-      lastTargetRef.current = nextTarget;
-
-      const from = valueRef.current;
-      const to = Math.max(0, nextTarget);
-      const delta = Math.abs(to - from);
-
-      // 큰 값(예: 10,000+)일수록 더 느리게 보여서 숫자 변화가 눈에 들어오게 합니다.
-      // durationMs는 "최소" duration으로 취급합니다.
-      const extraMs = Math.min(15000, Math.round((delta / 1000) * 800));
-      const resolvedDurationMs = Math.min(20000, Math.max(durationMs, durationMs + extraMs));
-
-      const start = performance.now();
-
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-
-      const tick = (now) => {
-        const t = Math.min(1, (now - start) / Math.max(1, resolvedDurationMs));
-        // 급가속(ease-out) 제거: 숫자가 "천천히 올라가는" 느낌을 유지하기 위해 선형으로 진행합니다.
-        const current = Math.round(from + (to - from) * t);
-        setDisplayValue((prev) => {
-          if (prev === current) return prev;
-          valueRef.current = current;
-          return current;
-        });
-        if (t < 1) {
-          rafRef.current = requestAnimationFrame(tick);
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(tick);
-      return () => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      };
-    }, [targetValue, durationMs]);
-
-    return displayValue;
-  };
-
   const [serverClock, setServerClock] = useState({
     fetchedAtMs: 0,
     serverNowMs: 0,
@@ -348,9 +299,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       maximumFractionDigits: 0,
     }).format(amount);
 
-  function RewardBadge({ amount, colorScheme, shouldAnimate = false }) {
-    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: COUNTUP_SLOW_MS });
-    const displayAmount = shouldAnimate ? animated : amount;
+  function RewardBadge({ amount, colorScheme }) {
     return (
       <div className="relative flex justify-center w-full -mt-4 z-10">
         <div
@@ -371,7 +320,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
             <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
           </svg>
           <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
-            {formatCurrency(displayAmount)}
+            {formatCurrency(amount)}
           </span>
         </div>
       </div>
@@ -410,13 +359,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           {
             id: 'g1',
             label: 'CC카지노 텔레공식채널 입장 확인',
-            isDone: api.gold_status !== 'LOCKED',
+            isDone: Boolean(api.telegram_ok),
             hint: '입장 기록은 텔레그램 CSV 업로드 후 다음날 반영됩니다.',
           },
           {
             id: 'g2',
             label: '담당실장 텔레공식채널 입장 확인',
-            isDone: api.gold_status !== 'LOCKED',
+            isDone: Boolean(api.telegram_ok),
             hint: '담당실장 채널 입장도 CSV 확인 후 다음날 반영됩니다.',
           },
           { id: 'g3', label: '수령 가능 시 금고 열기', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
@@ -660,7 +609,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
 
-  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: COUNTUP_SLOW_MS });
+  const lossTotal = Number(status?.loss_total || 0);
 
   const socialProofText = '';
 
@@ -746,7 +695,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
           {status?.loss_total ? (
             <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#F97935]/30">
-              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(animatedLossTotal)} 소멸</span>
+              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(lossTotal)} 소멸</span>
             </div>
           ) : null}
 
@@ -829,16 +778,17 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                   </h3>
                 </div>
 
-                <motion.div
-                  className="mb-6 relative"
-                  initial={{ y: 0 }}
-                  animate={{ y: [0, -5, 0] }}
-                  transition={{ y: { duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' } }}
-                >
-                  {getVaultIcon(vault.tier)}
+                <div className="mb-6 flex items-center justify-center gap-3">
+                  <motion.div
+                    initial={{ y: 0 }}
+                    animate={{ y: [0, -5, 0] }}
+                    transition={{ y: { duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' } }}
+                  >
+                    {getVaultIcon(vault.tier)}
+                  </motion.div>
 
                   <motion.div
-                    className={`absolute -bottom-3 left-1/2 transform -translate-x-1/2 px-3 py-1 rounded-full flex items-center justify-center ${
+                    className={`px-3 py-1 rounded-full flex items-center justify-center ${
                       isLocked
                         ? 'bg-gradient-to-r from-[#F97935] to-[#FF5500] border border-[#FF5500]/50'
                         : isAvailable
@@ -849,17 +799,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 + 0.2 * index, duration: 0.2, type: 'spring' }}
                   >
-                    <span className="text-xs font-bold text-white">
+                    <span className="text-xs font-bold text-white whitespace-nowrap">
                       {isLocked ? '잠금 상태' : isAvailable ? '해제됨' : isExpired ? '만료됨' : '수령완료'}
                     </span>
                   </motion.div>
-                </motion.div>
+                </div>
 
-                <RewardBadge 
-                  amount={vault.rewardAmount} 
-                  colorScheme={colorScheme} 
-                  shouldAnimate={vault.status === 'available'}
-                />
+                <RewardBadge amount={vault.rewardAmount} colorScheme={colorScheme} />
               </div>
 
               {vault.progress !== undefined && (

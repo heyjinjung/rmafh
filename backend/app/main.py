@@ -228,7 +228,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         # CSV 업로드된 회원만 접근 가능
         cur.execute(
             """
-            SELECT COALESCE(review_ok, false)
+            SELECT COALESCE(telegram_ok, false),
+                   COALESCE(review_ok, false)
               FROM user_admin_snapshot
              WHERE user_id=%s
             """,
@@ -253,7 +254,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     platinum_deposit_done = bool(row[5]) if row and row[5] is not None else False
     diamond_deposit_current = int(row[6]) if row and row[6] is not None else 0
 
-    platinum_review_done = bool(review_row[0]) if review_row and review_row[0] is not None else False
+    telegram_ok = bool(review_row[0]) if review_row and review_row[0] is not None else False
+    platinum_review_done = bool(review_row[1]) if review_row and review_row[1] is not None else False
 
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
@@ -274,6 +276,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "platinum_attendance_days": platinum_attendance_days,
         "platinum_deposit_done": platinum_deposit_done,
         "platinum_review_done": platinum_review_done,
+        "telegram_ok": telegram_ok,
         "diamond_deposit_current": diamond_deposit_current,
         "expires_at": expires_at.isoformat(),
         "now": now.isoformat(),
