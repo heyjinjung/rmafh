@@ -977,12 +977,13 @@ export default function AdminPage() {
                           </div>
 
                           <div className="space-y-2">
-                            <div className="text-sm font-semibold text-admin-text">출석 조정</div>
+                            <div className="text-sm font-semibold text-admin-text">플래티넘 출석 일수 조정</div>
+                            <p className="text-xs text-admin-muted">플래티넘 금고의 출석 일수를 수동으로 조정합니다.</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               <input
                                 type="number"
                                 className={inputBase}
-                                placeholder="delta_days (증가/감소)"
+                                placeholder="증가/감소할 일수 (예: +1 또는 -1)"
                                 value={attendanceForm.delta_days}
                                 onChange={(e) => setAttendanceForm((prev) => ({ ...prev, delta_days: e.target.value }))}
                                 disabled={!!busyKey}
@@ -990,7 +991,7 @@ export default function AdminPage() {
                               <input
                                 type="number"
                                 className={inputBase}
-                                placeholder="set_days (지정)"
+                                placeholder="설정할 일수 (예: 3)"
                                 value={attendanceForm.set_days}
                                 onChange={(e) => setAttendanceForm((prev) => ({ ...prev, set_days: e.target.value }))}
                                 disabled={!!busyKey}
@@ -1003,13 +1004,13 @@ export default function AdminPage() {
                                 const delta = attendanceForm.delta_days === '' ? null : Number(attendanceForm.delta_days);
                                 const setDays = attendanceForm.set_days === '' ? null : Number(attendanceForm.set_days);
                                 if (delta === null && setDays === null) {
-                                  setActionError({ 응답: { message: 'delta_days 또는 set_days를 입력하세요.' } });
+                                  setActionError({ 응답: { message: '증가/감소할 일수 또는 설정할 일수를 입력하세요.' } });
                                   return;
                                 }
                                 runAdminAction('attendance', { delta_days: delta, set_days: setDays });
                               }}
                             >
-                              출석 조정
+                              출석 일수 조정
                             </button>
                           </div>
 

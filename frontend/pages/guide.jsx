@@ -80,12 +80,12 @@ const Header = () => {
             내 금고 확인
           </Link>
           <a
-            href="https://t.me/jm956"
+            href="https://ccc-010.com"
             className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-4 py-2 rounded-lg text-sm font-bold border border-[#D2FD9C] hover:opacity-90 transition-all shadow-md"
             target="_blank"
             rel="noreferrer"
           >
-            담당실장텔레연락
+            씨씨싸이트
           </a>
         </div>
       </div>
@@ -113,12 +113,12 @@ const IntroSection = ({ animationSpeed }) => {
             <p className="text-sm text-gray-300 mb-6">처음이신가요? 아래 가이드만 보고 빠르게 시작할 수 있습니다.</p>
             <div className="flex flex-wrap gap-3">
               <a
-                href="https://t.me/jm956"
+                href="https://ccc-010.com"
                 className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] font-bold py-3 px-6 rounded-lg text-base hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
                 target="_blank"
                 rel="noreferrer"
               >
-                담당실장텔레연락
+                씨씨싸이트
               </a>
               <Link
                 href="/guide"
@@ -221,7 +221,7 @@ const VaultTypeSection = () => {
   const vaultTypes = [
     {
       title: '골드 금고',
-      description: '기본 단계의 금고로, 출석 조건 충족 시 해제됩니다.',
+      description: 'CC카지노 텔레공식채널 입장확인, 담당실장 텔레 공식채널 입장 확인 시 해제됩니다.',
       rewardRange: '기본 보상',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="white">
@@ -238,7 +238,7 @@ const VaultTypeSection = () => {
     },
     {
       title: '플래티넘 금고',
-      description: '중간 단계의 금고로, 출석 및 입금 조건 충족 시 해제됩니다.',
+      description: '연속 3일 5만원 이상 입금, 리뷰작성 1회 시 해제됩니다.',
       rewardRange: '중간 보상 (골드의 2배)',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="white">
@@ -250,7 +250,7 @@ const VaultTypeSection = () => {
     },
     {
       title: '다이아몬드 금고',
-      description: '최고 단계의 금고로, 모든 조건 충족 및 VIP 자격 필요합니다.',
+      description: '누적 50만원 이상 입금 시 해제됩니다.',
       rewardRange: '최고 보상 (플래티넘의 3배)',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="white">
