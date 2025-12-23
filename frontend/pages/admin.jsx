@@ -9,6 +9,7 @@ import {
   StatusViewer,
   UsersListViewer,
 } from '../components/admin';
+import { safeJsonPretty } from '../components/admin/utils';
 
 // Figma Assets (URLs are time-limited by Figma)
 const ICON_STAR = 'https://www.figma.com/api/mcp/asset/a121fe05-b028-4a40-a525-9af8852b220d';
@@ -63,6 +64,13 @@ export default function AdminPage() {
   const [notifyLoading, setNotifyLoading] = useState(false);
   const [notifyError, setNotifyError] = useState(null);
   const [notifyLastCall, setNotifyLastCall] = useState(null);
+
+  const [notifyList, setNotifyList] = useState(null);
+  const [notifyListLoading, setNotifyListLoading] = useState(false);
+  const [notifyListError, setNotifyListError] = useState(null);
+  const [notifyListLastCall, setNotifyListLastCall] = useState(null);
+  const [notifyListPage, setNotifyListPage] = useState(1);
+  const [notifyListFilters, setNotifyListFilters] = useState({ status: '', type: '', variant_id: '', external_user_id: '' });
 
   const [csvResponse, setCsvResponse] = useState(null);
   const [csvLoading, setCsvLoading] = useState(false);
@@ -141,6 +149,11 @@ export default function AdminPage() {
     setNotifyError(null);
     setNotifyResponse(null);
     setNotifyLastCall(null);
+    setNotifyList(null);
+    setNotifyListError(null);
+    setNotifyListLastCall(null);
+    setNotifyListPage(1);
+    setNotifyListFilters({ status: '', type: '', variant_id: '', external_user_id: '' });
     setCsvError(null);
     setCsvResponse(null);
     setCsvLastCall(null);
@@ -191,6 +204,48 @@ export default function AdminPage() {
     } finally {
       setStatusLoading(false);
       if (!skipBusy) setBusyKey('');
+    }
+  };
+
+  const notifyStatusOptions = ['', 'PENDING', 'RETRYING', 'SENT', 'FAILED', 'DLQ'];
+  const notifyTypeOptions = ['', 'EXPIRY_D2', 'EXPIRY_D0', 'ATTENDANCE_D2', 'TICKET_ZERO', 'SOCIAL_PROOF'];
+
+  const fetchNotifyList = async ({ page: pageOverride } = {}) => {
+    const nextPage = pageOverride || notifyListPage || 1;
+    setNotifyListLoading(true);
+    setNotifyListError(null);
+    setBusyKey('notify-list');
+
+    const params = new URLSearchParams();
+    params.set('page', String(nextPage));
+    params.set('page_size', '50');
+    if (notifyListFilters.status) params.set('status', notifyListFilters.status);
+    if (notifyListFilters.type) params.set('type', notifyListFilters.type);
+    if (notifyListFilters.variant_id) params.set('variant_id', notifyListFilters.variant_id);
+    if (notifyListFilters.external_user_id) params.set('external_user_id', notifyListFilters.external_user_id.trim());
+
+    const path = `/api/vault/admin/notifications?${params.toString()}`;
+    setNotifyListLastCall({ key: 'notify-list', method: 'GET', path, at: new Date().toISOString() });
+
+    try {
+      const response = await fetch(path, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': adminPassword,
+        },
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw { payload: data };
+      }
+      setNotifyList(data);
+      setNotifyListPage(nextPage);
+    } catch (e) {
+      setNotifyListError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+    } finally {
+      setNotifyListLoading(false);
+      setBusyKey('');
     }
   };
 
@@ -265,6 +320,14 @@ export default function AdminPage() {
       <div className="min-h-screen bg-black text-white overflow-x-hidden">
         <div className="mx-auto w-full max-w-none px-4 lg:px-0">
           <div className="relative min-h-screen flex flex-col lg:flex-row">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSection('notify-list')}
+                          disabled={!!busyKey}
+                          className={`${sectionButtonClass('notify-list')} flex-1`}
+                        >
+                          알림 목록
+                        </button>
             {/* Left column: Sidebar + Footer (desktop fixed width) */}
             <div className="w-full lg:w-[356px] lg:shrink-0 lg:flex lg:flex-col lg:min-h-screen">
               {/* Sidebar */}
@@ -1049,6 +1112,159 @@ export default function AdminPage() {
                         cardBase={cardBase}
                         actionKey="notify"
                       />
+                    </div>
+                  ) : null}
+
+                  {activeSection === 'notify-list' ? (
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className={`${cardBase} p-3 md:p-4`}>
+                        <div className="flex flex-col gap-3">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="w-full md:w-48">
+                              <label className="block text-xs font-semibold mb-1">상태</label>
+                              <select
+                                className={selectBase}
+                                value={notifyListFilters.status}
+                                onChange={(e) => setNotifyListFilters({ ...notifyListFilters, status: e.target.value })}
+                              >
+                                {notifyStatusOptions.map((opt) => (
+                                  <option key={opt || 'any'} value={opt}>{opt || '전체'}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-full md:w-48">
+                              <label className="block text-xs font-semibold mb-1">타입</label>
+                              <select
+                                className={selectBase}
+                                value={notifyListFilters.type}
+                                onChange={(e) => setNotifyListFilters({ ...notifyListFilters, type: e.target.value })}
+                              >
+                                {notifyTypeOptions.map((opt) => (
+                                  <option key={opt || 'any-type'} value={opt}>{opt || '전체'}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="w-full md:w-48">
+                              <label className="block text-xs font-semibold mb-1">버전</label>
+                              <input
+                                className={inputBase}
+                                value={notifyListFilters.variant_id}
+                                onChange={(e) => setNotifyListFilters({ ...notifyListFilters, variant_id: e.target.value })}
+                                placeholder="예: A"
+                              />
+                            </div>
+                            <div className="w-full md:w-64">
+                              <label className="block text-xs font-semibold mb-1">외부 아이디</label>
+                              <input
+                                className={inputBase}
+                                value={notifyListFilters.external_user_id}
+                                onChange={(e) => setNotifyListFilters({ ...notifyListFilters, external_user_id: e.target.value })}
+                                placeholder="필터 없으면 비워두기"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex gap-3 justify-end">
+                            <button
+                              className={buttonGhost}
+                              disabled={notifyListLoading}
+                              onClick={() => {
+                                setNotifyListFilters({ status: '', type: '', variant_id: '', external_user_id: '' });
+                                setNotifyListPage(1);
+                                setNotifyList(null);
+                                setNotifyListError(null);
+                              }}
+                            >
+                              초기화
+                            </button>
+                            <button
+                              className={buttonBase}
+                              disabled={notifyListLoading}
+                              onClick={() => {
+                                setNotifyListPage(1);
+                                fetchNotifyList({ page: 1 });
+                              }}
+                            >
+                              조회
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className={`${cardBase} p-3 md:p-4`}> 
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-bold">알림 큐 목록</h3>
+                          {notifyListLastCall ? (
+                            <span className="text-xs text-admin-muted">마지막 요청: {notifyListLastCall.path}</span>
+                          ) : null}
+                        </div>
+
+                        {notifyListLoading ? <p className="mt-3 text-sm text-admin-muted">불러오는 중...</p> : null}
+                        {notifyListError ? (
+                          <p className="mt-3 text-sm text-red-400">
+                            {notifyListError?.응답?.message || notifyListError?.message || '조회에 실패했어요.'}
+                          </p>
+                        ) : null}
+
+                        {notifyList && Array.isArray(notifyList.items) && notifyList.items.length > 0 ? (
+                          <div className="mt-3 overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                              <thead className="text-left text-admin-muted border-b border-admin-border">
+                                <tr>
+                                  <th className="py-2 pr-3">ID</th>
+                                  <th className="py-2 pr-3">외부ID</th>
+                                  <th className="py-2 pr-3">타입</th>
+                                  <th className="py-2 pr-3">버전</th>
+                                  <th className="py-2 pr-3">상태</th>
+                                  <th className="py-2 pr-3">예약시각</th>
+                                  <th className="py-2 pr-3">생성시각</th>
+                                  <th className="py-2 pr-3">Payload</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {notifyList.items.map((item) => (
+                                  <tr key={item.id} className="border-b border-admin-border/60">
+                                    <td className="py-2 pr-3 text-admin-text">{item.id}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.external_user_id || '-'}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.type}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.variant_id || '-'}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.status}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.scheduled_at || '-'}</td>
+                                    <td className="py-2 pr-3 text-admin-text">{item.created_at || '-'}</td>
+                                    <td className="py-2 pr-3 text-admin-text whitespace-pre-wrap text-xs">{safeJsonPretty(item.payload)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : !notifyListLoading && notifyList && (!notifyList.items || notifyList.items.length === 0) ? (
+                          <p className="mt-3 text-sm text-admin-muted">결과가 없습니다.</p>
+                        ) : null}
+
+                        {notifyList ? (
+                          <div className="mt-4 flex items-center justify-between text-sm text-admin-muted">
+                            <div>
+                              총 {notifyList.total}건 · 페이지 {notifyList.page}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                className={buttonGhost}
+                                disabled={notifyListLoading || notifyList.page <= 1}
+                                onClick={() => fetchNotifyList({ page: Math.max(1, notifyList.page - 1) })}
+                              >
+                                이전
+                              </button>
+                              <button
+                                className={buttonGhost}
+                                disabled={notifyListLoading || !notifyList.has_more}
+                                onClick={() => fetchNotifyList({ page: notifyList.page + 1 })}
+                              >
+                                다음
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   ) : null}
 

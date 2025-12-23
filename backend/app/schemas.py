@@ -48,6 +48,26 @@ class NotifyResponse(BaseModel):
     enqueued: int
 
 
+class AdminNotificationItem(BaseModel):
+    id: int
+    user_id: int
+    external_user_id: Optional[str] = None
+    type: str
+    variant_id: Optional[str] = None
+    status: str
+    scheduled_at: Optional[str] = None
+    created_at: Optional[str] = None
+    payload: Optional[dict] = None
+
+
+class AdminNotificationsListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+    items: List[AdminNotificationItem]
+
+
 class CompensationEnqueueRequest(BaseModel):
     user_id: Optional[int] = None
     external_user_id: Optional[str] = None

@@ -24,6 +24,7 @@ from app.schemas import (
     AdminUserCreateRequest,
     AdminUserUpdateRequest,
     AdminUserResponse,
+    AdminNotificationsListResponse,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
     HealthResponse,
@@ -1313,6 +1314,108 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
         
         conn.commit()
     return NotifyResponse(enqueued=inserted)
+
+
+@app.get("/api/vault/admin/notifications", response_model=AdminNotificationsListResponse)
+async def list_notifications(
+    status: str | None = None,
+    type: str | None = None,
+    variant_id: str | None = None,
+    user_id: int | None = None,
+    external_user_id: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    order: str = "desc",
+    _auth: str = Depends(verify_admin_password),
+):
+    allowed_status = {"PENDING", "SENT", "FAILED", "DLQ", "RETRYING"}
+    if status and status not in allowed_status:
+        raise HTTPException(status_code=400, detail="INVALID_STATUS")
+    if type and type not in config.ALLOWED_NOTIFY_TYPES:
+        raise HTTPException(status_code=400, detail="INVALID_NOTIFY_TYPE")
+    if variant_id and variant_id not in config.ALLOWED_VARIANT_IDS:
+        raise HTTPException(status_code=400, detail="VARIANT_NOT_FOUND")
+
+    page = 1 if page < 1 else page
+    page_size = 1 if page_size < 1 else page_size
+    page_size = 200 if page_size > 200 else page_size
+    offset = (page - 1) * page_size
+    order_sql = "DESC" if order.lower() != "asc" else "ASC"
+
+    conditions: list[str] = []
+    params: list = []
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+
+        resolved_user_id = user_id
+        if external_user_id:
+            resolved_user_id = _get_user_id_by_external_user_id(cur, external_user_id)
+            if resolved_user_id is None:
+                return AdminNotificationsListResponse(total=0, page=page, page_size=page_size, has_more=False, items=[])
+
+        if status:
+            conditions.append("nq.status=%s")
+            params.append(status)
+        if type:
+            conditions.append("nq.type=%s")
+            params.append(type)
+        if variant_id:
+            conditions.append("nq.variant_id=%s")
+            params.append(variant_id)
+        if resolved_user_id:
+            conditions.append("nq.user_id=%s")
+            params.append(resolved_user_id)
+
+        where_sql = ""
+        if conditions:
+            where_sql = " WHERE " + " AND ".join(conditions)
+
+        cur.execute(
+            f"SELECT COUNT(*) FROM notifications_queue nq {where_sql}",
+            tuple(params),
+        )
+        total = int(cur.fetchone()[0])
+
+        cur.execute(
+            f"""
+            SELECT nq.id,
+                   nq.user_id,
+                   ui.external_user_id,
+                   nq.type,
+                   nq.variant_id,
+                   nq.status,
+                   nq.scheduled_at,
+                   nq.created_at,
+                   nq.payload
+              FROM notifications_queue nq
+         LEFT JOIN user_identity ui ON ui.user_id = nq.user_id
+            {where_sql}
+          ORDER BY nq.id {order_sql}
+             LIMIT %s OFFSET %s
+            """,
+            tuple(params + [page_size, offset]),
+        )
+        rows = cur.fetchall() or []
+
+    items = []
+    for row in rows:
+        items.append(
+            {
+                "id": row[0],
+                "user_id": row[1],
+                "external_user_id": row[2],
+                "type": row[3],
+                "variant_id": row[4],
+                "status": row[5],
+                "scheduled_at": row[6].isoformat() if row[6] else None,
+                "created_at": row[7].isoformat() if row[7] else None,
+                "payload": row[8],
+            }
+        )
+
+    has_more = (offset + len(items)) < total
+    return AdminNotificationsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
 
 
 @app.get("/api/vault/admin/users")
