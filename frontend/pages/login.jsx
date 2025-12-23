@@ -63,9 +63,7 @@ export default function LoginPage() {
           {/* 로고 */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <div className="h-16 w-16 rounded-full overflow-hidden bg-gold-primary">
-                <img src={ICON_STAR} alt="CC Casino" className="h-full w-full object-cover" />
-              </div>
+              <img src={ICON_STAR} alt="CC Casino" className="h-16 w-16" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">CC CASINO</h1>
