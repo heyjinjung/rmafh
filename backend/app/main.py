@@ -748,14 +748,14 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                          WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
                                          ) THEN true
                                          ELSE false
                                      END,
                                      platinum_attendance_days = CASE
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
                                          )
                                          THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                          ELSE vs.platinum_attendance_days
@@ -763,7 +763,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      last_attended_at = CASE
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
                                          )
                                          THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
                                          ELSE vs.last_attended_at
@@ -774,7 +774,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                              CASE
                                                  WHEN (
                                                      (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                                     AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
+                                                     AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
                                                  )
                                                  THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                                  ELSE COALESCE(vs.platinum_attendance_days, 0)
