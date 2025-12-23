@@ -74,6 +74,7 @@ export default function AdminPage() {
 
   const [toast, setToast] = useState(null);
   const toastTimerRef = useRef(null);
+  const [showInlineUserList, setShowInlineUserList] = useState(false);
 
   const showToast = (next) => {
     if (toastTimerRef.current) {
@@ -867,6 +868,45 @@ export default function AdminPage() {
 
                   {activeSection === 'status' ? (
                     <>
+                      <div className="flex items-center justify-between px-1">
+                        <div>
+                          <h2 className="text-lg font-semibold text-admin-neon">상태 조회</h2>
+                          <p className="text-sm text-admin-muted">지정 사용자 상태 및 금고 액션을 관리합니다.</p>
+                        </div>
+                        <div className="flex gap-2 flex-wrap justify-end">
+                          <button
+                            className={buttonGhost}
+                            disabled={!!busyKey}
+                            onClick={() => setShowInlineUserList((v) => !v)}
+                          >
+                            {showInlineUserList ? '전체 조회 닫기' : '전체 회원 조회'}
+                          </button>
+                          <button
+                            className={buttonGhost}
+                            disabled={!!busyKey}
+                            onClick={() => setActiveSection('users')}
+                          >
+                            전체 조회 탭으로 이동
+                          </button>
+                        </div>
+                      </div>
+
+                      {showInlineUserList ? (
+                        <div className={`${cardBase} p-3 md:p-4`}> 
+                          <UsersListViewer
+                            adminPassword={adminPassword}
+                            onSelectUser={(user) => {
+                              setExternalUserId(user.external_user_id || '');
+                              setSelectedUserId(user.user_id || null);
+                              setStatusData(user);
+                              setActiveSection('status');
+                              setShowInlineUserList(false);
+                            }}
+                            onRefresh={() => setStatusData((prev) => prev)}
+                          />
+                        </div>
+                      ) : null}
+
                       <div className="grid grid-cols-1 gap-4">
                         <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
                       </div>
