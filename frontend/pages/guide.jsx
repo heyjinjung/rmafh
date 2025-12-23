@@ -79,12 +79,14 @@ const Header = () => {
           >
             내 금고 확인
           </Link>
-          <Link
-            href="/login"
+          <a
+            href="https://t.me/jm956"
             className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-4 py-2 rounded-lg text-sm font-bold border border-[#D2FD9C] hover:opacity-90 transition-all shadow-md"
+            target="_blank"
+            rel="noreferrer"
           >
-            로그인
-          </Link>
+            담당실장텔레연락
+          </a>
         </div>
       </div>
     </header>
@@ -110,12 +112,14 @@ const IntroSection = ({ animationSpeed }) => {
             </div>
             <p className="text-sm text-gray-300 mb-6">처음이신가요? 아래 가이드만 보고 빠르게 시작할 수 있습니다.</p>
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/login"
+              <a
+                href="https://t.me/jm956"
                 className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] font-bold py-3 px-6 rounded-lg text-base hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
+                target="_blank"
+                rel="noreferrer"
               >
-                로그인하기
-              </Link>
+                담당실장텔레연락
+              </a>
               <Link
                 href="/guide"
                 className="bg-transparent border border-[#D2FD9C] text-white font-bold py-3 px-6 rounded-lg text-base hover:bg-white hover:bg-opacity-10 transition-all shadow-inner"
@@ -549,12 +553,14 @@ const StepByStepGuideSection = () => {
 
         <div className="text-center mt-10">
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link
-              href="/login"
+            <a
+              href="https://t.me/jm956"
               className="inline-block bg-gradient-to-r from-[#282D1A] to-[#394508] text-white font-bold py-3 px-8 rounded-lg text-lg hover:opacity-90 transition-all shadow-lg border border-[#394508]"
+              target="_blank"
+              rel="noreferrer"
             >
-              지금 로그인하기
-            </Link>
+              담당실장텔레연락
+            </a>
           </motion.div>
         </div>
       </div>
@@ -686,12 +692,14 @@ const TroubleshootingSection = () => {
         </div>
 
         <div className="text-center mt-8">
-          <Link
+          <a
             className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] px-6 py-3 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
-            href="/"
+            href="https://t.me/jm956"
+            target="_blank"
+            rel="noreferrer"
           >
             운영자에게 문의하기
-          </Link>
+          </a>
         </div>
       </div>
     </section>

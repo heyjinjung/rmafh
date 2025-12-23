@@ -200,24 +200,35 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     const [displayValue, setDisplayValue] = useState(0);
     const rafRef = useRef(0);
     const lastTargetRef = useRef(null);
+    const valueRef = useRef(0);
 
     useEffect(() => {
       const nextTarget = Number.isFinite(Number(targetValue)) ? Number(targetValue) : 0;
       if (lastTargetRef.current === nextTarget) return;
       lastTargetRef.current = nextTarget;
 
-      const from = displayValue;
+      const from = valueRef.current;
       const to = Math.max(0, nextTarget);
+      const delta = Math.abs(to - from);
+
+      // 큰 값(예: 10,000+)일수록 더 느리게 보여서 숫자 변화가 눈에 들어오게 합니다.
+      // durationMs는 "최소" duration으로 취급합니다.
+      const extraMs = Math.min(15000, Math.round((delta / 1000) * 800));
+      const resolvedDurationMs = Math.min(20000, Math.max(durationMs, durationMs + extraMs));
+
       const start = performance.now();
 
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
       const tick = (now) => {
-        const t = Math.min(1, (now - start) / Math.max(1, durationMs));
-        // Ease-out for finance-style count-up.
-        const eased = 1 - Math.pow(1 - t, 3);
-        const current = Math.round(from + (to - from) * eased);
-        setDisplayValue(current);
+        const t = Math.min(1, (now - start) / Math.max(1, resolvedDurationMs));
+        // 급가속(ease-out) 제거: 숫자가 "천천히 올라가는" 느낌을 유지하기 위해 선형으로 진행합니다.
+        const current = Math.round(from + (to - from) * t);
+        setDisplayValue((prev) => {
+          if (prev === current) return prev;
+          valueRef.current = current;
+          return current;
+        });
         if (t < 1) {
           rafRef.current = requestAnimationFrame(tick);
         }
@@ -227,7 +238,6 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       return () => {
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [targetValue, durationMs]);
 
     return displayValue;
@@ -375,6 +385,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       case 'CLAIMED':
         return 'opened';
       case 'EXPIRED':
+        return 'expired';
       case 'LOCKED':
       default:
         return 'locked';
@@ -764,13 +775,16 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           const isAvailable = vault.status === 'available';
           const isLocked = vault.status === 'locked';
           const isOpened = vault.status === 'opened';
+          const isExpired = vault.status === 'expired';
 
           const buttonEnabled = isAvailable;
           const buttonLabel = isAvailable
             ? `${vault.tier === 'gold' ? '황금' : vault.tier === 'platinum' ? '플래티넘' : '다이아'} 금고 열기`
             : isOpened
-              ? '완료됨'
-              : '조건 자동 반영 중';
+              ? '수령완료'
+              : isExpired
+                ? '만료됨'
+                : '잠금 상태';
 
           return (
             <motion.div
@@ -835,7 +849,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 + 0.2 * index, duration: 0.2, type: 'spring' }}
                   >
-                    <span className="text-xs font-bold text-white">{isLocked ? 'LOCKED' : isAvailable ? 'AVAILABLE' : 'COMPLETED'}</span>
+                    <span className="text-xs font-bold text-white">
+                      {isLocked ? '잠금 상태' : isAvailable ? '해제됨' : isExpired ? '만료됨' : '수령완료'}
+                    </span>
                   </motion.div>
                 </motion.div>
 
