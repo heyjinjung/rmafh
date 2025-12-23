@@ -36,6 +36,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
                 {
                     "external_user_id": external_user_id,
                     "nickname": "nick",
+                    "joined_at": "2025-12-01",
                     "deposit_total": 50000,
                     "last_deposit_at": "2025-12-20",
                     "review_ok": False,
@@ -56,6 +57,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
             "rows": [
                 {
                     "external_user_id": external_user_id,
+                    "joined_at": "2025-12-01",
                     "deposit_total": 100000,
                     "last_deposit_at": "2025-12-21",
                     "review_ok": False,
@@ -76,6 +78,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
             "rows": [
                 {
                     "external_user_id": external_user_id,
+                    "joined_at": "2025-12-01",
                     "deposit_total": 150000,
                     "last_deposit_at": "2025-12-22",
                     "review_ok": True,

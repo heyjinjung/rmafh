@@ -689,8 +689,8 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
             review_ok = _parse_bool(getattr(r, "review_ok", False))
 
-            # import_date: joined_date 우선, 없으면 입금일/현재일 기반
-            import_date = joined_date or _select_import_date(last_deposit_at)
+            # import_date: 입금일(last_deposit_at) 기준, 없으면 현재일
+            import_date = _select_import_date(last_deposit_at)
 
             snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
             vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date))
@@ -739,6 +739,14 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                          WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
                                          WHEN v.telegram_ok THEN 'UNLOCKED'
                                          ELSE 'LOCKED'
+                                     END,
+                                     platinum_deposit_done = CASE
+                                         WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
+                                         WHEN (
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
+                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                         ) THEN true
+                                         ELSE false
                                      END,
                                      platinum_attendance_days = CASE
                                          WHEN (
@@ -1479,7 +1487,7 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
             capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
 
             deposit_total = int(row[11] or 0)
-            platinum_deposit_done = bool(row[8]) or deposit_total > 0
+            platinum_deposit_done = bool(row[8])
             diamond_deposit_current = int(row[9] or 0) or deposit_total
             
             users.append({
