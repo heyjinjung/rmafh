@@ -129,7 +129,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
                 <th className="px-3 py-2 text-admin-muted">플래티넘</th>
                 <th className="px-3 py-2 text-admin-muted">다이아</th>
                 <th className="px-3 py-2 text-admin-muted">출석</th>
-                <th className="px-3 py-2 text-admin-muted">입금</th>
+                <th className="px-3 py-2 text-admin-muted">입금(15만)</th>
                 <th className="px-3 py-2 text-admin-muted">텔레그램</th>
                 <th className="px-3 py-2 text-admin-muted">리뷰</th>
                 <th className="px-3 py-2 text-admin-muted">만료일</th>
@@ -159,7 +159,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
                     )}
                   </td>
                   <td className="px-3 py-2 text-admin-text">
-                    {user.platinum_deposit_done ? '플래티넘 완료' : '-'}
+                    {(user.platinum_attendance_days ?? 0) >= 3 ? '입금 완료' : '-'}
                   </td>
                   <td className="px-3 py-2 text-admin-text">{user.telegram_ok ? '✓' : '-'}</td>
                   <td className="px-3 py-2 text-admin-text">{user.review_ok ? '✓' : '-'}</td>

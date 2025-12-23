@@ -83,7 +83,7 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
             출석: {statusData.platinum_attendance_days ?? 0}
             {statusData.max_attendance_days != null ? ` / ${statusData.max_attendance_days}` : ''}일
           </div>
-          <div>입금: {statusData.platinum_deposit_done ? '완료' : '미완료'}</div>
+          <div>입금(15만): {(statusData.platinum_attendance_days ?? 0) >= 3 ? '완료' : '미완료'}</div>
           <div>리뷰: {statusData.review_ok ? '완료' : '미완료'}</div>
           <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
         </VaultRow>
