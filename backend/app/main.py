@@ -770,16 +770,13 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      END,
                                      platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
                                      platinum_status = CASE
-                                         WHEN vs.platinum_status IN ('LOCKED','ACTIVE') AND v.review_ok AND (
-                                             CASE
-                                                 WHEN (
-                                                     (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                                     AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                                 )
-                                                 THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
-                                                 ELSE COALESCE(vs.platinum_attendance_days, 0)
-                                             END
-                                         ) >= 3 THEN 'UNLOCKED'
+                                         WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
+                                              AND v.review_ok
+                                              AND (
+                                                  (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                                  AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
+                                              )
+                                         THEN 'UNLOCKED'
                                          ELSE vs.platinum_status
                                      END,
                    diamond_status = CASE
