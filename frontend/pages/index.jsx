@@ -87,7 +87,7 @@ export default function Home() {
               >
                 로그아웃
               </button>
-              <a href="#" style={styles.navButton} className="cc-navButton">금고 가이드</a>
+              <a href="/guide" style={styles.navButton} className="cc-navButton">금고 가이드</a>
             </div>
           </nav>
 
@@ -193,7 +193,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  const useCountUp = (targetValue, { durationMs = 1800 } = {}) => {
+  const COUNTUP_SLOW_MS = 4500;
+
+  const useCountUp = (targetValue, { durationMs = COUNTUP_SLOW_MS } = {}) => {
     const [displayValue, setDisplayValue] = useState(0);
     const rafRef = useRef(0);
     const lastTargetRef = useRef(null);
@@ -336,7 +338,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     }).format(amount);
 
   function RewardBadge({ amount, colorScheme, shouldAnimate = false }) {
-    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: 1800 });
+    const animated = useCountUp(shouldAnimate ? amount : 0, { durationMs: COUNTUP_SLOW_MS });
     const displayAmount = shouldAnimate ? animated : amount;
     return (
       <div className="relative flex justify-center w-full -mt-4 z-10">
@@ -635,7 +637,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
 
-  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: 2000 });
+  const animatedLossTotal = useCountUp(Number(status?.loss_total || 0), { durationMs: COUNTUP_SLOW_MS });
 
   const socialProofText = '';
 

@@ -1097,7 +1097,7 @@ export default function AdminPage() {
                   ) : null}
 
                   {activeSection === 'extend' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className={`${cardBase} p-3 md:p-4`}>
                         <ExpiryExtensionForm
                           externalUserId={externalUserId}
@@ -1117,8 +1117,11 @@ export default function AdminPage() {
                                   { key: 'extend-expiry', setLastCall: setExtendLastCall }
                                 );
                                 setExtendResponse(body);
+                                showToast({ type: 'success', title: '만료 연장 완료', message: '요청이 처리됐어요.' });
                               } catch (e) {
                                 setExtendError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+                                const msg = e?.payload?.응답?.message || e?.message || '요청에 실패했어요.';
+                                showToast({ type: 'error', title: '만료 연장 실패', message: msg });
                               } finally {
                                 setExtendLoading(false);
                                 setBusyKey('');
@@ -1132,21 +1135,11 @@ export default function AdminPage() {
                           buttonGhost={buttonGhost}
                         />
                       </div>
-
-                      <ResponseViewer
-                        title="만료 연장 결과"
-                        loading={extendLoading}
-                        error={extendError}
-                        response={extendResponse}
-                        lastCall={extendLastCall}
-                        cardBase={cardBase}
-                        actionKey="extend-expiry"
-                      />
                     </div>
                   ) : null}
 
                   {activeSection === 'notify' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div className={`${cardBase} p-3 md:p-4`}>
                         <NotificationForm
                           externalUserId={externalUserId}
@@ -1166,8 +1159,11 @@ export default function AdminPage() {
                                   { key: 'notify', setLastCall: setNotifyLastCall }
                                 );
                                 setNotifyResponse(body);
+                                showToast({ type: 'success', title: '알림 요청 완료', message: '알림이 큐에 등록됐어요.' });
                               } catch (e) {
                                 setNotifyError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+                                const msg = e?.payload?.응답?.message || e?.message || '요청에 실패했어요.';
+                                showToast({ type: 'error', title: '알림 요청 실패', message: msg });
                               } finally {
                                 setNotifyLoading(false);
                                 setBusyKey('');
@@ -1180,16 +1176,6 @@ export default function AdminPage() {
                           buttonBase={buttonBase}
                         />
                       </div>
-
-                      <ResponseViewer
-                        title="알림 요청 결과"
-                        loading={notifyLoading}
-                        error={notifyError}
-                        response={notifyResponse}
-                        lastCall={notifyLastCall}
-                        cardBase={cardBase}
-                        actionKey="notify"
-                      />
                     </div>
                   ) : null}
 
