@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import {
   CsvUploader,
   ExpiryExtensionForm,
@@ -71,6 +71,23 @@ export default function AdminPage() {
   const [notifyListLastCall, setNotifyListLastCall] = useState(null);
   const [notifyListPage, setNotifyListPage] = useState(1);
   const [notifyListFilters, setNotifyListFilters] = useState({ status: '', type: '', variant_id: '', external_user_id: '' });
+
+  const [toast, setToast] = useState(null);
+  const toastTimerRef = useRef(null);
+
+  const showToast = (next) => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setToast(next);
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000);
+  };
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+  }, []);
 
   const [csvResponse, setCsvResponse] = useState(null);
   const [csvLoading, setCsvLoading] = useState(false);
@@ -199,8 +216,11 @@ export default function AdminPage() {
       setStatusData(user);
       setSelectedUserId(user.user_id);
       if (user.external_user_id) setExternalUserId(user.external_user_id);
+      showToast({ type: 'success', title: '상태 갱신', message: '사용자 상태를 불러왔어요.' });
     } catch (e) {
       setStatusError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+      const msg = e?.payload?.응답?.message || e?.message || '요청에 실패했어요.';
+      showToast({ type: 'error', title: '상태 조회 실패', message: msg });
     } finally {
       setStatusLoading(false);
       if (!skipBusy) setBusyKey('');
@@ -252,6 +272,7 @@ export default function AdminPage() {
   const runAdminAction = async (action, body) => {
     if (!selectedUserId) {
       setActionError({ 응답: { message: '먼저 사용자 상태를 조회하거나 목록에서 선택하세요.' } });
+      showToast({ type: 'error', title: '실행 불가', message: '먼저 사용자 상태를 조회하거나 선택하세요.' });
       return;
     }
 
@@ -271,9 +292,20 @@ export default function AdminPage() {
         { key: action, setLastCall: setActionLastCall, includeExternalQuery: false }
       );
       setActionResponse(resp);
+      const actionLabel =
+        action === 'status'
+          ? '금고 상태 변경'
+          : action === 'attendance'
+            ? '출석 조정'
+            : action === 'deposit'
+              ? '입금/누적 업데이트'
+              : '관리 액션';
+      showToast({ type: 'success', title: '완료', message: `${actionLabel} 적용됐어요.` });
       await fetchUserStatus({ skipBusy: true });
     } catch (e) {
       setActionError(e?.payload || { 상태코드: 0, 응답: { message: e?.message || '요청에 실패했어요.' } });
+      const message = e?.payload?.응답?.message || e?.message || '요청에 실패했어요.';
+      showToast({ type: 'error', title: '실패', message });
     } finally {
       setActionLoading(false);
       setBusyKey('');
@@ -285,6 +317,39 @@ export default function AdminPage() {
       <Head>
         <title>CC Casino - 관리자 도구</title>
       </Head>
+
+      {toast ? (
+        <div className="fixed top-6 right-6 z-50 max-w-sm w-full drop-shadow-xl">
+          {(() => {
+            const tone = toast.type === 'success'
+              ? { bg: 'bg-emerald-900/90', border: 'border-emerald-500/60', icon: '✓' }
+              : toast.type === 'error'
+                ? { bg: 'bg-red-900/90', border: 'border-red-500/60', icon: '!' }
+                : { bg: 'bg-gray-900/90', border: 'border-gray-500/60', icon: 'i' };
+            return (
+              <div className={`rounded-lg border ${tone.border} ${tone.bg} backdrop-blur-md p-4 flex gap-3 items-start`}>
+                <div className="h-8 w-8 rounded-full bg-black/40 border border-white/10 flex items-center justify-center text-sm font-bold text-white">
+                  {tone.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white leading-tight">{toast.title}</p>
+                  {toast.message ? (
+                    <p className="text-xs text-white/80 mt-1 leading-snug break-words">{toast.message}</p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  aria-label="닫기"
+                  className="text-white/60 hover:text-white text-sm"
+                  onClick={() => setToast(null)}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      ) : null}
 
       {!isAuthenticated ? (
         <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -320,14 +385,6 @@ export default function AdminPage() {
       <div className="min-h-screen bg-black text-white overflow-x-hidden">
         <div className="mx-auto w-full max-w-none px-4 lg:px-0">
           <div className="relative min-h-screen flex flex-col lg:flex-row">
-                        <button
-                          type="button"
-                          onClick={() => setActiveSection('notify-list')}
-                          disabled={!!busyKey}
-                          className={`${sectionButtonClass('notify-list')} flex-1`}
-                        >
-                          알림 목록
-                        </button>
             {/* Left column: Sidebar + Footer (desktop fixed width) */}
             <div className="w-full lg:w-[356px] lg:shrink-0 lg:flex lg:flex-col lg:min-h-screen">
               {/* Sidebar */}
@@ -810,20 +867,11 @@ export default function AdminPage() {
 
                   {activeSection === 'status' ? (
                     <>
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 gap-4">
                         <StatusViewer statusData={statusData} cardBase={cardBase} externalUserId={externalUserId} />
-                        <ResponseViewer
-                          title="상태 조회 결과"
-                          loading={statusLoading}
-                          error={statusError}
-                          response={statusData}
-                          lastCall={statusLastCall}
-                          cardBase={cardBase}
-                          actionKey="status"
-                        />
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
+                      <div className="grid grid-cols-1 gap-4 mt-4">
                         <div className={`${cardBase} p-3 md:p-4 space-y-4`}>
                           <div className="flex items-center justify-between">
                             <div>
@@ -958,16 +1006,6 @@ export default function AdminPage() {
                             </button>
                           </div>
                         </div>
-
-                        <ResponseViewer
-                          title="최근 액션 응답"
-                          loading={actionLoading}
-                          error={actionError}
-                          response={actionResponse}
-                          lastCall={actionLastCall}
-                          cardBase={cardBase}
-                          actionKey={actionKey}
-                        />
                       </div>
                     </>
                   ) : null}
