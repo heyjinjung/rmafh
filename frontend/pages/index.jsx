@@ -383,7 +383,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         status: mapApiStatusToUi(api.platinum_status),
         expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
         missions: [
-          { id: 'p1', label: '연속 3일 달성 (일별 5만원 이상)', isDone: attendanceDays >= 3, hint: `현재 ${Math.min(3, attendanceDays)}/3 · 하루라도 건너뛰면 1일부터 다시` },
+          { id: 'p1', label: '누적입금 15만원 이상', isDone: Boolean(api.platinum_deposit_done), hint: '15만원 이상 입금 시 자동 확인됩니다.' },
           { id: 'p2', label: `리뷰 작성 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
           { id: 'p3', label: '플래티넘 금고 해금', isDone: api.platinum_status === 'UNLOCKED' || api.platinum_status === 'CLAIMED' },
           { id: 'p4', label: '수령 완료', isDone: api.platinum_status === 'CLAIMED' },

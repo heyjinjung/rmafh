@@ -79,10 +79,7 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
         </VaultRow>
 
         <VaultRow title="플래티넘 금고" status={statusData.platinum_status}>
-          <div>
-            출석: {statusData.platinum_attendance_days ?? 0}일
-          </div>
-          <div>입금(15만): {(statusData.platinum_attendance_days ?? 0) >= 3 ? '완료' : '미완료'}</div>
+          <div>누적입금(15만): {statusData.platinum_deposit_done ? '완료' : '미완료'}</div>
           <div>리뷰: {statusData.review_ok ? '완료' : '미완료'}</div>
           <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
         </VaultRow>
