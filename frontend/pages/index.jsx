@@ -1014,8 +1014,6 @@ const styles = {
   logoIcon: {
     width: 26,
     height: 27,
-    borderRadius: 18,
-    objectFit: 'cover',
   },
   logoText: {
     fontFamily: "'IBM Plex Sans', sans-serif",
