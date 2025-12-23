@@ -7,6 +7,7 @@ const ICON_STAR = 'https://www.figma.com/api/mcp/asset/a121fe05-b028-4a40-a525-9
 
 export default function LoginPage() {
   const router = useRouter();
+  const basePath = router.basePath || '';
   const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -23,7 +24,7 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/vault/login', {
+      const res = await fetch(`${basePath}/api/vault/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nickname: nickname.trim() }),

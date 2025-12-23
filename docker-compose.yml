@@ -51,6 +51,7 @@ services:
         condition: service_started
     environment:
       NEXT_PUBLIC_API_BASE: http://api:8000
+      NEXT_PUBLIC_BASE_PATH: ${NEXT_PUBLIC_BASE_PATH:-}
     ports:
       - "3002:3000"
 

@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
 
 /* ─── Figma Assets ─── */
@@ -20,13 +21,15 @@ const TOKENS = {
 };
 
 export default function Home() {
+  const router = useRouter();
+  const basePath = router.basePath || '';
   const [externalUserId, setExternalUserId] = useState('');
   const [userNickname, setUserNickname] = useState('');
 
   // 로그아웃 처리
   const handleLogout = () => {
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    window.location.href = `${basePath}/login`;
   };
 
   useEffect(() => {
@@ -49,9 +52,9 @@ export default function Home() {
       }
     } else {
       // 로그인 안 되어 있으면 로그인 페이지로
-      window.location.href = '/login';
+      window.location.href = `${basePath}/login`;
     }
-  }, []);
+  }, [basePath]);
 
   return (
     <>
@@ -126,7 +129,7 @@ export default function Home() {
 
         {/* ─── Main Content ─── */}
         <main style={styles.main} className="main">
-          <VaultChallenge />
+          <VaultChallenge basePath={basePath} />
         </main>
 
         {/* ─── Footer ─── */}
@@ -156,7 +159,7 @@ export default function Home() {
           .sidebar { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; padding: 20px !important; gap: 20px !important; left: 0 !important; }
           .main { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; left: 0 !important; right: 0 !important; top: 0 !important; bottom: 0 !important; }
           .footer { position: relative !important; width: 100% !important; max-width: 760px !important; margin: 0 auto; left: 0 !important; bottom: 0 !important; }
-          .modules { flex-wrap: wrap; }
+          .modules { flex-wrap: wrap; justify-content: center; }
           .nav-card { width: 121px !important; height: 85px !important; padding: 14px 10px !important; }
 
           /* Sidebar becomes App Header */
@@ -188,6 +191,7 @@ export default function Home() {
 }
 
 function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompletionBonus = true }) {
+function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompletionBonus = true, basePath = '' }) {
   const [selectedVault, setSelectedVault] = useState('gold-vault');
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -242,8 +246,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
       
       const endpoint = extUserId 
-        ? `/api/vault/status/?external_user_id=${encodeURIComponent(extUserId)}`
-        : '/api/vault/status/';
+        ? `${basePath}/api/vault/status/?external_user_id=${encodeURIComponent(extUserId)}`
+        : `${basePath}/api/vault/status/`;
       
       const data = await apiFetch(endpoint);
       setStatus(data);
@@ -419,9 +423,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
         
         const vaultType = tier.toUpperCase();
-        const endpoint = extUserId
-          ? `/api/vault/claim/?external_user_id=${encodeURIComponent(extUserId)}`
-          : '/api/vault/claim/';
+        const endpoint = extUserId 
+          ? `${basePath}/api/vault/claim/?external_user_id=${encodeURIComponent(extUserId)}`
+          : `${basePath}/api/vault/claim/`;
         
         const res = await apiFetch(endpoint, {
           method: 'POST',

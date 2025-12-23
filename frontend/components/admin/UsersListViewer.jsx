@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 
 function formatKoDate(value) {
   if (!value) return '-';
@@ -27,6 +28,8 @@ function statusBadge(status) {
 }
 
 export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh }) {
+  const router = useRouter();
+  const basePath = router.basePath || '';
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
@@ -38,7 +41,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
     setError(null);
     try {
       const qs = query ? `?query=${encodeURIComponent(query)}` : '';
-      const response = await fetch(`/api/vault/users-list${qs}`, {
+      const response = await fetch(`${basePath}/api/vault/users-list${qs}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

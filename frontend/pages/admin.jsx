@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
 import {
   CsvUploader,
   ExpiryExtensionForm,
@@ -17,6 +18,16 @@ const ICON_GAME = 'https://www.figma.com/api/mcp/asset/8625e6d9-bea3-4dd6-9416-8
 const ICON_TELEGRAM = 'https://www.figma.com/api/mcp/asset/01bcbc61-1f54-4542-8ffb-a7d7bdd11c9c';
 
 export default function AdminPage() {
+  const router = useRouter();
+  const basePath = router.basePath || '';
+  const toAppPath = (path) => {
+    if (typeof path !== 'string') return path;
+    if (!path.startsWith('/')) return path;
+    if (!basePath) return path;
+    if (path.startsWith(`${basePath}/`)) return path;
+    return `${basePath}${path}`;
+  };
+
   const [adminPassword, setAdminPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [externalUserId, setExternalUserId] = useState('');
@@ -124,7 +135,7 @@ export default function AdminPage() {
       headers['x-admin-password'] = adminPassword;
     }
 
-    const res = await fetch(pathWithQs, { ...init, headers });
+    const res = await fetch(toAppPath(pathWithQs), { ...init, headers });
     const ct = res.headers.get('content-type') || '';
     const body = ct.includes('application/json') ? await res.json() : await res.text();
     if (!res.ok) {
@@ -196,7 +207,7 @@ export default function AdminPage() {
     setStatusLastCall({ key: 'status', method: 'GET', path: `/api/vault/users-list${q}`, at: new Date().toISOString() });
 
     try {
-      const response = await fetch(`/api/vault/users-list${q}`, {
+      const response = await fetch(toAppPath(`/api/vault/users-list${q}`), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -249,7 +260,7 @@ export default function AdminPage() {
     setNotifyListLastCall({ key: 'notify-list', method: 'GET', path, at: new Date().toISOString() });
 
     try {
-      const response = await fetch(path, {
+      const response = await fetch(toAppPath(path), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
