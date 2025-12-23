@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 
@@ -87,7 +88,7 @@ export default function Home() {
               >
                 로그아웃
               </button>
-              <a href="/guide" style={styles.navButton} className="cc-navButton">금고 가이드</a>
+              <Link href="/guide" style={styles.navButton} className="cc-navButton">금고 가이드</Link>
             </div>
           </nav>
 

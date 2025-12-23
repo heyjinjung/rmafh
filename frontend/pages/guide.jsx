@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
@@ -72,18 +73,18 @@ const Header = () => {
           <h1 className="text-xl md:text-2xl font-bold tracking-tight">금고 시스템</h1>
         </div>
         <div className="flex space-x-2">
-          <a
+          <Link
             href="/"
             className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md border border-[#D2FD9C] hidden md:block"
           >
             내 금고 확인
-          </a>
-          <a
+          </Link>
+          <Link
             href="/login"
             className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-4 py-2 rounded-lg text-sm font-bold border border-[#D2FD9C] hover:opacity-90 transition-all shadow-md"
           >
             로그인
-          </a>
+          </Link>
         </div>
       </div>
     </header>
@@ -109,18 +110,18 @@ const IntroSection = ({ animationSpeed }) => {
             </div>
             <p className="text-sm text-gray-300 mb-6">처음이신가요? 아래 가이드만 보고 빠르게 시작할 수 있습니다.</p>
             <div className="flex flex-wrap gap-3">
-              <a
+              <Link
                 href="/login"
                 className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] font-bold py-3 px-6 rounded-lg text-base hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
               >
                 로그인하기
-              </a>
-              <a
+              </Link>
+              <Link
                 href="/guide"
                 className="bg-transparent border border-[#D2FD9C] text-white font-bold py-3 px-6 rounded-lg text-base hover:bg-white hover:bg-opacity-10 transition-all shadow-inner"
               >
                 금고 가이드 보기
-              </a>
+              </Link>
             </div>
           </div>
           <div className="md:w-2/5 flex justify-center">
@@ -339,7 +340,7 @@ const VaultStatusSection = () => {
               ))}
             </ul>
             <div className="flex flex-wrap gap-3">
-              <a href="/" className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-5 py-3 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md">내 금고 상태 확인</a>
+              <Link href="/" className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-5 py-3 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md">내 금고 상태 확인</Link>
             </div>
           </div>
           <div className="md:w-1/2 flex justify-center">
@@ -456,9 +457,9 @@ const ExpirySystemSection = () => {
                   <div className="text-[#D2FD9C] text-xs mb-1">손실 위험 금액</div>
                   <div className="text-red-500 text-2xl font-bold">50,000 포인트</div>
                 </div>
-                <a href="/" className="w-full inline-block text-center bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-md border border-[#98BF64]">
+                <Link href="/" className="w-full inline-block text-center bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-md border border-[#98BF64]">
                   지금 수령하기
-                </a>
+                </Link>
                 <div className="mt-4 bg-gray-900 rounded-lg p-2 border border-[#444] shadow-inner">
                   <div className="flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-red-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -547,14 +548,14 @@ const StepByStepGuideSection = () => {
         </div>
 
         <div className="text-center mt-10">
-          <motion.a
-            href="/login"
-            className="inline-block bg-gradient-to-r from-[#282D1A] to-[#394508] text-white font-bold py-3 px-8 rounded-lg text-lg hover:opacity-90 transition-all shadow-lg border border-[#394508]"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            지금 로그인하기
-          </motion.a>
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+            <Link
+              href="/login"
+              className="inline-block bg-gradient-to-r from-[#282D1A] to-[#394508] text-white font-bold py-3 px-8 rounded-lg text-lg hover:opacity-90 transition-all shadow-lg border border-[#394508]"
+            >
+              지금 로그인하기
+            </Link>
+          </motion.div>
         </div>
       </div>
     </section>
@@ -673,24 +674,24 @@ const TroubleshootingSection = () => {
                 </div>
               </div>
               <div className="mt-4 pl-12">
-                <a
+                <Link
                   href="/"
                   className="bg-[#D2FD9C] text-[#282D1A] px-3 py-1 rounded-md text-xs font-bold shadow-sm hover:bg-opacity-90 transition-all"
                 >
                   바로가기
-                </a>
+                </Link>
               </div>
             </div>
           ))}
         </div>
 
         <div className="text-center mt-8">
-          <a
+          <Link
             className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] px-6 py-3 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
             href="/"
           >
             운영자에게 문의하기
-          </a>
+          </Link>
         </div>
       </div>
     </section>
