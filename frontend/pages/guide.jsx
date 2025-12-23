@@ -238,7 +238,7 @@ const VaultTypeSection = () => {
     },
     {
       title: '플래티넘 금고',
-      description: '연속 3일 5만원 이상 입금, 리뷰작성 1회 시 해제됩니다.',
+      description: '3일 이내 15만원 이상 입금, 리뷰작성 1회 시 해제됩니다.',
       rewardRange: '중간 보상 (골드의 2배)',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" viewBox="0 0 20 20" fill="white">

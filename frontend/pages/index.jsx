@@ -71,9 +71,9 @@ export default function Home() {
               <img src={ICON_STAR} alt="CC Casino" style={styles.logoIcon} />
               <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
               {userNickname && (
-                <span style={{ fontSize: '12px', color: TOKENS.textSub }}>
+                <span style={{ fontSize: '12px', color: TOKENS.textSub, textAlign: 'center' }}>
                   {userNickname}님
                 </span>
               )}
@@ -85,13 +85,14 @@ export default function Home() {
                   border: '1px solid rgba(210,253,156,0.6)',
                   color: TOKENS.accent1,
                   boxShadow: '0 10px 24px rgba(0,0,0,0.35)',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  width: '100%'
                 }}
                 className="cc-navButton"
               >
                 로그아웃
               </button>
-              <Link href="/guide" style={styles.navButton} className="cc-navButton">금고 가이드</Link>
+              <Link href="/guide" style={{ ...styles.navButton, width: '100%' }} className="cc-navButton">금고 가이드</Link>
             </div>
           </nav>
 

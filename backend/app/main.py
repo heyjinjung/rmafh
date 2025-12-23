@@ -213,15 +213,17 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         review_row = None
         cur.execute(
             """
-            SELECT expires_at,
-                   gold_status,
-                   platinum_status,
-                   diamond_status,
-                   platinum_attendance_days,
-                   platinum_deposit_done,
-                   diamond_deposit_current
-              FROM vault_status
-             WHERE user_id=%s
+            SELECT vs.expires_at,
+                   vs.gold_status,
+                   vs.platinum_status,
+                   vs.diamond_status,
+                   vs.platinum_attendance_days,
+                   vs.platinum_deposit_done,
+                   vs.diamond_deposit_current,
+                   uas.last_deposit_at
+              FROM vault_status vs
+              LEFT JOIN user_admin_snapshot uas ON vs.user_id = uas.user_id
+             WHERE vs.user_id=%s
             """,
             (user_id,),
         )
@@ -247,7 +249,9 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
             )
 
     # Fallback defaults if user row not found
-    expires_at = row[0] if row else now + timedelta(hours=72)
+    last_deposit_at = row[7] if row and row[7] else None
+    base_time = last_deposit_at if last_deposit_at else now
+    expires_at = row[0] if row else base_time + timedelta(hours=72)
     gold_status = row[1] if row else "LOCKED"
     platinum_status = row[2] if row else "LOCKED"
     diamond_status = row[3] if row else "LOCKED"
@@ -693,7 +697,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             import_date = _select_import_date(last_deposit_at)
 
             snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
-            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date))
+            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at))
 
         if not snapshot_values:
             raise HTTPException(status_code=400, detail="NO_VALID_ROWS")
@@ -743,27 +747,23 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      platinum_deposit_done = CASE
                                          WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
                                          WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
                                          ) THEN true
                                          ELSE false
                                      END,
                                      platinum_attendance_days = CASE
                                          WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
                                          )
-                                         THEN CASE
-                                             WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
-                                                 THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
-                                             ELSE 1
-                                         END
+                                         THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                          ELSE vs.platinum_attendance_days
                                      END,
                                      last_attended_at = CASE
                                          WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                             AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
                                          )
                                          THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
                                          ELSE vs.last_attended_at
@@ -773,14 +773,10 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                          WHEN vs.platinum_status IN ('LOCKED','ACTIVE') AND v.review_ok AND (
                                              CASE
                                                  WHEN (
-                                                     (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
-                                                     AND (vs.last_attended_at IS NULL OR vs.last_attended_at::date < v.import_date)
+                                                     (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                                     AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= INTERVAL '3 days')
                                                  )
-                                                 THEN CASE
-                                                     WHEN vs.last_attended_at IS NOT NULL AND vs.last_attended_at::date = (v.import_date - INTERVAL '1 day')
-                                                         THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
-                                                     ELSE 1
-                                                 END
+                                                 THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
                                                  ELSE COALESCE(vs.platinum_attendance_days, 0)
                                              END
                                          ) >= 3 THEN 'UNLOCKED'
@@ -790,12 +786,16 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                                                          WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
                                      ELSE vs.diamond_status
                                    END,
+                   expires_at = CASE
+                       WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at + INTERVAL '7 days'
+                       ELSE vs.expires_at
+                   END,
                    updated_at = NOW()
-                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date)
+                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at)
              WHERE vs.user_id = v.user_id
             """,
             vault_update_values,
-                        template="(%s,%s,%s,%s,%s)",
+                        template="(%s,%s,%s,%s,%s,%s)",
         )
         vault_rows_updated = int(cur.rowcount or 0)
 
