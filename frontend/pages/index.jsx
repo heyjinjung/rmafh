@@ -396,9 +396,20 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         rewardAmount: 10000,
         status: mapApiStatusToUi(api.gold_status),
         missions: [
-          { id: 'g1', label: '골드 금고 상태 확인', isDone: api.gold_status !== 'LOCKED', hint: '조건 달성 시 자동 해금' },
-          { id: 'g2', label: '수령 가능 시 금고 열기', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
-          { id: 'g3', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },
+          {
+            id: 'g1',
+            label: 'CC카지노 텔레공식채널 입장 확인',
+            isDone: api.gold_status !== 'LOCKED',
+            hint: '입장 기록은 텔레그램 CSV 업로드 후 다음날 반영됩니다.',
+          },
+          {
+            id: 'g2',
+            label: '담당실장 텔레공식채널 입장 확인',
+            isDone: api.gold_status !== 'LOCKED',
+            hint: '담당실장 채널 입장도 CSV 확인 후 다음날 반영됩니다.',
+          },
+          { id: 'g3', label: '수령 가능 시 금고 열기', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
+          { id: 'g4', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },
         ],
       },
       {
