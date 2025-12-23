@@ -14,6 +14,7 @@ def test_status_returns_contract_fields(client):
         "platinum_attendance_days",
         "platinum_deposit_done",
         "platinum_review_done",
+        "telegram_ok",
         "diamond_deposit_current",
         "expires_at",
         "now",
@@ -89,7 +90,24 @@ def test_claim_enforces_state_and_idempotency(client):
     assert locked_resp.status_code == 403
     assert locked_resp.json().get("detail") == "NOT_CLAIMABLE"
 
-    # GOLD starts unlocked, first claim succeeds, second claim conflicts.
+    # GOLD is unlocked only after daily import marks telegram_ok=true.
+    import_resp = client.post(
+        "/api/vault/user-daily-import",
+        json={
+            "rows": [
+                {
+                    "external_user_id": external_user_id,
+                    "deposit_total": 0,
+                    "telegram_ok": True,
+                    "review_ok": False,
+                    "last_deposit_at": "2025-12-20",
+                }
+            ]
+        },
+    )
+    assert import_resp.status_code == 200
+
+    # First claim succeeds, second claim conflicts.
     first_claim = client.post(
         "/api/vault/claim",
         params={"external_user_id": external_user_id},

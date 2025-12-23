@@ -190,7 +190,6 @@ export default function Home() {
   );
 }
 
-function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompletionBonus = true }) {
 function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompletionBonus = true, basePath = '' }) {
   const [selectedVault, setSelectedVault] = useState('gold-vault');
   const [status, setStatus] = useState(null);
@@ -364,13 +363,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
             id: 'g1',
             label: 'CC카지노 텔레공식채널 입장 확인',
             isDone: Boolean(api.telegram_ok),
-            hint: '입장 기록은 텔레그램 CSV 업로드 후 다음날 반영됩니다.',
+            hint: '입장기록은 텔레그램 확인 후 다음날 반영됩니다.',
           },
           {
             id: 'g2',
             label: '담당실장 텔레공식채널 입장 확인',
             isDone: Boolean(api.telegram_ok),
-            hint: '담당실장 채널 입장도 CSV 확인 후 다음날 반영됩니다.',
+            hint: '담당실장 채널 입장도 확인 후 다음날 반영됩니다.',
           },
           { id: 'g3', label: '수령 가능 시 금고 열기', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
           { id: 'g4', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },

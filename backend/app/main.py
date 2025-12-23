@@ -163,7 +163,7 @@ async def user_login(body: UserLoginRequest):
         resolved_external_user_id = row[1]
 
         cur.execute(
-            "SELECT nickname FROM user_admin_snapshot WHERE user_id=%s",
+            "SELECT nickname, COALESCE(telegram_ok, false) FROM user_admin_snapshot WHERE user_id=%s",
             (user_id,),
         )
         snapshot_row = cur.fetchone()
@@ -175,17 +175,19 @@ async def user_login(body: UserLoginRequest):
 
         # CSV에 저장된 닉네임을 신뢰 소스로 사용
         snapshot_nickname = snapshot_row[0] or nickname
+        telegram_ok = bool(snapshot_row[1]) if snapshot_row[1] is not None else False
 
         # vault_status 기본 행이 누락된 경우에만 보정
         now = _now()
         expires_at = now + timedelta(hours=72)
+        initial_gold_status = "UNLOCKED" if telegram_ok else "LOCKED"
         cur.execute(
             """
             INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
-            VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+            VALUES (%s, %s, %s, 'LOCKED', 'LOCKED')
             ON CONFLICT (user_id) DO NOTHING
             """,
-            (user_id, expires_at),
+            (user_id, expires_at, initial_gold_status),
         )
 
         conn.commit()
@@ -246,7 +248,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
 
     # Fallback defaults if user row not found
     expires_at = row[0] if row else now + timedelta(hours=72)
-    gold_status = row[1] if row else "UNLOCKED"
+    gold_status = row[1] if row else "LOCKED"
     platinum_status = row[2] if row else "LOCKED"
     diamond_status = row[3] if row else "LOCKED"
 
@@ -331,7 +333,7 @@ async def claim_vault(body: ClaimRequest, user_id: int | None = None, external_u
                 """
                 INSERT INTO vault_status
                     (user_id, expires_at, gold_status, platinum_status, diamond_status)
-                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+                VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED')
                 ON CONFLICT (user_id) DO NOTHING
                 """,
                 (user_id, expires_at),
@@ -409,7 +411,7 @@ async def attendance(user_id: int | None = None, external_user_id: str | None = 
                 """
                 INSERT INTO vault_status
                     (user_id, expires_at, gold_status, platinum_status, diamond_status, platinum_attendance_days, platinum_deposit_done, last_attended_at)
-                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED', 0, false, NULL)
+                VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED', 0, false, NULL)
                 ON CONFLICT (user_id) DO NOTHING
                 """,
                 (user_id, expires_at),
@@ -543,7 +545,7 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
     cur.execute(
         """
         INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
-        VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+        VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED')
         ON CONFLICT (user_id) DO NOTHING
         """,
         (user_id, expires_at),
@@ -725,7 +727,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             ON CONFLICT (user_id) DO NOTHING
             """,
             ensure_values,
-            template="(%s,%s,'UNLOCKED','LOCKED','LOCKED')",
+            template="(%s,%s,'LOCKED','LOCKED','LOCKED')",
         )
 
         execute_values(
@@ -734,9 +736,10 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             UPDATE vault_status AS vs
                SET diamond_deposit_current = v.deposit_total,
                                      gold_status = CASE
-                                                                    WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
-                                                                    ELSE 'UNLOCKED'
-                                                                END,
+                                         WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
+                                         WHEN v.telegram_ok THEN 'UNLOCKED'
+                                         ELSE 'LOCKED'
+                                     END,
                                      platinum_attendance_days = CASE
                                          WHEN (
                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 50000
@@ -1001,7 +1004,7 @@ def _ensure_schema():
             CREATE TABLE IF NOT EXISTS vault_status (
                 user_id INTEGER PRIMARY KEY,
                 expires_at TIMESTAMPTZ NOT NULL,
-                gold_status TEXT NOT NULL DEFAULT 'UNLOCKED',
+                gold_status TEXT NOT NULL DEFAULT 'LOCKED',
                 platinum_status TEXT NOT NULL DEFAULT 'LOCKED',
                 diamond_status TEXT NOT NULL DEFAULT 'LOCKED',
                 expiry_extend_count INTEGER NOT NULL DEFAULT 0,
@@ -1064,7 +1067,7 @@ def _ensure_schema():
         )
 
         # Backward compatible adds if the table already exists with older schema.
-        cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'UNLOCKED'")
+        cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'LOCKED'")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_reason TEXT")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_at TIMESTAMPTZ")
@@ -1484,7 +1487,7 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
                 "external_user_id": row[1],
                 "created_at": row[2].isoformat() if row[2] else None,
                 "expires_at": row[3].isoformat() if row[3] else None,
-                "gold_status": row[4] or "UNLOCKED",
+                "gold_status": row[4] or "LOCKED",
                 "platinum_status": row[5] or "LOCKED",
                 "diamond_status": row[6] or "LOCKED",
                 "platinum_attendance_days": capped_attendance,
@@ -1556,10 +1559,10 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, _aut
             cur.execute(
                 """
                 INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
-                VALUES (%s, %s, 'UNLOCKED', 'LOCKED', 'LOCKED')
+                VALUES (%s, %s, %s, 'LOCKED', 'LOCKED')
                 ON CONFLICT (user_id) DO NOTHING
                 """,
-                (user_id, now + timedelta(hours=72)),
+                (user_id, now + timedelta(hours=72), ("UNLOCKED" if telegram_ok else "LOCKED")),
             )
 
             admin_user = request.client.host if request.client else "unknown"
@@ -1652,6 +1655,22 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
         )
         if cur.rowcount == 0:
             raise HTTPException(status_code=404, detail="SNAPSHOT_NOT_FOUND")
+
+        if telegram_ok is not None:
+            row = _get_or_create_vault_row(cur, user_id, now)
+            if row:
+                _expires_at, gold_status, *_rest = row
+                if gold_status != "CLAIMED":
+                    new_gold_status = "UNLOCKED" if telegram_ok else "LOCKED"
+                    cur.execute(
+                        """
+                        UPDATE vault_status
+                           SET gold_status=%s,
+                               updated_at=%s
+                         WHERE user_id=%s
+                        """,
+                        (new_gold_status, now, user_id),
+                    )
 
         admin_user = request.client.host if request.client else "unknown"
         _log_admin_action(
