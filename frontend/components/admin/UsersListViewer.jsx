@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 
+const DIAMOND_REWARD = 70000;
+
 function formatKoDate(value) {
   if (!value) return '-';
   const d = new Date(value);
@@ -151,7 +153,11 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
                   <td className="px-3 py-2">{statusBadge(user.gold_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.platinum_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.diamond_status)}</td>
-                  <td className="px-3 py-2 text-admin-neon font-bold">70,000원</td>
+                  <td className="px-3 py-2 text-admin-neon font-bold">
+                    {['UNLOCKED', 'CLAIMED'].includes(user.diamond_status)
+                      ? `${DIAMOND_REWARD.toLocaleString('ko-KR')}원`
+                      : '비활성'}
+                  </td>
                   <td className="px-3 py-2 text-admin-text">
                     {user.platinum_attendance_days}일
                     {user.max_attendance_days !== undefined && (

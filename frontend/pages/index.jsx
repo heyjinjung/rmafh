@@ -197,6 +197,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // 골드→플래티넘 해금 직후 토스트 노출 제어
+  const [showPlatinumUnlockedToast, setShowPlatinumUnlockedToast] = useState(false);
+  const prevStatusRef = useRef();
 
   const [serverClock, setServerClock] = useState({
     fetchedAtMs: 0,
@@ -250,6 +253,19 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         : `${basePath}/api/vault/status/`;
       
       const data = await apiFetch(endpoint);
+      // 골드→플래티넘 해금 직후 토스트 노출 로직
+      const prev = prevStatusRef.current;
+      if (
+        prev &&
+        (prev.gold_status === 'CLAIMED' || prev.gold_status === 'UNLOCKED') &&
+        prev.platinum_status !== 'UNLOCKED' &&
+        data.platinum_status === 'UNLOCKED'
+      ) {
+        setShowPlatinumUnlockedToast(true);
+        // 3초 후 자동 숨김
+        setTimeout(() => setShowPlatinumUnlockedToast(false), 3000);
+      }
+      prevStatusRef.current = data;
       setStatus(data);
 
       const serverNowMs = data?.now ? Date.parse(data.now) : Date.now();
@@ -625,6 +641,12 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         backgroundAttachment: 'fixed',
       }}
     >
+      {/* 골드→플래티넘 해금 토스트 */}
+      {showPlatinumUnlockedToast && (
+        <div className="fixed top-8 left-1/2 z-50 -translate-x-1/2 bg-[#07AF4D] text-white px-6 py-3 rounded-xl shadow-lg border border-[#07AF4D]/40 animate-fade-in-out text-base font-semibold">
+          플래티넘 금고가 열렸어요! 미션을 확인해보세요.
+        </div>
+      )}
       {(error || notice) && (
         <div className="max-w-5xl mx-auto mb-6">
           {error && (

@@ -8,6 +8,7 @@
 - 범위: 금고 상태 조회/수령, 출석, 입금 훅, 알림 트리거
 
 ## Changelog
+- 2025-12-24: DIAMOND 금고 보상액 70,000원 명시
 - 2025-12-20 v0.2: status 응답에 `platinum_review_done` 반영, PLATINUM 금액 20,000 기준으로 예시/문구 정합화
 
 ## 2. 공통
@@ -49,7 +50,7 @@
 	"expires_at": "2025-12-26T00:00:00Z",
 	"now": "2025-12-20T12:00:00Z",
 	"loss_total": 130000,
-	"loss_breakdown": {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 100000, "BONUS": 0},
+	"loss_breakdown": {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 70000, "BONUS": 0},
 	"ms_countdown": {"enabled": true, "remaining_ms": 3578123},
 	"referral_revive_available": true,
 	"social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
