@@ -1030,7 +1030,7 @@ export default function AdminPage() {
                               <input
                                 type="number"
                                 className={inputBase}
-                                placeholder="다이아 누적 입금 (원)"
+                                placeholder="다이아 누적 입금 (7만 지급, 원)"
                                 value={depositForm.diamond_deposit_current}
                                 onChange={(e) => setDepositForm((prev) => ({ ...prev, diamond_deposit_current: e.target.value }))}
                                 disabled={!!busyKey}

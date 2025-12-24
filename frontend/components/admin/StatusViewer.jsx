@@ -86,6 +86,7 @@ export function StatusViewer({ statusData, cardBase, externalUserId }) {
 
         <VaultRow title="다이아 금고" status={statusData.diamond_status}>
           <div>누적 입금: {(statusData.diamond_deposit_current ?? 0).toLocaleString('ko-KR')} 원</div>
+          <div className="text-admin-neon font-bold">보상액: 70,000원</div>
           <div>만료일: {expires ? formatKoDateTime(expires) : '-'}</div>
         </VaultRow>
       </div>

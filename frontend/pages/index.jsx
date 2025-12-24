@@ -393,7 +393,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       {
         id: 'diamond-vault',
         tier: 'diamond',
-        rewardAmount: 100000,
+        rewardAmount: 70000,
         status: mapApiStatusToUi(api.diamond_status),
         progress: Number.isFinite(diamondProgress) ? diamondProgress : 0,
         missions: [

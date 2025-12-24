@@ -128,6 +128,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
                 <th className="px-3 py-2 text-admin-muted">골드</th>
                 <th className="px-3 py-2 text-admin-muted">플래티넘</th>
                 <th className="px-3 py-2 text-admin-muted">다이아</th>
+                <th className="px-3 py-2 text-admin-neon">다이아 보상<br/>7만</th>
                 <th className="px-3 py-2 text-admin-muted">출석</th>
                 <th className="px-3 py-2 text-admin-muted">입금(15만)</th>
                 <th className="px-3 py-2 text-admin-muted">텔레그램</th>
@@ -150,6 +151,7 @@ export default function UsersListViewer({ adminPassword, onSelectUser, onRefresh
                   <td className="px-3 py-2">{statusBadge(user.gold_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.platinum_status)}</td>
                   <td className="px-3 py-2">{statusBadge(user.diamond_status)}</td>
+                  <td className="px-3 py-2 text-admin-neon font-bold">70,000원</td>
                   <td className="px-3 py-2 text-admin-text">
                     {user.platinum_attendance_days}일
                     {user.max_attendance_days !== undefined && (
