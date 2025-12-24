@@ -784,7 +784,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                      ELSE vs.diamond_status
                                    END,
                    expires_at = CASE
-                       WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at + INTERVAL '7 days'
+                       WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
                        ELSE vs.expires_at
                    END,
                    updated_at = NOW()
@@ -792,7 +792,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
              WHERE vs.user_id = v.user_id
             """,
             vault_update_values,
-                        template="(%s,%s,%s,%s,%s,%s)",
+                        template="(%s::int,%s::bigint,%s::bool,%s::bool,%s::date,%s::timestamptz)",
         )
         vault_rows_updated = int(cur.rowcount or 0)
 
