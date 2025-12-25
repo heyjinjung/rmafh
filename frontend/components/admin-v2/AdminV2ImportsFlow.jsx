@@ -192,13 +192,13 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
       <ol className="mb-4 list-decimal pl-4 text-sm text-[var(--v2-muted)]">
         <li>아래에서 CSV 파일을 올려주세요. <button type="button" className="ml-2 underline text-[var(--v2-accent)]" onClick={downloadExample}>예시 파일 다운로드</button></li>
         <li>파일 내용과 오류를 미리 확인하세요.</li>
-        <li>문제가 없으면 '적용' 버튼을 눌러주세요.</li>
+        <li>문제가 없으면 &apos;적용&apos; 버튼을 눌러주세요.</li>
       </ol>
       <div className="space-y-4">
         {/* 파일 업로드 */}
         <label className="flex items-center gap-3">
           <span className="font-semibold">CSV 파일 올리기</span>
-          <input type="file" accept=".csv" className="hidden" onChange={(e) => {
+          <input type="file" accept=".csv" className="hidden" aria-label="CSV 파일 업로드" onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
             setFileName(file.name);

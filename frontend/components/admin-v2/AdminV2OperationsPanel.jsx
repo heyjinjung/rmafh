@@ -25,6 +25,12 @@ function makeRequestId() {
 }
 
 export default function AdminV2OperationsPanel({ adminPassword, basePath, usersTarget, segmentTarget }) {
+    // 안전장치: 적용 버튼 클릭 시 확인 팝업
+    const handleApply = async (action) => {
+      if (!window.confirm('정말 적용하시겠습니까?')) return;
+      if (action === 'expiry') await submitExtendExpiry();
+      if (action === 'bulk') await submitBulkUpdate();
+    };
   const [targetScope, setTargetScope] = useState('segment');
   const [targetValue, setTargetValue] = useState('');
   const [expiryDays, setExpiryDays] = useState(3);
@@ -278,241 +284,97 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
 
   return (
     <section id="operations" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">운영</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">만료일 연장 및 상태/출석/입금 변경을 안전장치와 함께 실행합니다.</p>
+      <h2 className="text-lg font-bold text-[var(--v2-accent)] mb-2">회원정보 일괄 변경</h2>
+      <ol className="mb-4 list-decimal pl-4 text-sm text-[var(--v2-muted)]">
+        <li>Users에서 변경할 대상을 선택하세요.</li>
+        <li>아래에서 변경할 내용을 입력하세요.</li>
+        <li>미리보기로 대상과 변경 내용을 확인하세요.</li>
+        <li>문제가 없으면 '적용하기' 버튼을 눌러주세요.</li>
+      </ol>
+      <div className="space-y-4">
+        {/* 대상 안내 */}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
+          <b>대상: </b>
+          {linkedTarget
+            ? linkedTarget.mode === 'filter'
+              ? `필터: ${linkedTarget.filter?.query || '-'} / 상태: ${linkedTarget.filter?.status || '-'} `
+              : `선택된 user_id: ${linkedTarget.ids.length}명`
+            : 'Users에서 대상을 선택하세요.'}
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Shadow 모드 권장</span>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
-        <div className="space-y-4">
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-2">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">연동 타겟 (Users에서)</p>
-            {linkedTarget ? (
-              <div className="text-xs text-[var(--v2-muted)] space-y-1">
-                <div>모드: <span className="font-mono">{linkedTarget.mode}</span></div>
-                {linkedTarget.mode === 'filter' ? (
-                  <>
-                    <div>검색어: <span className="font-mono">{linkedTarget.filter?.query || '-'}</span></div>
-                    <div>상태: <span className="font-mono">{linkedTarget.filter?.status || '-'}</span></div>
-                  </>
-                ) : (
-                  <div>user_ids: <span className="font-mono">{linkedTarget.ids.length}</span></div>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--v2-muted)]">Users에서 타겟을 선택하면 여기에 연결됩니다.</p>
-            )}
+        {/* 만료일 연장 */}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
+          <b>만료일 연장</b>
+          <div className="mt-2 flex gap-3">
+            <input type="number" min="1" max="3" value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value) || 1)} className="rounded border px-2 py-1" />
+            <select value={reason} onChange={e => setReason(e.target.value)} className="rounded border px-2 py-1">
+              <option value="PROMO">프로모션</option>
+              <option value="OPS">운영</option>
+              <option value="ADMIN">관리자</option>
+            </select>
           </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">타겟 범위</p>
-            <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
-              {[
-                { key: 'segment', label: '저장 세그먼트' },
-                { key: 'filter', label: '현재 필터' },
-                { key: 'upload', label: '업로드 ID' },
-              ].map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => setTargetScope(opt.key)}
-                  className={[
-                    'rounded-full border px-3 py-1',
-                    targetScope === opt.key
-                      ? 'border-[var(--v2-accent)]/60 bg-[var(--v2-accent)]/10 text-[var(--v2-accent)]'
-                      : 'border-[var(--v2-border)] bg-[var(--v2-surface)] text-[var(--v2-text)]',
-                  ].join(' ')}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-            <input
-              value={targetValue}
-              onChange={(e) => setTargetValue(e.target.value)}
-              placeholder={targetScope === 'upload' ? '업로드 ID 목록 이름(참고용)' : '세그먼트 키 또는 필터 요약(참고용)'}
-              className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-            />
-            <p className="text-xs text-[var(--v2-muted)]">Segment/Filter 범위는 백엔드 타겟팅에 전달되며 멱등성과 감사 로그가 적용됩니다.</p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[var(--v2-text)]">만료일 연장</p>
-              <label className="inline-flex items-center gap-2 text-xs text-[var(--v2-muted)]">
-                <input
-                  type="checkbox"
-                  aria-label="Shadow 모드"
-                  checked={shadow}
-                  onChange={(e) => setShadow(e.target.checked)}
-                />
-                Shadow 모드
-              </label>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">연장 일수</label>
-                <input
-                  type="number"
-                  min="0"
-                  value={expiryDays}
-                  onChange={(e) => setExpiryDays(Number(e.target.value) || 0)}
-                  className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사유</label>
-                <select
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                >
-                  {['OPS', 'PROMO', 'ADMIN'].map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <p className="text-xs text-[var(--v2-muted)]">Shadow(미리보기): 미리보기 + 감사로그만. Apply(적용): 실제 반영 + 감사로그.</p>
-          </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">상태 / 출석 / 입금</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">골드</label>
-                <select
-                  value={goldStatus}
-                  onChange={(e) => setGoldStatus(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                >
-                  <option value="">변경 없음</option>
-                  {statusOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">플래티넘</label>
-                <select
-                  value={platinumStatus}
-                  onChange={(e) => setPlatinumStatus(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                >
-                  <option value="">변경 없음</option>
-                  {statusOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">다이아</label>
-                <select
-                  value={diamondStatus}
-                  onChange={(e) => setDiamondStatus(e.target.value)}
-                  className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                >
-                  <option value="">변경 없음</option>
-                  {statusOptions.map((s) => (
-                    <option key={s} value={s}>
-                      {statusLabel(s)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">출석 Δ / 상한</label>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    value={attendance.delta}
-                    onChange={(e) => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))}
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                  />
-                  <input
-                    type="number"
-                    value={attendance.cap}
-                    onChange={(e) => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))}
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 Δ / 하한</label>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    value={deposit.delta}
-                    onChange={(e) => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))}
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                  />
-                  <input
-                    type="number"
-                    value={deposit.floor}
-                    onChange={(e) => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))}
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          <div className="mt-2 text-xs text-[var(--v2-muted)]">예: 1~3일 연장, 사유 선택</div>
+          <button type="button" className="mt-3 w-full rounded bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black" onClick={() => handleApply('expiry')}>
+            적용하기
+          </button>
         </div>
-
-        <div className="space-y-4">
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">영향도 미리보기</p>
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-              <span className="text-[var(--v2-muted)]">대상 수(추정)</span>
-              <span className="font-semibold text-[var(--v2-accent)]">
-                {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}
-              </span>
+        {/* 상태/출석/입금 변경 */}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
+          <b>상태/출석/입금 변경</b>
+          <div className="grid gap-3 md:grid-cols-3 mt-2">
+            <div>
+              <label className="text-xs text-[var(--v2-muted)]">골드</label>
+              <select value={goldStatus} onChange={e => setGoldStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+                <option value="">변경 없음</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>{statusLabel(s)}</option>
+                ))}
+              </select>
             </div>
-            <div className="mt-2 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-              <span className="text-[var(--v2-muted)]">샘플 user_ids</span>
-              <span className="font-semibold text-[var(--v2-text)]">
-                {Array.isArray(preview.sample) && preview.sample.length ? `${preview.sample.slice(0, 10).join(', ')}` : '-'}
-              </span>
+            <div>
+              <label className="text-xs text-[var(--v2-muted)]">플래티넘</label>
+              <select value={platinumStatus} onChange={e => setPlatinumStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+                <option value="">변경 없음</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>{statusLabel(s)}</option>
+                ))}
+              </select>
             </div>
-            {preview.error ? <p className="mt-2 text-xs text-[var(--v2-warning)]">{String(preview.error)}</p> : null}
-            <p className="mt-2 text-xs text-[var(--v2-muted)]">백엔드가 타겟(세그먼트/필터/user_ids) 기준으로 정확한 대상을 계산합니다.</p>
+            <div>
+              <label className="text-xs text-[var(--v2-muted)]">다이아</label>
+              <select value={diamondStatus} onChange={e => setDiamondStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+                <option value="">변경 없음</option>
+                {statusOptions.map((s) => (
+                  <option key={s} value={s}>{statusLabel(s)}</option>
+                ))}
+              </select>
+            </div>
           </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)] space-y-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">안전장치</p>
-            <label className="text-xs text-[var(--v2-muted)]">실행을 활성화하려면 apply 를 입력하세요.</label>
-            <input
-              value={confirmText}
-              onChange={(e) => setConfirmText(e.target.value)}
-              className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-            />
-            <button
-              type="button"
-              disabled={!canExecute}
-              onClick={submitExtendExpiry}
-              className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_18px_rgba(183,247,90,0.35)] disabled:opacity-50"
-            >
-              {submitting ? '처리 중...' : '만료일 연장 제출 (멱등)'}
-            </button>
-            <button
-              type="button"
-              disabled={!canExecute}
-              onClick={submitBulkUpdate}
-              className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-4 py-3 text-sm font-semibold text-[var(--v2-text)] disabled:opacity-50"
-            >
-              {submitting ? '처리 중...' : '일괄 변경 제출 (멱등)'}
-            </button>
-            <p className="text-xs text-[var(--v2-muted)]">만료일 연장은 감사 로그에 기록되고, 일괄 변경은 admin job + job items를 생성합니다.</p>
+          <div className="grid gap-3 md:grid-cols-2 mt-2">
+            <div>
+              <label className="text-xs text-[var(--v2-muted)]">출석 Δ / 상한</label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <input type="number" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-[var(--v2-muted)]">입금 Δ / 하한</label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <input type="number" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+              </div>
+            </div>
           </div>
+          <button type="button" className="mt-3 w-full rounded bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black" onClick={() => handleApply('bulk')}>
+            적용하기
+          </button>
+        </div>
+        {/* 미리보기 */}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
+          <b>미리보기</b>
+          <div className="mt-2">대상 수: {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}</div>
+          <div className="mt-2">샘플 user_ids: {Array.isArray(preview.sample) && preview.sample.length ? preview.sample.slice(0, 10).join(', ') : '-'}</div>
+          {preview.error && <div className="mt-2 text-[var(--v2-warning)]">{preview.error}</div>}
         </div>
       </div>
     </section>
