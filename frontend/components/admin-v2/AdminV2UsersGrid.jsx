@@ -227,7 +227,15 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       setSelectedRow(null);
       fetchUsers();
     } catch (err) {
+      // 추가 디버깅: 서버 반환 payload/parsed 정보를 모두 찍어서 400 원인 파악
       console.error('Update error:', err);
+      console.error('Update error payload:', err?.payload);
+      try {
+        console.error('Update error payload (stringified):', JSON.stringify(err?.payload));
+      } catch (_e) {
+        console.error('Update error payload stringified failed');
+      }
+      console.error('Update error parsed:', err?.parsed);
       const info = extractErrorInfo(err);
       pushToast({ ok: false, message: info.summary || '저장 실패', detail: info.detail || info.code });
     } finally {
