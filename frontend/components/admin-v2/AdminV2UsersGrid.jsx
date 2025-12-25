@@ -173,7 +173,11 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   };
 
   const submitUpdate = async () => {
-    if (!ensureAuth()) return;
+    console.log('submitUpdate start - adminPassword:', !!adminPassword, 'selectedRow:', selectedRow?.user_id);
+    if (!ensureAuth()) {
+      console.error('ensureAuth failed - returning');
+      return;
+    }
     if (!selectedRow?.user_id) {
       console.error('selectedRow is null or no user_id');
       return;

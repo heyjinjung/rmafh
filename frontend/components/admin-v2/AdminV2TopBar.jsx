@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function AdminV2TopBar() {
+export default function AdminV2TopBar({ onLogout }) {
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleSearch = (e) => {
@@ -35,6 +35,15 @@ export default function AdminV2TopBar() {
           >
             빠른 가져오기
           </button>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="rounded-xl border border-[var(--v2-warning)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--v2-warning)] hover:bg-[var(--v2-warning)]/10 transition-colors"
+            >
+              로그아웃
+            </button>
+          )}
         </div>
       </div>
     </header>

@@ -14,7 +14,7 @@ const themeVars = {
   '--v2-text': '#e9eef5',
 };
 
-export default function AdminV2Layout({ active = 'dashboard', children }) {
+export default function AdminV2Layout({ active = 'dashboard', children, onLogout }) {
   const [showBackToTop, setShowBackToTop] = useState(false);
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export default function AdminV2Layout({ active = 'dashboard', children }) {
         <div className="relative z-10 flex min-h-screen">
           <AdminV2Sidebar active={active} />
           <div className="flex min-h-screen flex-1 flex-col">
-            <AdminV2TopBar />
+            <AdminV2TopBar onLogout={onLogout} />
             <main className="flex-1 px-6 py-6 lg:px-10">
               <div id="top" />
               {children}
