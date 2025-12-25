@@ -7,7 +7,14 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://vault:vaultpass@db:5432/v
 APP_ENV = os.getenv("APP_ENV", "local")
 
 # Admin access
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin1234")  # Change in production via env
+# In prod/stage, ADMIN_PASSWORD must be set via env. For test/local, a fallback is allowed only if bypass is enabled.
+ALLOW_INSECURE_ADMIN_BYPASS = os.getenv("ALLOW_INSECURE_ADMIN_BYPASS", "true").lower() == "true" if APP_ENV in {"test", "local"} else False
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+if ADMIN_PASSWORD is None:
+	if ALLOW_INSECURE_ADMIN_BYPASS:
+		ADMIN_PASSWORD = "admin1234"
+	else:
+		raise RuntimeError("ADMIN_PASSWORD is required")
 
 # Notification variants accepted (extend as needed)
 ALLOWED_VARIANT_IDS = {"A", "B", "LOSS_BANNER_A", "LOSS_BANNER_B", "SOCIAL_PROOF_A", "SOCIAL_PROOF_B", "TICKET_ZERO_A", "TICKET_ZERO_B"}
@@ -24,3 +31,7 @@ IDEMPOTENCY_TTL_HOURS = int(os.getenv("IDEMPOTENCY_TTL_HOURS", "24"))
 # Compensation retry policy
 COMPENSATION_MAX_RETRIES = int(os.getenv("COMPENSATION_MAX_RETRIES", "5"))
 COMPENSATION_BACKOFF_SECONDS = [1, 5, 30, 300, 900]
+
+# Job / admin query timeouts (ms)
+JOB_LOCK_TIMEOUT_MS = int(os.getenv("JOB_LOCK_TIMEOUT_MS", "2000"))
+JOB_STATEMENT_TIMEOUT_MS = int(os.getenv("JOB_STATEMENT_TIMEOUT_MS", "20000"))

@@ -49,23 +49,23 @@
 - [ ] 대량 작업 실패 시 부분 성공 처리 정책 정의
 
 ### 4.3 CSV 업로드 (Imports)
-- [ ] 업로드용 API: `POST /api/vault/admin/imports` 구현
-- [ ] Shadow vs Apply 모드 분리
+- [x] 업로드용 API: `POST /api/vault/admin/imports` 구현
+- [x] Shadow vs Apply 모드 분리
 - [ ] CSV 파싱 오류 리포트 생성 (CSV 다운로드)
-- [ ] 10,000행 초과 시 분할 Job 처리
-- [ ] 중복 external_user_id 제거 및 제거 목록 제공
+- [x] 10,000행 초과 시 분할 Job 처리
+- [x] 중복 external_user_id 제거 및 제거 목록 제공
 
 ### 4.4 기존 API 멱등성 적용
-- [ ] `/api/vault/user-daily-import` → idempotency 적용 + Job 전환
-- [ ] `/api/vault/extend-expiry` → request_id → idempotency key 매핑
-- [ ] `/api/vault/notify` → idempotency 추가 + 중복 요청 방지
-- [ ] `/api/vault/admin/users/*` 변경성 요청에 idempotency 적용
+- [x] `/api/vault/user-daily-import` → idempotency 적용 + Job 전환
+- [x] `/api/vault/extend-expiry` → request_id → idempotency key 매핑
+- [x] `/api/vault/notify` → idempotency 추가 + 중복 요청 방지
+- [x] `/api/vault/admin/users/*` 변경성 요청에 idempotency 적용
 
 ### 4.5 감사 로그/보안
-- [ ] `admin_audit_log`에 `job_id`, `idempotency_key` 필드 추가
-- [ ] 모든 변경성 작업에 `_log_admin_action` 호출 확인
-- [ ] `ADMIN_PASSWORD` 기본값 제거 및 환경 변수 필수화 검토
-- [ ] 요청 헤더 `x-admin-password` 누락 시 401 일관 처리
+- [x] `admin_audit_log`에 `job_id`, `idempotency_key` 필드 추가
+- [x] 모든 변경성 작업에 `_log_admin_action` 호출 확인
+- [x] `ADMIN_PASSWORD` 기본값 제거 및 환경 변수 필수화 검토
+- [x] 요청 헤더 `x-admin-password` 누락 시 401 일관 처리
 
 ### 4.6 성능/쿼리
 - [ ] 사용자 리스트 API 페이지네이션/정렬/필터 인덱스

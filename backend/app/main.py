@@ -3,6 +3,8 @@ from typing import Any, Dict, List
 import logging
 import hashlib
 import json
+import io
+import csv
 import secrets
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
@@ -64,9 +66,10 @@ app.add_middleware(
 
 # Admin auth dependency
 def verify_admin_password(x_admin_password: str | None = Header(None)):
-    if x_admin_password is None and config.APP_ENV in {"test", "local"}:
-        # 테스트/로컬 환경에서는 헤더 없이도 통과 (pytest 및 로컬 도커 compose)
-        return "bypass"
+    if x_admin_password is None:
+        if config.ALLOW_INSECURE_ADMIN_BYPASS:
+            return "bypass"
+        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     if x_admin_password != config.ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="UNAUTHORIZED")
     return x_admin_password
@@ -84,6 +87,9 @@ def _log_admin_action(
     response_summary: dict | None,
     error_message: str | None = None,
     metadata: dict | None = None,
+    *,
+    job_id: str | None = None,
+    idempotency_key: str | None = None,
 ):
     """어드민 감사 로그 기록"""
     cur = conn.cursor()
@@ -94,8 +100,9 @@ def _log_admin_action(
         """
         INSERT INTO admin_audit_log
             (admin_user, action, endpoint, target_user_ids, target_count,
-             request_id, request_body, response_status, response_summary, error_message, metadata)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             request_id, request_body, response_status, response_summary, error_message, metadata,
+             job_id, idempotency_key)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             admin_user,
@@ -109,6 +116,8 @@ def _log_admin_action(
             Json(response_summary) if response_summary else None,
             error_message,
             Json(metadata) if metadata else None,
+            job_id,
+            idempotency_key,
         ),
     )
 
@@ -747,7 +756,7 @@ def _dedupe_str_list(values: list[str] | None, *, max_items: int) -> list[str]:
 
 
 @app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
-async def user_daily_import(body: DailyUserImportRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def user_daily_import(body: DailyUserImportRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     """일일 엑셀/CSV 업로드 데이터로 운영 스냅샷 + 조건을 갱신.
 
     입력(권장): external_user_id, nickname, deposit_total(누적), joined_at, last_deposit_at, telegram_ok
@@ -766,6 +775,11 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
     if len(rows) > 10000:
         raise HTTPException(status_code=400, detail="TOO_MANY_ROWS")
 
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/user-daily-import"
+    request_hash = _hash_request_body(body.model_dump(by_alias=True))
+
     cleaned_rows = []
     external_ids = []
     seen = set()
@@ -782,14 +796,21 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
     if not external_ids:
         raise HTTPException(status_code=400, detail="EMPTY_EXTERNAL_USER_IDS")
 
-    now = _now()
-    default_expires = now + timedelta(hours=72)
-
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '20s'")
+        cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
+        cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return DailyUserImportResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        now = _now()
+        default_expires = now + timedelta(hours=72)
+
         mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
         identity_created = int(mapping.pop("__created_count__", 0))
 
@@ -808,7 +829,6 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
             review_ok = _parse_bool(getattr(r, "review_ok", False))
 
-            # import_date: 입금일(last_deposit_at) 기준, 없으면 현재일
             import_date = _select_import_date(last_deposit_at)
 
             snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
@@ -836,7 +856,6 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
             template="(%s,%s,%s,%s,%s,%s,%s,NOW())",
         )
 
-        # Ensure baseline rows exist
         ensure_values = [(int(row[0]), default_expires) for row in snapshot_values]
         execute_values(
             cur,
@@ -859,45 +878,11 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                                          WHEN v.telegram_ok THEN 'UNLOCKED'
                                          ELSE 'LOCKED'
                                      END,
-                                     platinum_deposit_done = CASE
-                                         WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
-                                         WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                         ) THEN true
-                                         ELSE false
-                                     END,
-                                     platinum_attendance_days = CASE
-                                         WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                         )
-                                         THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
-                                         ELSE vs.platinum_attendance_days
-                                     END,
-                                     last_attended_at = CASE
-                                         WHEN (
-                                             (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                             AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                         )
-                                         THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
-                                         ELSE vs.last_attended_at
-                                     END,
-                                     platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
-                                     platinum_status = CASE
-                                         WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
-                                              AND v.review_ok
-                                              AND (
-                                                  (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                                  AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                              )
-                                         THEN 'UNLOCKED'
-                                         ELSE vs.platinum_status
-                                     END,
+                   platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
                    diamond_status = CASE
-                                                                         WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
-                                     ELSE vs.diamond_status
-                                   END,
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                       ELSE vs.diamond_status
+                   END,
                    expires_at = CASE
                        WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
                        ELSE vs.expires_at
@@ -911,15 +896,34 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
         )
         vault_rows_updated = int(cur.rowcount or 0)
 
-        # 감사 로그 기록
+        target_user_ids = [int(mapping[ext]) for ext in external_ids]
+        _bump_platinum_progress(cur, target_user_ids)
+
+        job_id = _generate_job_id()
+        cur.execute(
+            """
+            INSERT INTO admin_jobs
+                (job_id, type, status, request_id, target_count, processed, failed, payload, created_at, updated_at)
+            VALUES (%s, %s, 'DONE', %s, %s, %s, 0, %s, NOW(), NOW())
+            """,
+            (
+                job_id,
+                "DAILY_IMPORT",
+                key,
+                len(target_user_ids),
+                len(snapshot_values),
+                Json({"source": "USER_DAILY_IMPORT", "total_rows": len(rows)}),
+            ),
+        )
+
         admin_user = request.client.host if request.client else "unknown"
         _log_admin_action(
             conn=conn,
             admin_user=admin_user,
             action="USER_DAILY_IMPORT",
             endpoint="/api/vault/user-daily-import",
-            target_user_ids=[int(mapping[ext]) for ext in external_ids],
-            request_id=None,
+            target_user_ids=target_user_ids,
+            request_id=key,
             request_body={"total_rows": len(rows)},
             response_status="SUCCESS",
             response_summary={
@@ -927,16 +931,61 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
                 "processed": len(snapshot_values),
                 "identity_created": identity_created,
                 "vault_rows_updated": vault_rows_updated,
+                "job_id": job_id,
             },
+            idempotency_key=key,
+            job_id=job_id,
+        )
+
+        response_body = {
+            "total": len(rows),
+            "processed": len(snapshot_values),
+            "identity_created": identity_created,
+            "vault_rows_updated": vault_rows_updated,
+            "job_id": job_id,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
 
         conn.commit()
 
-    return DailyUserImportResponse(
-        total=len(rows),
-        processed=len(snapshot_values),
-        identity_created=identity_created,
-        vault_rows_updated=vault_rows_updated,
+    response.headers["Idempotency-Status"] = "recorded"
+    return DailyUserImportResponse(**response_body)
+
+
+def _bump_platinum_progress(cur, user_ids: list[int]):
+    if not user_ids:
+        return
+    cur.execute(
+        """
+        UPDATE vault_status AS vs
+           SET platinum_attendance_days = LEAST(3, vs.platinum_attendance_days + 1),
+               last_attended_at = COALESCE(vs.last_attended_at, NOW()),
+               platinum_deposit_done = CASE
+                   WHEN vs.platinum_deposit_done THEN true
+                   WHEN uas.deposit_total >= 150000 THEN true
+                   ELSE false
+               END,
+               platinum_status = CASE
+                   WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
+                        AND uas.review_ok
+                        AND (CASE WHEN vs.platinum_deposit_done THEN true ELSE uas.deposit_total >= 150000 END)
+                        AND LEAST(3, vs.platinum_attendance_days + 1) >= 3
+                   THEN 'UNLOCKED'
+                   ELSE vs.platinum_status
+               END
+          FROM user_admin_snapshot uas
+         WHERE vs.user_id = uas.user_id
+           AND vs.user_id = ANY(%s)
+        """,
+        (user_ids,),
     )
 
 
@@ -1010,45 +1059,11 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
                                      WHEN v.telegram_ok THEN 'UNLOCKED'
                                      ELSE 'LOCKED'
                                  END,
-                                 platinum_deposit_done = CASE
-                                     WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
-                                     WHEN (
-                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                     ) THEN true
-                                     ELSE false
-                                 END,
-                                 platinum_attendance_days = CASE
-                                     WHEN (
-                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                     )
-                                     THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
-                                     ELSE vs.platinum_attendance_days
-                                 END,
-                                 last_attended_at = CASE
-                                     WHEN (
-                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                     )
-                                     THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
-                                     ELSE vs.last_attended_at
-                                 END,
-                                 platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
-                                 platinum_status = CASE
-                                     WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
-                                          AND v.review_ok
-                                          AND (
-                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
-                                              AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
-                                          )
-                                     THEN 'UNLOCKED'
-                                     ELSE vs.platinum_status
-                                 END,
-               diamond_status = CASE
-                                                                         WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
-                                 ELSE vs.diamond_status
-                               END,
+                   platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
+                   diamond_status = CASE
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                       ELSE vs.diamond_status
+                   END,
                expires_at = CASE
                    WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
                    ELSE vs.expires_at
@@ -1061,12 +1076,14 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
                     template="(%s::int,%s::bigint,%s::bool,%s::bool,%s::date,%s::timestamptz)",
     )
     vault_rows_updated = int(cur.rowcount or 0)
+    target_user_ids = [int(mapping[ext]) for ext in external_ids]
+    _bump_platinum_progress(cur, target_user_ids)
 
     return {
         "processed": len(snapshot_values),
         "identity_created": identity_created,
         "vault_rows_updated": vault_rows_updated,
-        "target_user_ids": [int(mapping[ext]) for ext in external_ids],
+        "target_user_ids": target_user_ids,
     }
 
 
@@ -1087,9 +1104,8 @@ async def admin_imports(body: AdminImportRequest, request: Request, response: Re
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '20s'")
+        cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
+        cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
         if idem["status"] == "replayed":
@@ -1463,6 +1479,9 @@ def _ensure_schema():
             """
         )
 
+        cur.execute("ALTER TABLE admin_audit_log ADD COLUMN IF NOT EXISTS job_id TEXT")
+        cur.execute("ALTER TABLE admin_audit_log ADD COLUMN IF NOT EXISTS idempotency_key TEXT")
+
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS idempotency_keys (
@@ -1585,7 +1604,7 @@ def _ensure_schema():
         conn.commit()
 
 @app.post("/api/vault/extend-expiry", response_model=ExtendExpiryResponse)
-async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     """운영/프로모션 만료 연장. shadow=true면 미적용 프리뷰."""
     request_id = _validate_request_id(getattr(body, "request_id", None))
     if body.scope not in {"ALL_ACTIVE", "USER_IDS"}:
@@ -1599,6 +1618,11 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str 
     if not (1 <= body.extend_hours <= 72):
         raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
 
+    key = _validate_idempotency_key(request_id)
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/extend-expiry"
+    request_hash = _hash_request_body(body.dict())
+
     with db.get_conn() as conn:
         cur = conn.cursor()
         if config.APP_ENV == "test":
@@ -1606,21 +1630,12 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str 
             cur.execute("SET LOCAL statement_timeout = '20s'")
         now = _now()
 
-        # Best-effort idempotency on request_id (for ops retries).
-        # Older rows may have metadata=NULL; this only guarantees idempotency for runs after this change.
-        if not body.shadow:
-            cur.execute(
-                """
-                SELECT 1
-                  FROM vault_expiry_extension_log
-                 WHERE metadata->>'base_request_id'=%s
-                   AND shadow=false
-                 LIMIT 1
-                """,
-                (request_id,),
-            )
-            if cur.fetchone() is not None:
-                return ExtendExpiryResponse(shadow=False, updated=0)
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return ExtendExpiryResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         if body.scope == "USER_IDS":
             resolved_user_ids: list[int] = []
@@ -1651,7 +1666,18 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str 
 
         if body.shadow:
             sample_ids = [r[0] for r in rows[:10]]
-            return ExtendExpiryResponse(shadow=True, candidates=len(rows), sample_user_ids=sample_ids)
+            response_body = {"shadow": True, "candidates": len(rows), "sample_user_ids": sample_ids}
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
+            )
+            conn.commit()
+            response.headers["Idempotency-Status"] = "recorded"
+            return ExtendExpiryResponse(**response_body)
 
         new_expires_at = None
         updated = 0
@@ -1702,18 +1728,35 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, _auth: str 
             action="EXTEND_EXPIRY",
             endpoint="/api/vault/extend-expiry",
             target_user_ids=target_ids[:1000],  # 최대 1000개만 저장 (샘플링)
-            request_id=request_id,
+            request_id=key,
             request_body={"scope": body.scope, "extend_hours": body.extend_hours, "reason": body.reason, "shadow": body.shadow},
             response_status="SUCCESS",
             response_summary={"updated": updated, "new_expires_at": new_expires_at.isoformat() if new_expires_at else None},
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "shadow": False,
+            "updated": updated,
+            "new_expires_at": new_expires_at.isoformat() if new_expires_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
         
         conn.commit()
-        return ExtendExpiryResponse(shadow=False, updated=updated, new_expires_at=new_expires_at.isoformat() if new_expires_at else None)
+        response.headers["Idempotency-Status"] = "recorded"
+        return ExtendExpiryResponse(**response_body)
 
 
 @app.post("/api/vault/notify", response_model=NotifyResponse)
-async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def notify(body: NotifyRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     if body.type not in config.ALLOWED_NOTIFY_TYPES:
         raise HTTPException(status_code=400, detail="INVALID_NOTIFY_TYPE")
 
@@ -1724,6 +1767,11 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
     if body.variant_id and body.variant_id not in config.ALLOWED_VARIANT_IDS:
         raise HTTPException(status_code=400, detail="VARIANT_NOT_FOUND")
 
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/notify"
+    request_hash = _hash_request_body(body.model_dump(by_alias=True))
+
     now = _now()
     dedup_suffix = body.variant_id or "base"
     inserted = 0
@@ -1732,6 +1780,13 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
         if config.APP_ENV == "test":
             cur.execute("SET LOCAL lock_timeout = '2s'")
             cur.execute("SET LOCAL statement_timeout = '20s'")
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return NotifyResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
         resolved_user_ids: list[int] = []
         if user_ids:
             resolved_user_ids.extend(user_ids)
@@ -1760,14 +1815,26 @@ async def notify(body: NotifyRequest, request: Request, _auth: str = Depends(ver
             action="NOTIFY",
             endpoint="/api/vault/notify",
             target_user_ids=resolved_user_ids[:1000],  # 최대 1000개만 저장
-            request_id=None,
+            request_id=key,
             request_body={"type": body.type, "variant_id": body.variant_id},
             response_status="SUCCESS",
             response_summary={"enqueued": inserted, "total_targets": len(resolved_user_ids)},
+            idempotency_key=key,
+        )
+        
+        response_body = {"enqueued": inserted}
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
         
         conn.commit()
-    return NotifyResponse(enqueued=inserted)
+    response.headers["Idempotency-Status"] = "recorded"
+    return NotifyResponse(**response_body)
 
 
 @app.get("/api/vault/admin/notifications", response_model=AdminNotificationsListResponse)
@@ -1951,6 +2018,8 @@ async def admin_create_job(
             request_body=payload,
             response_status="SUCCESS",
             response_summary={"job_id": job_id, "target_count": target_count},
+            job_id=job_id,
+            idempotency_key=key,
         )
 
         response_body = {
@@ -2160,6 +2229,7 @@ async def retry_admin_job(job_id: str, request: Request, _auth: str = Depends(ve
             request_body={"job_id": job_id},
             response_status="SUCCESS",
             response_summary={"job_id": job_id, "status": "PENDING"},
+            job_id=job_id,
         )
         conn.commit()
 
@@ -2270,7 +2340,7 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
 
 
 @app.post("/api/vault/admin/users", response_model=AdminUserResponse)
-async def admin_create_user(body: AdminUserCreateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_create_user(body: AdminUserCreateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     ext = _normalize_external_user_id(body.external_user_id)
     if not ext:
         raise HTTPException(status_code=400, detail="EXTERNAL_USER_ID_REQUIRED")
@@ -2281,9 +2351,20 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, _aut
     telegram_ok = bool(body.telegram_ok)
     review_ok = bool(body.review_ok)
 
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/admin/users"
+    request_hash = _hash_request_body(body.dict())
+
     now = _now()
     with db.get_conn() as conn:
         cur = conn.cursor()
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminUserResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
         try:
             cur.execute(
                 """
@@ -2337,7 +2418,7 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, _aut
                 action="ADMIN_USER_CREATE",
                 endpoint="/api/vault/admin/users",
                 target_user_ids=[user_id],
-                request_id=None,
+                request_id=key,
                 request_body={
                     "external_user_id": ext,
                     "nickname": nickname,
@@ -2348,16 +2429,29 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, _aut
                 },
                 response_status="SUCCESS",
                 response_summary={"created": True},
+                idempotency_key=key,
+            )
+
+            response_body = {
+                "user_id": user_id,
+                "external_user_id": ext,
+                "nickname": nickname,
+                "joined_date": joined_date.isoformat() if joined_date else None,
+                "created_at": created_at.isoformat() if created_at else None,
+            }
+
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
             )
 
             conn.commit()
-            return AdminUserResponse(
-                user_id=user_id,
-                external_user_id=ext,
-                nickname=nickname,
-                joined_date=joined_date.isoformat() if joined_date else None,
-                created_at=created_at.isoformat() if created_at else None,
-            )
+            response.headers["Idempotency-Status"] = "recorded"
+            return AdminUserResponse(**response_body)
         except HTTPException:
             conn.rollback()
             raise
@@ -2367,7 +2461,7 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, _aut
 
 
 @app.patch("/api/vault/admin/users/{user_id}", response_model=AdminUserResponse)
-async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     if all(
         getattr(body, field) is None
         for field in ("nickname", "joined_date", "deposit_total", "telegram_ok", "review_ok")
@@ -2381,6 +2475,11 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
     review_ok = None if body.review_ok is None else bool(body.review_ok)
 
     now = _now()
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}"
+    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+
     with db.get_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT external_user_id, created_at FROM user_identity WHERE user_id=%s", (user_id,))
@@ -2388,6 +2487,13 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
         if not row:
             raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
         external_user_id, created_at = row[0], row[1]
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminUserResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         set_parts = []
         params = []
@@ -2444,13 +2550,12 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
             action="ADMIN_USER_UPDATE",
             endpoint=f"/api/vault/admin/users/{user_id}",
             target_user_ids=[user_id],
-            request_id=None,
+            request_id=key,
             request_body=body.dict(),
             response_status="SUCCESS",
             response_summary={"updated": True},
+            idempotency_key=key,
         )
-
-        conn.commit()
 
         cur.execute(
             """
@@ -2462,17 +2567,36 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
         )
         snap = cur.fetchone()
 
-        return AdminUserResponse(
-            user_id=user_id,
-            external_user_id=external_user_id,
-            nickname=snap[0] if snap else nickname,
-            joined_date=snap[1].isoformat() if snap and snap[1] else (joined_date.isoformat() if joined_date else None),
-            created_at=created_at.isoformat() if created_at else None,
+        response_body = {
+            "user_id": user_id,
+            "external_user_id": external_user_id,
+            "nickname": snap[0] if snap else nickname,
+            "joined_date": snap[1].isoformat() if snap and snap[1] else (joined_date.isoformat() if joined_date else None),
+            "created_at": created_at.isoformat() if created_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
+
+        conn.commit()
+
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminUserResponse(**response_body)
 
 
 @app.delete("/api/vault/admin/users/{user_id}")
-async def admin_delete_user(user_id: int, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_delete_user(user_id: int, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}"
+    request_hash = _hash_request_body({"user_id": user_id})
+
     with db.get_conn() as conn:
         cur = conn.cursor()
         cur.execute("SELECT external_user_id FROM user_identity WHERE user_id=%s", (user_id,))
@@ -2481,7 +2605,13 @@ async def admin_delete_user(user_id: int, request: Request, _auth: str = Depends
             raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
         external_user_id = row[0]
 
-        # 삭제 순서: 종속 데이터 -> 스냅샷 -> status -> identity
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return idem["response_body"]
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
         cur.execute("DELETE FROM vault_status WHERE user_id=%s", (user_id,))
         cur.execute("DELETE FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
         cur.execute("DELETE FROM user_identity WHERE user_id=%s", (user_id,))
@@ -2493,18 +2623,30 @@ async def admin_delete_user(user_id: int, request: Request, _auth: str = Depends
             action="ADMIN_USER_DELETE",
             endpoint=f"/api/vault/admin/users/{user_id}",
             target_user_ids=[user_id],
-            request_id=None,
+            request_id=key,
             request_body={"user_id": user_id, "external_user_id": external_user_id},
             response_status="SUCCESS",
             response_summary={"deleted": True},
+            idempotency_key=key,
+        )
+
+        response_body = {"deleted": True, "user_id": user_id, "external_user_id": external_user_id}
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
 
         conn.commit()
-        return {"deleted": True, "user_id": user_id, "external_user_id": external_user_id}
+        response.headers["Idempotency-Status"] = "recorded"
+        return response_body
 
 
 @app.post("/api/vault/admin/users/{user_id}/vault/status", response_model=AdminStatusUpdateResponse)
-async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     now = _now()
     updates = {}
     if body.gold_status is not None:
@@ -2516,6 +2658,11 @@ async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest
     if not updates:
         raise HTTPException(status_code=400, detail="NO_FIELDS")
 
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/status"
+    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+
     with db.get_conn() as conn:
         cur = conn.cursor()
         if config.APP_ENV == "test":
@@ -2525,6 +2672,13 @@ async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest
         cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminStatusUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         row = _get_or_create_vault_row(cur, user_id, now)
         if not row:
@@ -2568,27 +2722,45 @@ async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest
             action="ADMIN_STATUS_UPDATE",
             endpoint=f"/api/vault/admin/users/{user_id}/vault/status",
             target_user_ids=[user_id],
-            request_id=None,
+            request_id=key,
             request_body=updates,
             response_status="SUCCESS",
             response_summary={"updated": True},
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "updated": True,
+            "gold_status": updates.get("gold_status", gold_status),
+            "platinum_status": updates.get("platinum_status", platinum_status),
+            "diamond_status": updates.get("diamond_status", diamond_status),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
 
         conn.commit()
 
-        return AdminStatusUpdateResponse(
-            updated=True,
-            gold_status=updates.get("gold_status", gold_status),
-            platinum_status=updates.get("platinum_status", platinum_status),
-            diamond_status=updates.get("diamond_status", diamond_status),
-            expires_at=expires_at.isoformat() if expires_at else None,
-        )
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminStatusUpdateResponse(**response_body)
 
 
 @app.post("/api/vault/admin/users/{user_id}/vault/attendance", response_model=AdminAttendanceAdjustResponse)
-async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     if body.delta_days is None and body.set_days is None:
         raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/attendance"
+    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
 
     delta_days = int(body.delta_days or 0)
     with db.get_conn() as conn:
@@ -2600,6 +2772,13 @@ async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustReque
         cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
         snap_row = cur.fetchone()
         review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminAttendanceAdjustResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         row = _get_or_create_vault_row(cur, user_id, _now())
         if not row:
@@ -2638,26 +2817,44 @@ async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustReque
             action="ADMIN_ATTENDANCE_ADJUST",
             endpoint=f"/api/vault/admin/users/{user_id}/vault/attendance",
             target_user_ids=[user_id],
-            request_id=None,
+            request_id=key,
             request_body={"delta_days": body.delta_days, "set_days": body.set_days},
             response_status="SUCCESS",
             response_summary={"platinum_attendance_days": target_days, "platinum_status": new_platinum_status},
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "platinum_attendance_days": target_days,
+            "platinum_status": new_platinum_status,
+            "last_attended_at": now.isoformat(),
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
 
         conn.commit()
 
-        return AdminAttendanceAdjustResponse(
-            platinum_attendance_days=target_days,
-            platinum_status=new_platinum_status,
-            last_attended_at=now.isoformat(),
-            expires_at=expires_at.isoformat() if expires_at else None,
-        )
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminAttendanceAdjustResponse(**response_body)
 
 
 @app.post("/api/vault/admin/users/{user_id}/vault/deposit", response_model=AdminDepositUpdateResponse)
-async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     if body.platinum_deposit_done is None and body.diamond_deposit_current is None:
         raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/deposit"
+    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -2668,6 +2865,13 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
         cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
         snap_row = cur.fetchone()
         review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminDepositUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         row = _get_or_create_vault_row(cur, user_id, _now())
         if not row:
@@ -2715,7 +2919,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
             action="ADMIN_DEPOSIT_UPDATE",
             endpoint=f"/api/vault/admin/users/{user_id}/vault/deposit",
             target_user_ids=[user_id],
-            request_id=None,
+            request_id=key,
             request_body={
                 "platinum_deposit_done": body.platinum_deposit_done,
                 "diamond_deposit_current": body.diamond_deposit_current,
@@ -2725,17 +2929,30 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
                 "platinum_status": new_platinum_status,
                 "diamond_status": new_diamond_status,
             },
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "platinum_deposit_done": new_platinum_deposit_done,
+            "diamond_deposit_current": new_diamond_deposit_current,
+            "platinum_status": new_platinum_status,
+            "diamond_status": new_diamond_status,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
         )
 
         conn.commit()
 
-        return AdminDepositUpdateResponse(
-            platinum_deposit_done=new_platinum_deposit_done,
-            diamond_deposit_current=new_diamond_deposit_current,
-            platinum_status=new_platinum_status,
-            diamond_status=new_diamond_status,
-            expires_at=expires_at.isoformat() if expires_at else None,
-        )
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminDepositUpdateResponse(**response_body)
 
 
 @app.post("/api/vault/compensation-enqueue")

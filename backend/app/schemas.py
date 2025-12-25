@@ -178,6 +178,7 @@ class DailyUserImportResponse(BaseModel):
     processed: int
     identity_created: int
     vault_rows_updated: int
+    job_id: Optional[str] = None
 
 
 class AdminImportError(BaseModel):
@@ -201,6 +202,7 @@ class AdminImportResponse(BaseModel):
     dedup_removed: int
     errors: List[AdminImportError] = Field(default_factory=list)
     job_ids: Optional[List[str]] = None
+    error_report_csv: Optional[str] = None
 
 
 class UserLoginRequest(BaseModel):
