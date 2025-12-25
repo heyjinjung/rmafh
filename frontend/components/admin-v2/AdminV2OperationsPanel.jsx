@@ -188,7 +188,7 @@ export default function AdminV2OperationsPanel() {
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)] space-y-3">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Safety</p>
-            <label className="text-xs text-[var(--v2-muted)]">Type "apply" to enable execution.</label>
+            <label className="text-xs text-[var(--v2-muted)]">Type apply to enable execution.</label>
             <input
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}

@@ -2,38 +2,132 @@ import { useMemo, useState } from 'react';
 import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 
-const sampleColumns = ['external_user_id', 'nickname', 'deposit_total', 'telegram_ok', 'review_ok'];
-const samplePreview = [
-  { external_user_id: 'ext-1001', nickname: 'Alpha', deposit_total: 5000, telegram_ok: true, review_ok: false },
-  { external_user_id: 'ext-1002', nickname: 'Bravo', deposit_total: 12000, telegram_ok: false, review_ok: true },
-  { external_user_id: 'ext-1003', nickname: 'Charlie', deposit_total: 8000, telegram_ok: true, review_ok: true },
-];
+const requiredFields = ['external_user_id'];
+const optionalFields = ['nickname', 'deposit_total', 'joined_at', 'last_deposit_at', 'telegram_ok', 'review_ok'];
+
+function parseDelimited(text) {
+  const rawLines = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .split('\n');
+
+  const lines = rawLines
+    .map((l) => String(l).trim())
+    .filter((l) => l && !l.startsWith('#'));
+
+  if (!lines.length) return { header: [], rows: [] };
+
+  const toCells = (line) => line.split(/[\t,;]/).map((c) => String(c).trim().replace(/^"|"$/g, ''));
+  const header = toCells(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    rows.push(toCells(lines[i]));
+  }
+  return { header, rows };
+}
+
+function coerceBool(v) {
+  const s = String(v || '').trim().toLowerCase();
+  if (!s) return false;
+  return ['1', 'true', 't', 'yes', 'y', 'ok', 'o', 'ㅇㅇ', '확인', '완료'].includes(s);
+}
+
+function coerceInt(v) {
+  const s = String(v || '').replace(/,/g, '').trim();
+  const digits = s.replace(/[^0-9-]/g, '');
+  const n = Number(digits);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function buildRowsForApi({ header, rows, mapping }) {
+  const idxByName = new Map();
+  header.forEach((name, idx) => {
+    idxByName.set(String(name || '').trim(), idx);
+  });
+
+  const get = (cells, colName) => {
+    const idx = idxByName.get(colName);
+    if (idx === undefined) return '';
+    return cells[idx];
+  };
+
+  const seen = new Set();
+  const out = [];
+  rows.forEach((cells) => {
+    const ext = String(get(cells, mapping.external_user_id) || '').trim();
+    if (!ext) return;
+    if (seen.has(ext)) return;
+    seen.add(ext);
+
+    const row = {
+      external_user_id: ext,
+    };
+
+    if (mapping.nickname) {
+      const v = String(get(cells, mapping.nickname) || '').trim();
+      if (v) row.nickname = v;
+    }
+    if (mapping.deposit_total) row.deposit_total = coerceInt(get(cells, mapping.deposit_total));
+    if (mapping.joined_at) {
+      const v = String(get(cells, mapping.joined_at) || '').trim();
+      if (v) row.joined_at = v;
+    }
+    if (mapping.last_deposit_at) {
+      const v = String(get(cells, mapping.last_deposit_at) || '').trim();
+      if (v) row.last_deposit_at = v;
+    }
+    if (mapping.telegram_ok) row.telegram_ok = coerceBool(get(cells, mapping.telegram_ok));
+    if (mapping.review_ok) row.review_ok = coerceBool(get(cells, mapping.review_ok));
+
+    out.push(row);
+  });
+  return out;
+}
 
 export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
   const [step, setStep] = useState(1);
   const [fileName, setFileName] = useState('');
-  const [rowCount, setRowCount] = useState(0);
-  const [mapping, setMapping] = useState({ external_user_id: 'external_user_id', nickname: 'nickname', deposit_total: 'deposit_total' });
+  const [csvText, setCsvText] = useState('');
+  const [parsed, setParsed] = useState({ header: [], rows: [] });
+  const [mapping, setMapping] = useState({
+    external_user_id: '',
+    nickname: '',
+    deposit_total: '',
+    joined_at: '',
+    last_deposit_at: '',
+    telegram_ok: '',
+    review_ok: '',
+  });
   const [mode, setMode] = useState('SHADOW');
   const [riskAck, setRiskAck] = useState('');
   const [submitState, setSubmitState] = useState(null);
   const [serverError, setServerError] = useState(null);
-  const [failureUrl, setFailureUrl] = useState('');
-  const [loadingFailure, setLoadingFailure] = useState(false);
+  const [validationResult, setValidationResult] = useState(null);
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
+
+  const availableColumns = useMemo(() => parsed.header || [], [parsed.header]);
+  const rowCount = useMemo(() => (parsed.rows || []).length, [parsed.rows]);
+
+  const rowsForApi = useMemo(() => {
+    if (!parsed.header.length || !parsed.rows.length) return [];
+    if (!mapping.external_user_id) return [];
+    return buildRowsForApi({ header: parsed.header, rows: parsed.rows, mapping });
+  }, [parsed.header, parsed.rows, mapping]);
 
   const validation = useMemo(() => {
     const errors = [];
-    if (!mapping.external_user_id) errors.push('external_user_id is required');
+    if (!csvText) errors.push('CSV 파일을 선택해주세요.');
+    if (!mapping.external_user_id) errors.push('필수 매핑: external_user_id');
+    if (mapping.external_user_id && rowsForApi.length === 0) errors.push('CSV에서 external_user_id를 하나도 찾지 못했어요.');
     if (rowCount > 10000) errors.push('Rows > 10,000 will be split into batch jobs');
     return { errors, warnings: rowCount > 0 && rowCount <= 10000 ? [] : errors.length ? [] : ['No warnings'] };
-  }, [mapping, rowCount]);
+  }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length]);
 
   const canProceed = () => {
-    if (step === 1) return Boolean(fileName);
-    if (step === 2) return Boolean(mapping.external_user_id && mapping.nickname);
+    if (step === 1) return Boolean(fileName && csvText);
+    if (step === 2) return Boolean(mapping.external_user_id);
     if (step === 3) return true;
-    if (step === 4) return riskAck.trim().toLowerCase() === 'i understand';
+    if (step === 4) return mode === 'SHADOW' ? true : riskAck.trim().toLowerCase() === 'i understand';
     return false;
   };
 
@@ -42,20 +136,24 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
   const uploadLabel = fileName ? `${fileName} (${rowCount.toLocaleString()} rows)` : 'CSV 파일 선택';
 
-  const triggerImport = async () => {
+  const runImport = async ({ runMode }) => {
     setSubmitState({ loading: true });
     setServerError(null);
     try {
       const body = {
-        mode,
-        file_name: fileName || 'import.csv',
-        row_count: rowCount,
-        mapping,
+        mode: runMode,
+        rows: rowsForApi,
       };
       const res = await apiFetch('/api/vault/admin/imports', { method: 'POST', body });
+      const data = res?.data;
+
       setSubmitState({ ok: true, idempotencyKey: res.idempotencyKey, idempotencyStatus: res.idempotencyStatus });
-      pushToast({ ok: true, message: 'Import 요청 전송', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
-      loadLatestImportFailure();
+      if (runMode === 'SHADOW') {
+        setValidationResult(data);
+        pushToast({ ok: true, message: '서버 검증(SHADOW) 완료', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
+      } else {
+        pushToast({ ok: true, message: 'Import 실행(APPLY) 요청 완료', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
+      }
     } catch (err) {
       const info = extractErrorInfo(err);
       setServerError(info);
@@ -66,28 +164,9 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     }
   };
 
-  const loadLatestImportFailure = async () => {
-    setLoadingFailure(true);
-    try {
-      const res = await apiFetch('/api/vault/admin/jobs?limit=5');
-      const jobs = res?.data?.items || res?.data?.jobs || res?.data || [];
-      const importJob = jobs.find((j) => (j.type || '').includes('IMPORT'));
-      const url = importJob?.failures_csv || importJob?.failure_download_url;
-      setFailureUrl(url || '');
-      if (url) {
-        pushToast({ ok: false, message: '최신 Import 실패 CSV 준비됨', detail: url });
-      }
-    } catch (err) {
-      const info = extractErrorInfo(err);
-      setServerError(info);
-      pushToast({ ok: false, message: info.summary || '실패 로그 확인 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
-    } finally {
-      setLoadingFailure(false);
-    }
-  };
-
-  const openFailureCsv = () => {
-    if (failureUrl && typeof window !== 'undefined') window.open(failureUrl, '_blank');
+  const openErrorReportCsv = () => {
+    const url = validationResult?.error_report_csv;
+    if (url && typeof window !== 'undefined') window.open(url, '_blank');
   };
 
   return (
@@ -115,7 +194,23 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                     const file = e.target.files?.[0];
                     if (!file) return;
                     setFileName(file.name);
-                    setRowCount(Math.max(200, Math.floor(file.size / 32)));
+                    file.text().then((text) => {
+                      setCsvText(text);
+                      const p = parseDelimited(text);
+                      setParsed(p);
+                      // best-effort default mapping: exact match
+                      const headerSet = new Set((p.header || []).map((h) => String(h || '').trim()));
+                      setMapping((prev) => ({
+                        ...prev,
+                        external_user_id: headerSet.has('external_user_id') ? 'external_user_id' : (p.header || [])[0] || '',
+                        nickname: headerSet.has('nickname') ? 'nickname' : prev.nickname,
+                        deposit_total: headerSet.has('deposit_total') ? 'deposit_total' : prev.deposit_total,
+                        joined_at: headerSet.has('joined_at') ? 'joined_at' : prev.joined_at,
+                        last_deposit_at: headerSet.has('last_deposit_at') ? 'last_deposit_at' : prev.last_deposit_at,
+                        telegram_ok: headerSet.has('telegram_ok') ? 'telegram_ok' : prev.telegram_ok,
+                        review_ok: headerSet.has('review_ok') ? 'review_ok' : prev.review_ok,
+                      }));
+                    });
                   }}
                 />
                 <span className="text-[var(--v2-muted)]">Browse</span>
@@ -127,7 +222,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
           {step === 2 && (
             <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
               <p className="text-sm font-semibold text-[var(--v2-text)]">2) 컬럼 매핑</p>
-              {['external_user_id', 'nickname', 'deposit_total', 'telegram_ok', 'review_ok'].map((field) => (
+              {[...requiredFields, ...optionalFields].map((field) => (
                 <div key={field} className="grid grid-cols-[160px_1fr] items-center gap-3 text-sm">
                   <span className="text-[var(--v2-muted)]">{field}</span>
                   <select
@@ -136,13 +231,13 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                     className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-[var(--v2-text)]"
                   >
                     <option value="">선택</option>
-                    {sampleColumns.map((col) => (
+                    {availableColumns.map((col) => (
                       <option key={col} value={col}>{col}</option>
                     ))}
                   </select>
                 </div>
               ))}
-              <p className="text-xs text-[var(--v2-muted)]">필수: external_user_id, nickname. 선택: deposit_total, telegram_ok, review_ok.</p>
+              <p className="text-xs text-[var(--v2-muted)]">필수: external_user_id. 나머지는 선택입니다.</p>
             </div>
           )}
 
@@ -150,19 +245,29 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
             <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-[var(--v2-text)]">3) 검증 & 미리보기 (최대 200행)</p>
-                <span className="text-xs text-[var(--v2-muted)]">샘플 3행</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--v2-muted)]">샘플 3행</span>
+                  <button
+                    type="button"
+                    onClick={() => runImport({ runMode: 'SHADOW' })}
+                    disabled={submitState?.loading || validation.errors.length > 0}
+                    className="rounded border border-[var(--v2-border)] px-3 py-1 text-xs text-[var(--v2-text)] disabled:opacity-50"
+                  >
+                    서버 검증(SHADOW)
+                  </button>
+                </div>
               </div>
               <div className="mt-3 overflow-auto rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]">
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
                     <tr>
-                      {Object.keys(samplePreview[0]).map((col) => (
+                      {Object.keys((rowsForApi[0] || { external_user_id: '' })).map((col) => (
                         <th key={col} className="px-3 py-2 uppercase tracking-[0.12em]">{col}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--v2-border)]">
-                    {samplePreview.map((row) => (
+                    {(rowsForApi.slice(0, 3) || []).map((row) => (
                       <tr key={row.external_user_id}>
                         {Object.entries(row).map(([col, val]) => (
                           <td key={col} className="px-3 py-2 font-mono text-[var(--v2-text)]">{String(val)}</td>
@@ -181,6 +286,63 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                   {validation.errors.length === 0 ? <li>No errors detected in sample.</li> : validation.errors.map((e) => <li key={e}>{e}</li>)}
                 </ul>
               </div>
+
+              <div className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
+                <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
+                  <span>서버 검증 결과</span>
+                  <div className="space-x-2">
+                    <button
+                      type="button"
+                      className="rounded border border-[var(--v2-border)] px-3 py-1 text-xs text-[var(--v2-text)] disabled:opacity-50"
+                      onClick={openErrorReportCsv}
+                      disabled={!validationResult?.error_report_csv}
+                    >
+                      CSV로 저장
+                    </button>
+                  </div>
+                </div>
+
+                {!validationResult ? (
+                  <p className="mt-2 text-xs text-[var(--v2-muted)]">서버 검증(SHADOW)을 실행하면 오류 목록과 CSV 링크가 표시됩니다.</p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs text-[var(--v2-muted)]">
+                      shadow: {String(validationResult.shadow)} · total: {validationResult.total} · processed: {validationResult.processed} · dedup_removed: {validationResult.dedup_removed}
+                    </div>
+                    {validationResult.error_report_csv ? (
+                      <div className="text-xs text-[var(--v2-text)]">error_report_csv: {validationResult.error_report_csv}</div>
+                    ) : null}
+
+                    <div className="overflow-hidden rounded-lg border border-[var(--v2-border)]">
+                      <table className="min-w-full table-fixed text-left text-xs">
+                        <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
+                          <tr>
+                            <th className="px-3 py-2">row</th>
+                            <th className="px-3 py-2">external_user_id</th>
+                            <th className="px-3 py-2">code</th>
+                            <th className="px-3 py-2">detail</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">
+                          {(validationResult.errors || []).slice(0, 200).map((e, idx) => (
+                            <tr key={`${e.row_index}-${idx}`}>
+                              <td className="px-3 py-2">{e.row_index}</td>
+                              <td className="px-3 py-2 font-mono text-[var(--v2-accent)]">{e.external_user_id || '-'}</td>
+                              <td className="px-3 py-2">{e.code}</td>
+                              <td className="px-3 py-2">{e.detail || ''}</td>
+                            </tr>
+                          ))}
+                          {!validationResult.errors?.length ? (
+                            <tr>
+                              <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={4}>오류가 없습니다.</td>
+                            </tr>
+                          ) : null}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -189,11 +351,11 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
               <p className="text-sm font-semibold text-[var(--v2-text)]">4) 실행</p>
               <div className="flex items-center gap-3 text-sm text-[var(--v2-text)]">
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" name="mode" value="SHADOW" checked={mode === 'SHADOW'} onChange={() => setMode('SHADOW')} />
+                  <input aria-label="Mode: SHADOW" type="radio" name="mode" value="SHADOW" checked={mode === 'SHADOW'} onChange={() => setMode('SHADOW')} />
                   Shadow (검증만)
                 </label>
                 <label className="inline-flex items-center gap-2">
-                  <input type="radio" name="mode" value="APPLY" checked={mode === 'APPLY'} onChange={() => setMode('APPLY')} />
+                  <input aria-label="Mode: APPLY" type="radio" name="mode" value="APPLY" checked={mode === 'APPLY'} onChange={() => setMode('APPLY')} />
                   Apply (실행)
                 </label>
               </div>
@@ -259,16 +421,21 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
             <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-              <span>Failure CSV</span>
-              <div className="space-x-2">
-                <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={loadLatestImportFailure} disabled={loadingFailure}>Refresh</button>
-                <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={openFailureCsv} disabled={!failureUrl}>Download</button>
-              </div>
+              <span>Error Report CSV</span>
+              <button
+                className="rounded border border-[var(--v2-border)] px-3 py-1 disabled:opacity-50"
+                onClick={openErrorReportCsv}
+                disabled={!validationResult?.error_report_csv}
+              >
+                CSV로 저장
+              </button>
             </div>
             <div className="mt-2 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-muted)]">
-              {loadingFailure ? <p>최근 실패 잡을 불러오는 중...</p> : null}
-              {!loadingFailure && failureUrl ? <p className="text-[var(--v2-text)]">Latest failure CSV ready → {failureUrl}</p> : null}
-              {!loadingFailure && !failureUrl ? <p>가장 최근 Import 실패 CSV가 여기 표시됩니다. 실패 잡이 없으면 빈 상태입니다.</p> : null}
+              {validationResult?.error_report_csv ? (
+                <p className="text-[var(--v2-text)]">{validationResult.error_report_csv}</p>
+              ) : (
+                <p>서버 검증(SHADOW) 결과에 error_report_csv가 있으면 여기서 다운로드할 수 있습니다.</p>
+              )}
             </div>
           </div>
 
@@ -283,11 +450,11 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
             </button>
             <button
               type="button"
-              onClick={step === 4 ? triggerImport : nextStep}
+              onClick={step === 4 ? () => runImport({ runMode: mode }) : nextStep}
               disabled={!canProceed() || (step === 4 && submitState?.loading)}
               className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_20px_rgba(183,247,90,0.35)] disabled:opacity-50"
             >
-              {step === 4 ? (submitState?.loading ? '실행 요청 중...' : '실행 요청') : '다음 단계'}
+              {step === 4 ? (submitState?.loading ? '실행 요청 중...' : mode === 'SHADOW' ? 'SHADOW 실행' : 'APPLY 실행') : '다음 단계'}
             </button>
           </div>
         </div>

@@ -4,28 +4,23 @@ import { pushToast } from './toastBus';
 
 const typeOptions = ['ALERT', 'REMINDER', 'BROADCAST'];
 const variantOptions = ['EXPIRY', 'DEPOSIT', 'DAILY_IMPORT', 'MAINTENANCE'];
-const targetModes = ['SEGMENT', 'UPLOADED_IDS', 'FILTER_SCOPE'];
-const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED'];
+const targetModes = ['EXTERNAL_USER_IDS', 'USER_IDS'];
+const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED', 'DLQ', 'RETRYING'];
 
 const normalizeNotification = (n) => ({
-  id: n.id || n.notification_id,
+  id: n.id,
   type: n.type,
-  variant: n.variant || n.template,
+  variant_id: n.variant_id,
   status: n.status,
-  scheduled: n.scheduled_at || n.scheduled || n.created_at,
-  request_id: n.request_id || n.idempotency_key,
+  scheduled_at: n.scheduled_at,
+  created_at: n.created_at,
 });
 
 export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [type, setType] = useState('ALERT');
   const [variant, setVariant] = useState('EXPIRY');
-  const [targetMode, setTargetMode] = useState('SEGMENT');
-  const [segmentId, setSegmentId] = useState('');
-  const [uploadedIds, setUploadedIds] = useState('');
-  const [scheduleAt, setScheduleAt] = useState('');
-  const [title, setTitle] = useState('만료 임박 안내');
-  const [body, setBody] = useState('만료 3일 전입니다. Shadow 체크 후 Apply 해주세요.');
-  const [dedupeKey, setDedupeKey] = useState('auto-generate');
+  const [targetMode, setTargetMode] = useState('EXTERNAL_USER_IDS');
+  const [targetText, setTargetText] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -39,11 +34,11 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: '20', offset: String((page - 1) * 20) });
+      const params = new URLSearchParams({ page: String(page), page_size: '20', order: 'desc' });
       if (statusFilter !== 'ALL') params.set('status', statusFilter);
-      if (query) params.set('q', query);
+      if (query) params.set('external_user_id', query);
       const resp = await apiFetch(`/api/vault/admin/notifications?${params.toString()}`);
-      const items = resp?.data?.items || resp?.data?.notifications || resp?.data || [];
+      const items = resp?.data?.items || [];
       setNotifications(items.map(normalizeNotification));
     } catch (err) {
       const info = extractErrorInfo(err);
@@ -60,24 +55,28 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   }, [page, statusFilter, query]);
 
   const submitNotification = async () => {
-    const payload = {
-      type,
-      variant,
-      target_mode: targetMode,
-      segment_id: segmentId || undefined,
-      uploaded_ids: uploadedIds ? uploadedIds.split(/[,\s]+/).filter(Boolean) : undefined,
-      schedule_at: scheduleAt || null,
-      title,
-      body,
-      dedupe_key: dedupeKey === 'auto-generate' ? undefined : dedupeKey,
-    };
     try {
       setSubmitting(true);
-      const res = await apiFetch('/api/vault/admin/notifications', {
-        method: 'POST',
-        body: payload,
-      });
-      pushToast({ ok: true, message: '알림 생성 요청 완료', detail: res.idempotencyKey });
+      const rawTargets = String(targetText || '')
+        .split(/[,\s]+/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (!rawTargets.length) {
+        setError('대상 아이디를 입력해주세요.');
+        pushToast({ ok: false, message: '대상 아이디를 입력해주세요.' });
+        return;
+      }
+
+      const payload = {
+        type,
+        variant_id: variant || undefined,
+        user_ids: targetMode === 'USER_IDS' ? rawTargets.map((v) => Number(v)).filter((n) => Number.isFinite(n)) : undefined,
+        external_user_ids: targetMode === 'EXTERNAL_USER_IDS' ? rawTargets : undefined,
+      };
+
+      const res = await apiFetch('/api/vault/notify', { method: 'POST', body: payload });
+      const enqueued = res?.data?.enqueued;
+      pushToast({ ok: true, message: '알림 생성(큐 적재) 완료', detail: `enqueued: ${enqueued ?? '-'}`, idempotencyKey: res.idempotencyKey });
       load();
     } catch (err) {
       const info = extractErrorInfo(err);
@@ -86,26 +85,6 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const actOnNotification = async (id, action) => {
-    try {
-      const res = await apiFetch(`/api/vault/admin/notifications/${id}/${action}`, { method: 'POST' });
-      pushToast({ ok: true, message: `${action} 요청 완료`, detail: res.idempotencyKey });
-      load();
-    } catch (err) {
-      const info = extractErrorInfo(err);
-      setError(info.summary || `${action} 실패`);
-      pushToast({ ok: false, message: info.summary || `${action} 실패`, detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
-    }
-  };
-
-  const downloadCsv = () => {
-    const params = new URLSearchParams();
-    if (statusFilter !== 'ALL') params.set('status', statusFilter);
-    if (query) params.set('q', query);
-    const url = `${basePath || ''}/api/vault/admin/notifications/export?${params.toString()}`;
-    if (typeof window !== 'undefined') window.open(url, '_blank');
   };
 
   return (
@@ -151,8 +130,9 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Schedule (UTC)</label>
               <input
                 type="datetime-local"
-                value={scheduleAt}
-                onChange={(e) => setScheduleAt(e.target.value)}
+                value={''}
+                onChange={() => {}}
+                disabled
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               />
             </div>
@@ -172,38 +152,37 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               </select>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Segment</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Targets</label>
               <input
-                value={segmentId}
-                onChange={(e) => setSegmentId(e.target.value)}
-                placeholder="segment_id or saved filter"
+                value={targetText}
+                onChange={(e) => setTargetText(e.target.value)}
+                placeholder={targetMode === 'USER_IDS' ? '1,2,3' : 'ext-1001,ext-1002'}
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               />
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Upload IDs</label>
-              <input
-                value={uploadedIds}
-                onChange={(e) => setUploadedIds(e.target.value)}
-                placeholder="user1,user2,user3"
-                className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-              />
+              <div className="mt-6 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-muted)]">
+                <p className="text-[var(--v2-text)]">백엔드 지원 범위</p>
+                <p className="mt-1">현재 알림 생성은 <span className="font-mono">/api/vault/notify</span>만 지원하며, Segment/예약/본문 템플릿은 미지원입니다.</p>
+              </div>
             </div>
           </div>
 
           <div>
             <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Title</label>
             <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={'(backend 미지원)'}
+              onChange={() => {}}
+              disabled
               className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
             />
           </div>
           <div>
             <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Body</label>
             <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
+              value={'(backend 미지원)'}
+              onChange={() => {}}
+              disabled
               rows={3}
               className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
             />
@@ -219,13 +198,8 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               </ul>
             </div>
             <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
-              <label className="text-[var(--v2-muted)]">Dedupe Key</label>
-              <input
-                value={dedupeKey}
-                onChange={(e) => setDedupeKey(e.target.value)}
-                className="mt-2 w-full rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-2 py-1 text-sm"
-              />
-              <p className="mt-2 text-[var(--v2-muted)]">비워두면 서버에서 자동 생성합니다.</p>
+              <p className="text-[var(--v2-muted)]">Idempotency</p>
+              <p className="mt-2 text-[var(--v2-muted)]">요청마다 <span className="font-mono">x-idempotency-key</span>가 자동으로 붙습니다(클라이언트 생성).</p>
             </div>
           </div>
 
@@ -234,10 +208,10 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             <div className="space-x-2">
               <button
                 type="button"
-                onClick={() => setDedupeKey('auto-generate')}
+                onClick={() => setTargetText('')}
                 className="rounded-lg border border-[var(--v2-border)] px-3 py-2 text-sm text-[var(--v2-text)]"
               >
-                Dedupe Key 재설정
+                대상 초기화
               </button>
               <button
                 type="button"
@@ -292,27 +266,20 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                   <th className="px-3 py-2 text-xs">Type/Variant</th>
                   <th className="px-3 py-2 text-xs">Status</th>
                   <th className="px-3 py-2 text-xs">Scheduled</th>
-                  <th className="px-3 py-2 text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--v2-border)]">
                 {notifications.map((n) => (
                   <tr key={n.id} className="text-[var(--v2-text)]">
                     <td className="px-3 py-2 font-mono text-xs text-[var(--v2-accent)]">{n.id}</td>
-                    <td className="px-3 py-2 text-xs">{n.type} / {n.variant}</td>
+                    <td className="px-3 py-2 text-xs">{n.type} / {n.variant_id || '-'}</td>
                     <td className="px-3 py-2 text-xs">{n.status}</td>
-                    <td className="px-3 py-2 text-xs">{n.scheduled}</td>
-                    <td className="px-3 py-2 text-xs">
-                      <div className="flex gap-2">
-                        <button className="rounded border border-[var(--v2-border)] px-2 py-1" onClick={() => actOnNotification(n.id, 'retry')}>Retry</button>
-                        <button className="rounded border border-[var(--v2-border)] px-2 py-1" onClick={() => actOnNotification(n.id, 'cancel')}>Cancel</button>
-                      </div>
-                    </td>
+                    <td className="px-3 py-2 text-xs">{n.scheduled_at || n.created_at || '-'}</td>
                   </tr>
                 ))}
                 {notifications.length === 0 ? (
                   <tr>
-                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={5}>표시할 알림이 없습니다.</td>
+                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={4}>표시할 알림이 없습니다.</td>
                   </tr>
                 ) : null}
               </tbody>
