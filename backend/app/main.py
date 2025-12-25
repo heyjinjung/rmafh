@@ -3602,12 +3602,23 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, resp
                 idempotency_key=key,
             )
 
+            cur.execute(
+                "SELECT expires_at FROM vault_status WHERE user_id=%s",
+                (user_id,),
+            )
+            vs_row = cur.fetchone()
+            expires_at = vs_row[0] if vs_row else None
+
             response_body = {
                 "user_id": user_id,
                 "external_user_id": ext,
                 "nickname": nickname,
                 "joined_date": joined_date.isoformat() if joined_date else None,
                 "created_at": created_at.isoformat() if created_at else None,
+                "expires_at": expires_at.isoformat() if expires_at else None,
+                "deposit_total": deposit_total,
+                "telegram_ok": telegram_ok,
+                "review_ok": review_ok,
             }
 
             _idempotency_finish(
@@ -3729,7 +3740,7 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
 
         cur.execute(
             """
-            SELECT nickname, joined_date
+            SELECT nickname, joined_date, deposit_total, telegram_ok, review_ok
               FROM user_admin_snapshot
              WHERE user_id=%s
             """,
@@ -3737,12 +3748,23 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
         )
         snap = cur.fetchone()
 
+        cur.execute(
+            "SELECT expires_at FROM vault_status WHERE user_id=%s",
+            (user_id,),
+        )
+        vs_row = cur.fetchone()
+        expires_at = vs_row[0] if vs_row else None
+
         response_body = {
             "user_id": user_id,
             "external_user_id": external_user_id,
             "nickname": snap[0] if snap else nickname,
             "joined_date": snap[1].isoformat() if snap and snap[1] else (joined_date.isoformat() if joined_date else None),
             "created_at": created_at.isoformat() if created_at else None,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "deposit_total": snap[2] if snap else (deposit_total or 0),
+            "telegram_ok": snap[3] if snap else (telegram_ok or False),
+            "review_ok": snap[4] if snap else (review_ok or False),
         }
 
         _idempotency_finish(

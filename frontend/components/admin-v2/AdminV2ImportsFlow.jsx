@@ -202,7 +202,12 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
             const file = e.target.files?.[0];
             if (!file) return;
             setFileName(file.name);
-            file.text().then((text) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              const arrayBuffer = event.target.result;
+              // UTF-8로 디코딩
+              const decoder = new TextDecoder('utf-8');
+              const text = decoder.decode(arrayBuffer);
               setCsvText(text);
               const p = parseDelimited(text);
               setParsed(p);
@@ -218,7 +223,8 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                 telegram_ok: headerSet.has('telegram_ok') ? 'telegram_ok' : prev.telegram_ok,
                 review_ok: headerSet.has('review_ok') ? 'review_ok' : prev.review_ok,
               }));
-            });
+            };
+            reader.readAsArrayBuffer(file);
           }} />
           <span className="text-[var(--v2-muted)]">{fileName ? fileName : '파일 선택'}</span>
         </label>
@@ -230,17 +236,25 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
                   <tr>
-                    {Object.keys((rowsForApi[0] || { external_user_id: '' })).map((col) => (
-                      <th key={col} className="px-3 py-2 uppercase tracking-[0.12em]">{col}</th>
-                    ))}
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">external_user_id</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">nickname</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">deposit_total</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">joined_at</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">last_deposit_at</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">telegram_ok</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">review_ok</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--v2-border)]">
                   {(rowsForApi.slice(0, 3) || []).map((row) => (
                     <tr key={row.external_user_id}>
-                      {Object.entries(row).map(([col, val]) => (
-                        <td key={col} className="px-3 py-2 font-mono text-[var(--v2-text)]">{String(val)}</td>
-                      ))}
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.external_user_id || ''}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.nickname || ''}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.deposit_total || 0}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.joined_at || ''}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.last_deposit_at || ''}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.telegram_ok ? '✓' : '✗'}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.review_ok ? '✓' : '✗'}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -263,6 +263,10 @@ class AdminUserResponse(BaseModel):
     nickname: Optional[str]
     joined_date: Optional[str]
     created_at: Optional[str]
+    expires_at: Optional[str]
+    deposit_total: int = 0
+    telegram_ok: bool = False
+    review_ok: bool = False
 
 
 class UserIdentityBulkRequest(BaseModel):
