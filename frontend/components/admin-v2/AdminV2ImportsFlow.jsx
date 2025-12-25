@@ -174,296 +174,107 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     if (url && typeof window !== 'undefined') window.open(url, '_blank');
   };
 
+  // 예시 파일 다운로드 함수
+  const downloadExample = () => {
+    const example = 'external_user_id,nickname,deposit_total\nuser1,홍길동,10000\nuser2,김철수,20000';
+    const blob = new Blob([example], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'import_example.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <section id="imports" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">가져오기</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">4단계 흐름: 파일 → 매핑 → 검증 → 실행.</p>
-        </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">단계 {step} / 4</span>
-      </div>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <div className="space-y-4">
-          {step === 1 && (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-              <p className="text-sm font-semibold text-[var(--v2-text)]">1) 파일 업로드</p>
-              <label className="mt-3 flex cursor-pointer items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-4 py-3 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50">
-                <span>{uploadLabel}</span>
-                <input
-                  type="file"
-                  accept=".csv"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setFileName(file.name);
-                    file.text().then((text) => {
-                      setCsvText(text);
-                      const p = parseDelimited(text);
-                      setParsed(p);
-                      // best-effort default mapping: exact match
-                      const headerSet = new Set((p.header || []).map((h) => String(h || '').trim()));
-                      setMapping((prev) => ({
-                        ...prev,
-                        external_user_id: headerSet.has('external_user_id') ? 'external_user_id' : (p.header || [])[0] || '',
-                        nickname: headerSet.has('nickname') ? 'nickname' : prev.nickname,
-                        deposit_total: headerSet.has('deposit_total') ? 'deposit_total' : prev.deposit_total,
-                        joined_at: headerSet.has('joined_at') ? 'joined_at' : prev.joined_at,
-                        last_deposit_at: headerSet.has('last_deposit_at') ? 'last_deposit_at' : prev.last_deposit_at,
-                        telegram_ok: headerSet.has('telegram_ok') ? 'telegram_ok' : prev.telegram_ok,
-                        review_ok: headerSet.has('review_ok') ? 'review_ok' : prev.review_ok,
-                      }));
-                    });
-                  }}
-                />
-                <span className="text-[var(--v2-muted)]">찾아보기</span>
-              </label>
-              <p className="mt-2 text-xs text-[var(--v2-muted)]">최대 10,000행 단위로 Job 분할 예정. 헤더가 포함된 UTF-8 CSV.</p>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-              <p className="text-sm font-semibold text-[var(--v2-text)]">2) 컬럼 매핑</p>
-              {[...requiredFields, ...optionalFields].map((field) => (
-                <div key={field} className="grid grid-cols-[160px_1fr] items-center gap-3 text-sm">
-                  <span className="text-[var(--v2-muted)]">{field}</span>
-                  <select
-                    value={mapping[field] || ''}
-                    onChange={(e) => setMapping((prev) => ({ ...prev, [field]: e.target.value }))}
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-[var(--v2-text)]"
-                  >
-                    <option value="">선택</option>
-                    {availableColumns.map((col) => (
-                      <option key={col} value={col}>{col}</option>
+      <h2 className="text-lg font-bold text-[var(--v2-accent)] mb-2">회원정보 가져오기</h2>
+      <ol className="mb-4 list-decimal pl-4 text-sm text-[var(--v2-muted)]">
+        <li>아래에서 CSV 파일을 올려주세요. <button type="button" className="ml-2 underline text-[var(--v2-accent)]" onClick={downloadExample}>예시 파일 다운로드</button></li>
+        <li>파일 내용과 오류를 미리 확인하세요.</li>
+        <li>문제가 없으면 '적용' 버튼을 눌러주세요.</li>
+      </ol>
+      <div className="space-y-4">
+        {/* 파일 업로드 */}
+        <label className="flex items-center gap-3">
+          <span className="font-semibold">CSV 파일 올리기</span>
+          <input type="file" accept=".csv" className="hidden" onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setFileName(file.name);
+            file.text().then((text) => {
+              setCsvText(text);
+              const p = parseDelimited(text);
+              setParsed(p);
+              // best-effort default mapping: exact match
+              const headerSet = new Set((p.header || []).map((h) => String(h || '').trim()));
+              setMapping((prev) => ({
+                ...prev,
+                external_user_id: headerSet.has('external_user_id') ? 'external_user_id' : (p.header || [])[0] || '',
+                nickname: headerSet.has('nickname') ? 'nickname' : prev.nickname,
+                deposit_total: headerSet.has('deposit_total') ? 'deposit_total' : prev.deposit_total,
+                joined_at: headerSet.has('joined_at') ? 'joined_at' : prev.joined_at,
+                last_deposit_at: headerSet.has('last_deposit_at') ? 'last_deposit_at' : prev.last_deposit_at,
+                telegram_ok: headerSet.has('telegram_ok') ? 'telegram_ok' : prev.telegram_ok,
+                review_ok: headerSet.has('review_ok') ? 'review_ok' : prev.review_ok,
+              }));
+            });
+          }} />
+          <span className="text-[var(--v2-muted)]">{fileName ? fileName : '파일 선택'}</span>
+        </label>
+        {/* 미리보기 및 오류 안내 */}
+        {csvText && (
+          <div>
+            <h3 className="text-sm font-bold mt-4">미리보기</h3>
+            <div className="overflow-auto rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] mt-2">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
+                  <tr>
+                    {Object.keys((rowsForApi[0] || { external_user_id: '' })).map((col) => (
+                      <th key={col} className="px-3 py-2 uppercase tracking-[0.12em]">{col}</th>
                     ))}
-                  </select>
-                </div>
-              ))}
-              <p className="text-xs text-[var(--v2-muted)]">필수: external_user_id. 나머지는 선택입니다.</p>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-[var(--v2-text)]">3) 검증 & 미리보기 (최대 200행)</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-[var(--v2-muted)]">샘플 3행</span>
-                  <button
-                    type="button"
-                    onClick={() => runImport({ runMode: 'SHADOW' })}
-                    disabled={submitState?.loading || validation.errors.length > 0}
-                    className="rounded border border-[var(--v2-border)] px-3 py-1 text-xs text-[var(--v2-text)] disabled:opacity-50"
-                  >
-                    서버 검증(SHADOW)
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 overflow-auto rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
-                    <tr>
-                      {Object.keys((rowsForApi[0] || { external_user_id: '' })).map((col) => (
-                        <th key={col} className="px-3 py-2 uppercase tracking-[0.12em]">{col}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--v2-border)]">
+                  {(rowsForApi.slice(0, 3) || []).map((row) => (
+                    <tr key={row.external_user_id}>
+                      {Object.entries(row).map(([col, val]) => (
+                        <td key={col} className="px-3 py-2 font-mono text-[var(--v2-text)]">{String(val)}</td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--v2-border)]">
-                    {(rowsForApi.slice(0, 3) || []).map((row) => (
-                      <tr key={row.external_user_id}>
-                        {Object.entries(row).map(([col, val]) => (
-                          <td key={col} className="px-3 py-2 font-mono text-[var(--v2-text)]">{String(val)}</td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm">
-                <div className="flex items-center justify-between text-[var(--v2-muted)]">
-                  <span>오류</span>
-                  <span>{validation.errors.length}</span>
-                </div>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--v2-warning)]">
-                  {validation.errors.length === 0 ? <li>샘플에서 오류가 감지되지 않았습니다.</li> : validation.errors.map((e) => <li key={e}>{e}</li>)}
-                </ul>
-              </div>
-
-              <div className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-                <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-                  <span>서버 검증 결과</span>
-                  <div className="space-x-2">
-                    <button
-                      type="button"
-                      className="rounded border border-[var(--v2-border)] px-3 py-1 text-xs text-[var(--v2-text)] disabled:opacity-50"
-                      onClick={openErrorReportCsv}
-                      disabled={!validationResult?.error_report_csv}
-                    >
-                      CSV로 저장
-                    </button>
-                  </div>
-                </div>
-
-                {!validationResult ? (
-                  <p className="mt-2 text-xs text-[var(--v2-muted)]">서버 검증(SHADOW)을 실행하면 오류 목록과 CSV 링크가 표시됩니다.</p>
-                ) : (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs text-[var(--v2-muted)]">
-                      shadow: {String(validationResult.shadow)} · total: {validationResult.total} · processed: {validationResult.processed} · dedup_removed: {validationResult.dedup_removed}
-                    </div>
-                    {validationResult.error_report_csv ? (
-                      <div className="text-xs text-[var(--v2-text)]">error_report_csv: {validationResult.error_report_csv}</div>
-                    ) : null}
-
-                    <div className="overflow-hidden rounded-lg border border-[var(--v2-border)]">
-                      <table className="min-w-full table-fixed text-left text-xs">
-                        <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
-                          <tr>
-                            <th className="px-3 py-2">행</th>
-                            <th className="px-3 py-2">external_user_id</th>
-                            <th className="px-3 py-2">코드</th>
-                            <th className="px-3 py-2">상세</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">
-                          {(validationResult.errors || []).slice(0, 200).map((e, idx) => (
-                            <tr key={`${e.row_index}-${idx}`}>
-                              <td className="px-3 py-2">{e.row_index}</td>
-                              <td className="px-3 py-2 font-mono text-[var(--v2-accent)]">{e.external_user_id || '-'}</td>
-                              <td className="px-3 py-2">{e.code}</td>
-                              <td className="px-3 py-2">{e.detail || ''}</td>
-                            </tr>
-                          ))}
-                          {!validationResult.errors?.length ? (
-                            <tr>
-                              <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={4}>오류가 없습니다.</td>
-                            </tr>
-                          ) : null}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-
-          {step === 4 && (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-              <p className="text-sm font-semibold text-[var(--v2-text)]">4) 실행</p>
-              <div className="flex items-center gap-3 text-sm text-[var(--v2-text)]">
-                <label className="inline-flex items-center gap-2">
-                  <input aria-label="Mode: SHADOW" type="radio" name="mode" value="SHADOW" checked={mode === 'SHADOW'} onChange={() => setMode('SHADOW')} />
-                  Shadow (검증만)
-                </label>
-                <label className="inline-flex items-center gap-2">
-                  <input aria-label="Mode: APPLY" type="radio" name="mode" value="APPLY" checked={mode === 'APPLY'} onChange={() => setMode('APPLY')} />
-                  Apply (실행)
-                </label>
+            {/* 오류 안내 */}
+            {validation.errors.length > 0 ? (
+              <div className="mt-2 text-[var(--v2-warning)]">
+                <b>오류가 있습니다:</b>
+                <ul>{validation.errors.map((e) => <li key={e}>{e}</li>)}</ul>
               </div>
-              <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
-                <div className="flex items-center justify-between text-[var(--v2-muted)]">
-                  <span>영향도 미리보기</span>
-                  <span>{rowCount.toLocaleString()}행</span>
-                </div>
-                <p className="mt-2 text-xs text-[var(--v2-muted)]">10,000행 단위로 배치로 분할합니다. 서버에서 external_user_id 기준으로 중복 제거합니다.</p>
-              </div>
-              <div className="space-y-2 text-sm text-[var(--v2-text)]">
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">위험 작업 확인</label>
-                <input
-                  value={riskAck}
-                  onChange={(e) => setRiskAck(e.target.value)}
-                  placeholder="'I understand' 또는 '이해했습니다' 입력"
-                  className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                />
-                <p className="text-xs text-[var(--v2-warning)]">위험 작업: Apply 모드에서는 되돌릴 수 없습니다.</p>
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="space-y-4">
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">단계 안내</p>
-            <ol className="mt-3 list-decimal space-y-2 pl-4 text-[var(--v2-muted)]">
-              <li>CSV 업로드 (UTF-8, header 포함)</li>
-              <li>컬럼 매핑 확인</li>
-              <li>샘플 검증 및 오류 확인</li>
-              <li>Shadow/Apply 선택 후 실행</li>
-            </ol>
-            <p className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-muted)]">
-              POST /api/vault/admin/imports 호출 시 idempotency-key 포함, 실패 시 request_id/idem-key를 아래 응답 카드와 토스트에서 확인하세요.
-            </p>
+            ) : (
+              <div className="mt-2 text-[var(--v2-accent)]">오류가 없습니다. 적용 가능합니다.</div>
+            )}
           </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-              <span>서버 응답</span>
-              {submitState?.idempotencyKey ? <span className="font-mono">{submitState.idempotencyKey}</span> : null}
-            </div>
-            <div className="mt-2 space-y-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs">
-              {submitState?.loading ? <p className="text-[var(--v2-muted)]">요청 중...</p> : null}
-              {submitState?.ok ? (
-                <>
-                  <p className="text-[var(--v2-accent)]">Import 요청이 접수되었습니다.</p>
-                  {submitState.idempotencyStatus ? <p className="text-[var(--v2-muted)]">Idem-Status: {submitState.idempotencyStatus}</p> : null}
-                </>
-              ) : null}
-              {serverError ? (
-                <div className="space-y-1 text-[var(--v2-warning)]">
-                  <p>{serverError.summary || '오류 발생'}</p>
-                  {serverError.detail ? <p className="text-[var(--v2-muted)]">{serverError.detail}</p> : null}
-                  {serverError.requestId ? <p className="text-[var(--v2-muted)]">request_id: {serverError.requestId}</p> : null}
-                  {serverError.idempotencyKey ? <p className="text-[var(--v2-muted)]">idem-key: {serverError.idempotencyKey}</p> : null}
-                </div>
-              ) : null}
-              {!submitState && !serverError ? <p className="text-[var(--v2-muted)]">실행 요청 시 서버 응답과 idempotency 정보가 표시됩니다.</p> : null}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-              <span>오류 리포트 CSV</span>
-              <button
-                className="rounded border border-[var(--v2-border)] px-3 py-1 disabled:opacity-50"
-                onClick={openErrorReportCsv}
-                disabled={!validationResult?.error_report_csv}
-              >
-                CSV로 저장
-              </button>
-            </div>
-            <div className="mt-2 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-muted)]">
-              {validationResult?.error_report_csv ? (
-                <p className="text-[var(--v2-text)]">{validationResult.error_report_csv}</p>
-              ) : (
-                <p>서버 검증(SHADOW) 결과에 error_report_csv가 있으면 여기서 다운로드할 수 있습니다.</p>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={prevStep}
-              disabled={step === 1}
-              className="flex-1 rounded-lg border border-[var(--v2-border)] px-4 py-3 text-sm text-[var(--v2-text)] disabled:opacity-50"
-            >
-              이전 단계
-            </button>
-            <button
-              type="button"
-              onClick={step === 4 ? () => runImport({ runMode: mode }) : nextStep}
-              disabled={!canProceed() || (step === 4 && submitState?.loading)}
-              className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_20px_rgba(183,247,90,0.35)] disabled:opacity-50"
-            >
-              {step === 4 ? (submitState?.loading ? '실행 요청 중...' : mode === 'SHADOW' ? 'SHADOW 실행' : 'APPLY 실행') : '다음 단계'}
-            </button>
-          </div>
-        </div>
+        )}
+        {/* 실행 버튼 */}
+        <button
+          type="button"
+          className="w-full rounded-lg bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black mt-4"
+          disabled={!csvText || validation.errors.length > 0}
+          onClick={() => runImport({ runMode: 'APPLY' })}
+        >
+          적용하기
+        </button>
       </div>
+      {/* 오류 리포트 CSV 다운로드 안내 */}
+      {validationResult?.error_report_csv && (
+        <div className="mt-4">
+          <button type="button" className="underline text-[var(--v2-accent)]" onClick={openErrorReportCsv}>
+            오류 CSV 다운로드
+          </button>
+        </div>
+      )}
     </section>
   );
 }
