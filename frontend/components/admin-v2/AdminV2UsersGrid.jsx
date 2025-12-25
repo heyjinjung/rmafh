@@ -584,11 +584,11 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-[var(--v2-muted)]">생성일</div>
-                    <div>{selectedRow.created_at || '-'}</div>
+                    <div>{selectedRow.created_at ? selectedRow.created_at.slice(0, 10) : '-'}</div>
                   </div>
                   <div>
                     <div className="text-xs text-[var(--v2-muted)]">만료일</div>
-                    <div>{selectedRow.expires_at || '-'}</div>
+                    <div>{selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}</div>
                   </div>
                 </div>
 

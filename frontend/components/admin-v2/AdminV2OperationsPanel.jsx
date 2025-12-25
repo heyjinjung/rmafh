@@ -25,12 +25,27 @@ function makeRequestId() {
 }
 
 export default function AdminV2OperationsPanel({ adminPassword, basePath, usersTarget, segmentTarget }) {
-    // 안전장치: 적용 버튼 클릭 시 확인 팝업
-    const handleApply = async (action) => {
-      if (!window.confirm('정말 적용하시겠습니까?')) return;
-      if (action === 'expiry') await submitExtendExpiry();
-      if (action === 'bulk') await submitBulkUpdate();
-    };
+  // 안전장치: 적용 버튼 클릭 시 확인 팝업
+  const handleApply = async (action) => {
+    if (!window.confirm('정말 적용하시겠습니까?')) return;
+    if (action === 'expiry') await submitExtendExpiry();
+    if (action === 'bulk') await submitBulkUpdate();
+  };
+
+  // 직접 대상 입력/필터/CSV 업로드/최근 사용
+  const [manualUserIds, setManualUserIds] = useState('');
+  const [manualFilter, setManualFilter] = useState('');
+  const [csvFile, setCsvFile] = useState(null);
+  const [recentTargets, setRecentTargets] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('recentTargets') || '[]');
+    } catch { return []; }
+  });
+  const saveRecentTarget = (target) => {
+    const next = [target, ...recentTargets.filter(t => t !== target)].slice(0, 5);
+    setRecentTargets(next);
+    localStorage.setItem('recentTargets', JSON.stringify(next));
+  };
   const [targetScope, setTargetScope] = useState('segment');
   const [targetValue, setTargetValue] = useState('');
   const [expiryDays, setExpiryDays] = useState(3);
@@ -286,20 +301,32 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
     <section id="operations" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <h2 className="text-lg font-bold text-[var(--v2-accent)] mb-2">회원정보 일괄 변경</h2>
       <ol className="mb-4 list-decimal pl-4 text-sm text-[var(--v2-muted)]">
-        <li>Users에서 변경할 대상을 선택하세요.</li>
-        <li>아래에서 변경할 내용을 입력하세요.</li>
-        <li>미리보기로 대상과 변경 내용을 확인하세요.</li>
+        <li>아래에서 <b>user_id 직접 입력</b>, <b>조건(필터) 입력</b>, <b>CSV 업로드</b> 중 하나로 대상을 지정하세요.</li>
+        <li>최근 사용한 대상은 드롭다운에서 바로 선택할 수 있습니다.</li>
+        <li>변경할 내용을 입력하고, 미리보기로 대상/변경 내용을 확인하세요.</li>
         <li>문제가 없으면 &apos;적용하기&apos; 버튼을 눌러주세요.</li>
       </ol>
       <div className="space-y-4">
-        {/* 대상 안내 */}
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <b>대상: </b>
-          {linkedTarget
-            ? linkedTarget.mode === 'filter'
-              ? `필터: ${linkedTarget.filter?.query || '-'} / 상태: ${linkedTarget.filter?.status || '-'} `
-              : `선택된 user_id: ${linkedTarget.ids.length}명`
-            : 'Users에서 대상을 선택하세요.'}
+        {/* 대상 직접 입력/필터/CSV/최근 */}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-2">
+          <b>대상 지정</b>
+          <div className="flex flex-col gap-2 md:flex-row md:gap-4">
+            <input type="text" placeholder="user_id 직접 입력 (쉼표/엔터 구분)" value={manualUserIds} onChange={e => setManualUserIds(e.target.value)} className="rounded border px-2 py-1 flex-1" />
+            <input type="text" placeholder="조건(예: 상태: UNLOCKED, 만료일: 2025-12-31 이전)" value={manualFilter} onChange={e => setManualFilter(e.target.value)} className="rounded border px-2 py-1 flex-1" />
+            <input type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} className="flex-1" />
+          </div>
+          <div className="flex gap-2 mt-2">
+            <select className="rounded border px-2 py-1 text-xs" onChange={e => {
+              const v = e.target.value;
+              if (!v) return;
+              setManualUserIds(v);
+            }}>
+              <option value="">최근 사용 대상 선택</option>
+              {recentTargets.map((t, i) => <option key={i} value={t}>{t}</option>)}
+            </select>
+            <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => saveRecentTarget(manualUserIds)}>현재 입력 저장</button>
+          </div>
+          <div className="text-xs text-[var(--v2-muted)]">user_id 여러 명 입력 시 쉼표(,) 또는 엔터로 구분, 조건은 예시 참고</div>
         </div>
         {/* 만료일 연장 */}
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
