@@ -90,7 +90,7 @@ export default function AdminV2Page() {
           <AdminV2SegmentsPanel />
           <AdminV2OperationsPanel />
           <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
-          <AdminV2ImportsFlow />
+          <AdminV2ImportsFlow adminPassword={adminPassword} basePath={basePath} />
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">

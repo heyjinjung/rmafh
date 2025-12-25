@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { pushToast, useToastSubscription } from './toastBus';
 
 const sampleError = {
   code: 'IDEMPOTENCY_KEY_REUSE',
@@ -11,8 +12,8 @@ const randomKey = () => `idem_${Math.random().toString(36).slice(2, 12)}`;
 export default function AdminV2CommonUxPanel() {
   const [idemKey, setIdemKey] = useState(randomKey());
   const [auto, setAuto] = useState(true);
-  const [toast, setToast] = useState(null);
   const [detailLink, setDetailLink] = useState('job/job_20251226_001');
+  const { toasts, clear } = useToastSubscription();
 
   useEffect(() => {
     if (!auto) return undefined;
@@ -22,17 +23,19 @@ export default function AdminV2CommonUxPanel() {
 
   const copyKey = () => {
     if (typeof navigator !== 'undefined') navigator.clipboard?.writeText(idemKey);
-    setToast({ ok: true, message: 'Idempotency key copied', detail: detailLink });
+    pushToast({ ok: true, message: 'Idempotency key copied', detail: detailLink });
   };
 
   const regenerate = () => {
     setIdemKey(randomKey());
-    setToast({ ok: true, message: '새 키 생성', detail: detailLink });
+    pushToast({ ok: true, message: '새 키 생성', detail: detailLink });
   };
 
   const simulateError = () => {
-    setToast({ ok: false, message: sampleError.summary, detail: sampleError.code });
+    pushToast({ ok: false, message: sampleError.summary, detail: sampleError.code, requestId: 'req_sim', idempotencyKey: randomKey() });
   };
+
+  const latest = toasts[0];
 
   return (
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="common-ux">
@@ -71,15 +74,20 @@ export default function AdminV2CommonUxPanel() {
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
             <span>Result Toast + Detail Link</span>
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={simulateError}>Simulate Error</button>
+            <div className="flex gap-2">
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={simulateError}>Simulate Error</button>
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={clear}>Clear</button>
+            </div>
           </div>
           <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-sm text-[var(--v2-text)]">
-            {toast ? (
+            {latest ? (
               <div className="space-y-1">
-                <div className={toast.ok ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-warning)]'}>
-                  {toast.message}
+                <div className={latest.ok ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-warning)]'}>
+                  {latest.message}
                 </div>
-                <div className="text-[var(--v2-muted)]">detail: {toast.detail}</div>
+                <div className="text-[var(--v2-muted)]">detail: {latest.detail}</div>
+                {latest.requestId ? <div className="text-[var(--v2-muted)]">request_id: {latest.requestId}</div> : null}
+                {latest.idempotencyKey ? <div className="text-[var(--v2-muted)]">idem-key: {latest.idempotencyKey}</div> : null}
                 <div className="text-xs text-[var(--v2-muted)]">링크 예: {detailLink}</div>
               </div>
             ) : (
@@ -87,7 +95,7 @@ export default function AdminV2CommonUxPanel() {
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-muted)]">
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setToast({ ok: true, message: 'Apply 완료', detail: detailLink })}>Simulate Success</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => pushToast({ ok: true, message: 'Apply 완료', detail: detailLink })}>Simulate Success</button>
             <input
               value={detailLink}
               onChange={(e) => setDetailLink(e.target.value)}

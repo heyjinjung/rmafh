@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
+import { pushToast } from './toastBus';
 
 const sampleColumns = ['external_user_id', 'nickname', 'deposit_total', 'telegram_ok', 'review_ok'];
 const samplePreview = [
@@ -7,13 +9,18 @@ const samplePreview = [
   { external_user_id: 'ext-1003', nickname: 'Charlie', deposit_total: 8000, telegram_ok: true, review_ok: true },
 ];
 
-export default function AdminV2ImportsFlow() {
+export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
   const [step, setStep] = useState(1);
   const [fileName, setFileName] = useState('');
   const [rowCount, setRowCount] = useState(0);
   const [mapping, setMapping] = useState({ external_user_id: 'external_user_id', nickname: 'nickname', deposit_total: 'deposit_total' });
   const [mode, setMode] = useState('SHADOW');
   const [riskAck, setRiskAck] = useState('');
+  const [submitState, setSubmitState] = useState(null);
+  const [serverError, setServerError] = useState(null);
+  const [failureUrl, setFailureUrl] = useState('');
+  const [loadingFailure, setLoadingFailure] = useState(false);
+  const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
   const validation = useMemo(() => {
     const errors = [];
@@ -34,6 +41,54 @@ export default function AdminV2ImportsFlow() {
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
   const uploadLabel = fileName ? `${fileName} (${rowCount.toLocaleString()} rows)` : 'CSV 파일 선택';
+
+  const triggerImport = async () => {
+    setSubmitState({ loading: true });
+    setServerError(null);
+    try {
+      const body = {
+        mode,
+        file_name: fileName || 'import.csv',
+        row_count: rowCount,
+        mapping,
+      };
+      const res = await apiFetch('/api/vault/admin/imports', { method: 'POST', body });
+      setSubmitState({ ok: true, idempotencyKey: res.idempotencyKey, idempotencyStatus: res.idempotencyStatus });
+      pushToast({ ok: true, message: 'Import 요청 전송', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
+      loadLatestImportFailure();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setServerError(info);
+      setSubmitState({ ok: false, message: info.summary, idempotencyKey: info.idempotencyKey });
+      pushToast({ ok: false, message: info.summary || 'Import 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setSubmitState((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
+  const loadLatestImportFailure = async () => {
+    setLoadingFailure(true);
+    try {
+      const res = await apiFetch('/api/vault/admin/jobs?limit=5');
+      const jobs = res?.data?.items || res?.data?.jobs || res?.data || [];
+      const importJob = jobs.find((j) => (j.type || '').includes('IMPORT'));
+      const url = importJob?.failures_csv || importJob?.failure_download_url;
+      setFailureUrl(url || '');
+      if (url) {
+        pushToast({ ok: false, message: '최신 Import 실패 CSV 준비됨', detail: url });
+      }
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setServerError(info);
+      pushToast({ ok: false, message: info.summary || '실패 로그 확인 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setLoadingFailure(false);
+    }
+  };
+
+  const openFailureCsv = () => {
+    if (failureUrl && typeof window !== 'undefined') window.open(failureUrl, '_blank');
+  };
 
   return (
     <section id="imports" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
@@ -173,8 +228,48 @@ export default function AdminV2ImportsFlow() {
               <li>Shadow/Apply 선택 후 실행</li>
             </ol>
             <p className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-muted)]">
-              Backend wiring TODO: POST /api/vault/admin/imports with idempotency key and job creation. Current UI simulates state only.
+              POST /api/vault/admin/imports 호출 시 idempotency-key 포함, 실패 시 request_id/idem-key를 아래 응답 카드와 토스트에서 확인하세요.
             </p>
+          </div>
+
+          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
+            <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
+              <span>Server Response</span>
+              {submitState?.idempotencyKey ? <span className="font-mono">{submitState.idempotencyKey}</span> : null}
+            </div>
+            <div className="mt-2 space-y-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs">
+              {submitState?.loading ? <p className="text-[var(--v2-muted)]">요청 중...</p> : null}
+              {submitState?.ok ? (
+                <>
+                  <p className="text-[var(--v2-accent)]">Import 요청이 접수되었습니다.</p>
+                  {submitState.idempotencyStatus ? <p className="text-[var(--v2-muted)]">Idem-Status: {submitState.idempotencyStatus}</p> : null}
+                </>
+              ) : null}
+              {serverError ? (
+                <div className="space-y-1 text-[var(--v2-warning)]">
+                  <p>{serverError.summary || '오류 발생'}</p>
+                  {serverError.detail ? <p className="text-[var(--v2-muted)]">{serverError.detail}</p> : null}
+                  {serverError.requestId ? <p className="text-[var(--v2-muted)]">request_id: {serverError.requestId}</p> : null}
+                  {serverError.idempotencyKey ? <p className="text-[var(--v2-muted)]">idem-key: {serverError.idempotencyKey}</p> : null}
+                </div>
+              ) : null}
+              {!submitState && !serverError ? <p className="text-[var(--v2-muted)]">실행 요청 시 서버 응답과 idempotency 정보가 표시됩니다.</p> : null}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
+            <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
+              <span>Failure CSV</span>
+              <div className="space-x-2">
+                <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={loadLatestImportFailure} disabled={loadingFailure}>Refresh</button>
+                <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={openFailureCsv} disabled={!failureUrl}>Download</button>
+              </div>
+            </div>
+            <div className="mt-2 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-muted)]">
+              {loadingFailure ? <p>최근 실패 잡을 불러오는 중...</p> : null}
+              {!loadingFailure && failureUrl ? <p className="text-[var(--v2-text)]">Latest failure CSV ready → {failureUrl}</p> : null}
+              {!loadingFailure && !failureUrl ? <p>가장 최근 Import 실패 CSV가 여기 표시됩니다. 실패 잡이 없으면 빈 상태입니다.</p> : null}
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-3">
@@ -188,11 +283,11 @@ export default function AdminV2ImportsFlow() {
             </button>
             <button
               type="button"
-              onClick={nextStep}
-              disabled={!canProceed()}
+              onClick={step === 4 ? triggerImport : nextStep}
+              disabled={!canProceed() || (step === 4 && submitState?.loading)}
               className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_20px_rgba(183,247,90,0.35)] disabled:opacity-50"
             >
-              {step === 4 ? '실행 준비 완료' : '다음 단계'}
+              {step === 4 ? (submitState?.loading ? '실행 요청 중...' : '실행 요청') : '다음 단계'}
             </button>
           </div>
         </div>

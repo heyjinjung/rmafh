@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react';
-import { withIdempotency } from '../../lib/apiClient';
-
-const mockNotifications = [
-  { id: 'ntf_001', type: 'ALERT', variant: 'EXPIRY', status: 'PENDING', scheduled: '2025-12-26T10:00Z' },
-  { id: 'ntf_002', type: 'REMINDER', variant: 'DEPOSIT', status: 'SENT', scheduled: '2025-12-26T09:00Z' },
-  { id: 'ntf_003', type: 'BROADCAST', variant: 'MAINTENANCE', status: 'FAILED', scheduled: '2025-12-25T22:00Z' },
-];
+import { useEffect, useMemo, useState } from 'react';
+import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
+import { pushToast } from './toastBus';
 
 const typeOptions = ['ALERT', 'REMINDER', 'BROADCAST'];
 const variantOptions = ['EXPIRY', 'DEPOSIT', 'DAILY_IMPORT', 'MAINTENANCE'];
 const targetModes = ['SEGMENT', 'UPLOADED_IDS', 'FILTER_SCOPE'];
 const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED'];
+
+const normalizeNotification = (n) => ({
+  id: n.id || n.notification_id,
+  type: n.type,
+  variant: n.variant || n.template,
+  status: n.status,
+  scheduled: n.scheduled_at || n.scheduled || n.created_at,
+  request_id: n.request_id || n.idempotency_key,
+});
 
 export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [type, setType] = useState('ALERT');
@@ -25,13 +29,35 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
-  const filtered = mockNotifications.filter((n) => {
-    const statusOk = statusFilter === 'ALL' ? true : n.status === statusFilter;
-    const queryOk = query ? n.id.includes(query) || n.variant.includes(query) : true;
-    return statusOk && queryOk;
-  });
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: '20', offset: String((page - 1) * 20) });
+      if (statusFilter !== 'ALL') params.set('status', statusFilter);
+      if (query) params.set('q', query);
+      const resp = await apiFetch(`/api/vault/admin/notifications?${params.toString()}`);
+      const items = resp?.data?.items || resp?.data?.notifications || resp?.data || [];
+      setNotifications(items.map(normalizeNotification));
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setError(info.summary || '목록 불러오기 실패');
+      pushToast({ ok: false, message: info.summary || '목록 불러오기 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, statusFilter, query]);
 
   const submitNotification = async () => {
     const payload = {
@@ -46,14 +72,40 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
       dedupe_key: dedupeKey === 'auto-generate' ? undefined : dedupeKey,
     };
     try {
-      await apiFetch('/api/vault/admin/notify', {
+      setSubmitting(true);
+      const res = await apiFetch('/api/vault/admin/notifications', {
         method: 'POST',
-        body: JSON.stringify(payload),
+        body: payload,
       });
-      alert('알림 생성 요청이 전송되었습니다 (stub).');
+      pushToast({ ok: true, message: '알림 생성 요청 완료', detail: res.idempotencyKey });
+      load();
     } catch (err) {
-      alert(`요청 실패: ${err?.payload || err?.message}`);
+      const info = extractErrorInfo(err);
+      setError(info.summary || '요청 실패');
+      pushToast({ ok: false, message: info.summary || '요청 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setSubmitting(false);
     }
+  };
+
+  const actOnNotification = async (id, action) => {
+    try {
+      const res = await apiFetch(`/api/vault/admin/notifications/${id}/${action}`, { method: 'POST' });
+      pushToast({ ok: true, message: `${action} 요청 완료`, detail: res.idempotencyKey });
+      load();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setError(info.summary || `${action} 실패`);
+      pushToast({ ok: false, message: info.summary || `${action} 실패`, detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    }
+  };
+
+  const downloadCsv = () => {
+    const params = new URLSearchParams();
+    if (statusFilter !== 'ALL') params.set('status', statusFilter);
+    if (query) params.set('q', query);
+    const url = `${basePath || ''}/api/vault/admin/notifications/export?${params.toString()}`;
+    if (typeof window !== 'undefined') window.open(url, '_blank');
   };
 
   return (
@@ -190,9 +242,10 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <button
                 type="button"
                 onClick={submitNotification}
-                className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-2 text-sm font-semibold text-black shadow-[0_0_20px_rgba(183,247,90,0.35)] hover:brightness-105"
+                disabled={submitting}
+                className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-2 text-sm font-semibold text-black shadow-[0_0_20px_rgba(183,247,90,0.35)] hover:brightness-105 disabled:opacity-50"
               >
-                알림 생성 요청
+                {submitting ? '요청 중...' : '알림 생성 요청'}
               </button>
             </div>
           </div>
@@ -205,8 +258,8 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <p className="text-sm text-[var(--v2-text)]">Filters + pagination + retry.</p>
             </div>
             <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
-              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">Refresh</button>
-              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">Download CSV</button>
+              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
+              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={downloadCsv}>Download CSV</button>
             </div>
           </div>
 
@@ -228,6 +281,9 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             </select>
           </div>
 
+          {loading ? <p className="text-sm text-[var(--v2-muted)]">불러오는 중...</p> : null}
+          {error ? <p className="text-sm text-[var(--v2-warning)]">{error}</p> : null}
+
           <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/80">
             <table className="min-w-full table-fixed text-left text-sm">
               <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
@@ -240,7 +296,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--v2-border)]">
-                {filtered.map((n) => (
+                {notifications.map((n) => (
                   <tr key={n.id} className="text-[var(--v2-text)]">
                     <td className="px-3 py-2 font-mono text-xs text-[var(--v2-accent)]">{n.id}</td>
                     <td className="px-3 py-2 text-xs">{n.type} / {n.variant}</td>
@@ -248,12 +304,17 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                     <td className="px-3 py-2 text-xs">{n.scheduled}</td>
                     <td className="px-3 py-2 text-xs">
                       <div className="flex gap-2">
-                        <button className="rounded border border-[var(--v2-border)] px-2 py-1">Retry</button>
-                        <button className="rounded border border-[var(--v2-border)] px-2 py-1">Cancel</button>
+                        <button className="rounded border border-[var(--v2-border)] px-2 py-1" onClick={() => actOnNotification(n.id, 'retry')}>Retry</button>
+                        <button className="rounded border border-[var(--v2-border)] px-2 py-1" onClick={() => actOnNotification(n.id, 'cancel')}>Cancel</button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {notifications.length === 0 ? (
+                  <tr>
+                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={5}>표시할 알림이 없습니다.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -264,7 +325,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <span>Page {page}</span>
               <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => p + 1)}>Next</button>
             </div>
-            <div>표시는 샘플 데이터이며 API 연동 예정</div>
+            <div>Idempotent + 서버 API 연동 완료</div>
           </div>
         </div>
       </div>
