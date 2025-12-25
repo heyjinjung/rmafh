@@ -9,6 +9,7 @@
 
 ## Changelog
 - 2025-12-26: Admin/Job/Idempotency API 추가
+- 2025-12-25: Notifications 예약 발송(scheduled_at) 및 Admin notifications retry/cancel, job items CSV 다운로드 파라미터 반영
 - 2025-12-25: Admin Imports/Users/Audit Logs 경로·파라미터·필드 정오표 반영 (audit-log, page/page_size/order, imports rows/error_report_csv).
 - 2025-12-24: DIAMOND 금고 보상액 70,000원 명시
 - 2025-12-20 v0.2: status 응답에 `platinum_review_done` 반영, PLATINUM 금액 20,000 기준으로 예시/문구 정합화
@@ -114,13 +115,26 @@
 - 아직 미구현(문서 설계만 존재)
 
 ### 4.5 POST /api/vault/notify
-- 설명: 알림 트리거(내부용). 소멸 경고/출석 부족 알림 발송
+- 설명: 알림 큐 적재(내부용). 특정 사용자에게 알림을 enqueue 하며, 필요 시 예약 발송을 위해 `scheduled_at`을 지정할 수 있습니다.
 - Body
 ```json
-{ "type": "EXPIRY_D2" | "ATTENDANCE_D2" | "TICKET_ZERO", "user_ids": [123,124], "variant_id": "A" }
+{
+	"type": "ALERT" | "REMINDER" | "BROADCAST",
+	"variant_id": "EXPIRY" | "DEPOSIT" | "DAILY_IMPORT" | "MAINTENANCE",
+	"scheduled_at": "2025-12-25T12:00:00.000Z",
+	"user_ids": [123, 124],
+	"external_user_ids": ["ext-1001", "ext-1002"]
+}
 ```
-- Validation: type 필수, user_ids 비어있으면 400, 최대 1000명 제한, variant_id는 사전 등록된 값만 허용, 내부 인증 필요
-- Response 202: 비동기 큐 enqueue 결과
+- Notes
+	- `scheduled_at` 미지정 시 서버는 즉시 처리(`now`)로 취급합니다.
+	- `scheduled_at`은 ISO8601 UTC 문자열을 권장합니다(FE는 datetime-local 입력 후 `toISOString()` 전송).
+	- 대상은 `user_ids` 또는 `external_user_ids` 중 하나 이상이 필요합니다.
+	- 서버는 payload 기반 dedupe 정책(및 idempotency key)을 적용할 수 있습니다.
+- Response 200
+```json
+{ "enqueued": 2 }
+```
 
 ### 4.6 POST /api/vault/referral-revive
 - 설명: 만료 D-1 사용자가 친구 초대/특정 액션 수행 시 expires_at을 +24h 연장 (1회 제한)
@@ -161,8 +175,21 @@
 ```
 - GET /api/vault/admin/jobs?status=&type=&page=&page_size=
 - GET /api/vault/admin/jobs/{job_id}
-- GET /api/vault/admin/jobs/{job_id}/items
+- GET /api/vault/admin/jobs/{job_id}/items?format=json|csv&failed_only=true|false&page=&page_size=
+	- `format=json`(기본): 기존과 동일하게 페이지네이션 응답(JSON)
+	- `format=csv`: CSV 파일 다운로드(`Content-Disposition: attachment`), 일반적으로 `failed_only=true`와 함께 사용
 - POST /api/vault/admin/jobs/{job_id}/retry
+
+### 4.12 Admin Notifications (v2)
+- GET /api/vault/admin/notifications
+	- query: status, external_user_id, page, page_size, order
+	- status: PENDING | SENT | FAILED | DLQ | RETRYING | CANCELED
+- POST /api/vault/admin/notifications/{id}/retry
+	- 허용 상태: FAILED, DLQ
+	- 효과: status를 PENDING으로 되돌리고 `scheduled_at=NOW()`로 재큐잉
+- POST /api/vault/admin/notifications/{id}/cancel
+	- 허용 상태: PENDING, RETRYING
+	- 효과: status를 CANCELED로 변경
 
 ### 4.9 Admin Imports (v2)
 - POST /api/vault/admin/imports

@@ -2,13 +2,14 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.2.0
+- 문서 버전: v1.2.1
 - 작성일: 2025-12-25
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
 - 2025-12-25 v1.2.0: Segments 백엔드 영속화(/api/vault/admin/segments) + segment_id 타겟팅 + Operations Extend-expiry 실제 Submit 연동 반영.
+- 2025-12-25 v1.2.1: Notifications 예약 발송(scheduled_at) + retry/cancel 액션 연동, Jobs 실패 아이템 CSV 다운로드 연동 및 배포/롤백 플랜 초안 반영.
 - 2025-12-25 v1.1.0: Users 벌크 타겟(필터/업로드/선택 IDs) → Operations 타겟 연결 및 행 클릭 우측 상세 패널 구현 반영.
 - 2025-12-25 v1.0.9: 프론트엔드 체크리스트(섹션 5) 진행 현황/남은 작업을 실제 구현 기준으로 보강하고 체크박스 정합성 수정.
 - 2025-12-25 v1.0.8: Admin v2 실제 구현 기준으로 문서의 Admin API 경로/파라미터/필드 정오표 반영 (audit-log, page/page_size/order, imports error_report_csv).
@@ -130,15 +131,15 @@
 
 ### 5.7 Notifications UI
 - [x] 알림 생성 폼 (type/variant/대상) + `POST /api/vault/notify`
-- [ ] 예약 발송 입력(scheduled_at) 및 서버 파라미터 연동 (현재 UI disabled)
+- [x] 예약 발송 입력(scheduled_at) 및 서버 파라미터 연동
 - [x] 중복 방지 정책 안내 문구 표시
 - [x] 알림 리스트 필터/페이지네이션 (`GET /api/vault/admin/notifications?page&page_size&order&status&external_user_id`)
-- [ ] 재시도/상태 변경 액션 (현재 미구현; 가능하면 Job retry(`/api/vault/admin/jobs/{id}/retry`)로 연결)
+- [x] 재시도/상태 변경 액션 (`POST /api/vault/admin/notifications/{id}/retry|cancel`)
 
 ### 5.8 Audit & Jobs UI
 - [x] 감사 로그 테이블 + 필터
 - [x] Job 리스트/상세 (리스트 + 상세(처리/실패 수) 병합 표시)
-- [ ] Job 실패 아이템 다운로드 (`GET /api/vault/admin/jobs/{job_id}/items` 연동 + CSV 다운로드)
+- [x] Job 실패 아이템 다운로드 (`GET /api/vault/admin/jobs/{job_id}/items?format=csv&failed_only=true`)
 - [x] Job 재시도 버튼 + 상태 업데이트
 
 ### 5.9 공통 UX
@@ -174,10 +175,42 @@
 ## 8. 보안/운영 체크리스트
 - [ ] ADMIN_PASSWORD 미설정 시 서비스 부팅 차단 여부 검토
 ## 9. 배포/전환 체크리스트
-- [ ] 신규 DB 스키마 배포 계획 수립
-- [ ] 기능 플래그 ON/OFF 롤백 시나리오 작성
-- [ ] `/admin` → `/admin/v2` 전환 일정 공지
+- [x] 신규 DB 스키마 배포 계획 수립
+- [x] 기능 플래그 ON/OFF 롤백 시나리오 작성
 - [ ] 운영자 매뉴얼 배포 및 교육 진행
+
+### 9.1 신규 DB 스키마 배포 계획(초안)
+- 목표: 무중단(또는 최소 다운타임)으로 신규 테이블/인덱스/확장(pg_trgm 등) 반영 후, 기능 플래그로 단계적 노출.
+- 원칙: "Expand → Migrate → Contract"(확장/이행/정리) 순서로 배포.
+- 단계:
+	1) (사전) 현재 운영 DB에 적용될 변경 목록 확정
+		 - 신규 테이블: `admin_segments`, `idempotency_keys`, `admin_jobs`, `admin_job_items`, `admin_audit_log`(컬럼 추가), `notifications_queue`(scheduled_at 포함)
+		 - 인덱스/확장: 사용자 검색/정렬용 인덱스, `pg_trgm`(가능한 경우)
+	2) (배포 1) DB 변경 먼저 적용
+		 - DDL은 별도 스크립트로 실행(권장)하고, 애플리케이션의 `_ensure_schema()`는 "best-effort" 보조 역할로만 사용
+		 - 인덱스 생성은 `CONCURRENTLY` 옵션 사용(가능한 경우) + 트래픽 저점 시간대 수행
+	3) (배포 2) 백엔드 배포
+		 - 신규 엔드포인트는 기능 플래그 OFF 상태에서 배포해도 404/미노출이 되도록 라우팅/UX 보호
+		 - 마이그레이션 직후, 헬스체크 + 핵심 Admin API 스모크(segments/jobs/notifications) 수행
+	4) (배포 3) 프론트엔드 배포
+		 - `/admin/v2` 화면 자체는 배포하되, 기능 플래그로 접근/버튼 활성화 제어
+	5) (검증) 관측 지표
+		 - Admin API 오류율(4xx/5xx), Job 실패율, idempotency 409 비율, notifications 상태 전이(FAILED/DLQ) 분포
+
+### 9.2 기능 플래그 ON/OFF 롤백 시나리오(초안)
+- 플래그 후보:
+	- `ADMIN_V2_ENABLED`: `/admin/v2` 접근/네비게이션 노출
+	- `ADMIN_IDEMPOTENCY_ENABLED`: Admin 변경성 요청에 멱등성 적용 강제(또는 경고 모드)
+- 롤아웃:
+	1) `ADMIN_V2_ENABLED=0`(기본)로 FE/BE 배포
+	2) 내부 운영자만 `ADMIN_V2_ENABLED=1`로 사용(운영 환경에서는 allowlist 또는 별도 배포 슬롯 권장)
+	3) 문제 없으면 점진 확대
+- 롤백(즉시 대응):
+	- UI 문제: `ADMIN_V2_ENABLED=0`으로 즉시 차단 → 기존 `/admin`로 회귀
+	- 멱등성/Job 문제:
+		- 신규 bulk/notify 경로에서 오류 증가 시 해당 버튼/액션을 FE에서 비활성화(또는 `ADMIN_IDEMPOTENCY_ENABLED=0`으로 완화)
+		- job worker 관련 문제는 worker 컨테이너/프로세스만 중지하여 신규 처리만 멈추고, 데이터는 보존
+	- DB 롤백 원칙: 이미 적용된 DDL은 일반적으로 되돌리지 않고(리스크 큼), 플래그 OFF로 기능만 차단 후 원인 분석/핫픽스
 
 ## 10. 최종 승인 체크리스트
 - [ ] FE/BE/OPS 최종 승인
