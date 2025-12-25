@@ -197,13 +197,15 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
     try {
       setSaving(true);
-      await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'PATCH', body: payload });
+      const response = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'PATCH', body: payload });
+      console.log('Update response:', response);
       pushToast({ ok: true, message: '저장 완료' });
       setDrawerOpen(false);
       setPanelMode('none');
       setSelectedRow(null);
       fetchUsers();
     } catch (err) {
+      console.error('Update error:', err);
       const info = extractErrorInfo(err);
       pushToast({ ok: false, message: info.summary || '저장 실패', detail: info.detail || info.code });
     } finally {
