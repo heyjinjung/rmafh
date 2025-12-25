@@ -5,11 +5,9 @@ import { useRouter } from 'next/router';
 import {
   AdminV2Layout,
   AdminV2KpiCards,
-  AdminV2QuickActions,
   AdminV2UsersGrid,
   AdminV2SegmentsPanel,
   AdminV2ImportsFlow,
-  AdminV2OperationsPanel,
   AdminV2NotificationsPanel,
 } from '../../components/admin-v2';
 
@@ -105,8 +103,6 @@ export default function AdminV2Page() {
           </div>
 
           <AdminV2KpiCards adminPassword={adminPassword} basePath={basePath} />
-          <AdminV2QuickActions />
-
           <AdminV2UsersGrid
             adminPassword={adminPassword}
             basePath={basePath}
@@ -116,12 +112,6 @@ export default function AdminV2Page() {
             adminPassword={adminPassword}
             basePath={basePath}
             onSegmentChange={setSegmentTarget}
-          />
-          <AdminV2OperationsPanel
-            adminPassword={adminPassword}
-            basePath={basePath}
-            usersTarget={usersTarget}
-            segmentTarget={segmentTarget}
           />
           <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
           <AdminV2ImportsFlow adminPassword={adminPassword} basePath={basePath} />
