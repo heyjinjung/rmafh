@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import Any, Dict, List
+import hashlib
 import json
+import secrets
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Request
+from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -25,6 +27,12 @@ from app.schemas import (
     AdminUserUpdateRequest,
     AdminUserResponse,
     AdminNotificationsListResponse,
+    AdminJobCreateRequest,
+    AdminJobResponse,
+    AdminJobsListResponse,
+    AdminJobDetailResponse,
+    AdminJobItemsListResponse,
+    AdminJobItem,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
     HealthResponse,
@@ -600,6 +608,74 @@ def _validate_request_id(value: str | None) -> str:
     return request_id
 
 
+def _validate_idempotency_key(value: str | None) -> str:
+    key = _require_non_empty(value, code="IDEMPOTENCY_KEY_REQUIRED")
+    if len(key) > 128:
+        raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
+    return key
+
+
+def _idempotency_scope(request: Request) -> str:
+    return request.client.host if request.client else "unknown"
+
+
+def _hash_request_body(body: Dict[str, Any]) -> str:
+    payload = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash: str) -> Dict[str, Any]:
+    cur.execute(
+        """
+        SELECT request_hash, status, response_status, response_body
+          FROM idempotency_keys
+         WHERE key=%s AND scope=%s AND endpoint=%s
+           AND expires_at > NOW()
+        """,
+        (key, scope, endpoint),
+    )
+    row = cur.fetchone()
+    if row:
+        existing_hash, status, response_status, response_body = row
+        if existing_hash != request_hash:
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_KEY_REUSE")
+        if status == "DONE":
+            return {
+                "status": "replayed",
+                "response_status": int(response_status or 200),
+                "response_body": response_body,
+            }
+        return {"status": "in_progress"}
+
+    cur.execute(
+        """
+        INSERT INTO idempotency_keys
+            (key, scope, endpoint, request_hash, status)
+        VALUES (%s, %s, %s, %s, 'IN_PROGRESS')
+        """,
+        (key, scope, endpoint, request_hash),
+    )
+    return {"status": "recorded"}
+
+
+def _idempotency_finish(cur, *, key: str, scope: str, endpoint: str, response_status: int, response_body: Dict[str, Any]):
+    cur.execute(
+        """
+        UPDATE idempotency_keys
+           SET status='DONE',
+               response_status=%s,
+               response_body=%s,
+               updated_at=NOW()
+         WHERE key=%s AND scope=%s AND endpoint=%s
+        """,
+        (response_status, Json(response_body), key, scope, endpoint),
+    )
+
+
+def _generate_job_id() -> str:
+    return f"job_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(4)}"
+
+
 def _dedupe_int_list(values: list[int] | None, *, max_items: int) -> list[int]:
     out: list[int] = []
     seen: set[int] = set()
@@ -1071,6 +1147,57 @@ def _ensure_schema():
             """
         )
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS idempotency_keys (
+                key TEXT NOT NULL,
+                scope TEXT NOT NULL,
+                endpoint TEXT NOT NULL,
+                request_hash TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'IN_PROGRESS',
+                response_status INTEGER,
+                response_body JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                expires_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '24 hours'),
+                PRIMARY KEY (key, scope, endpoint)
+            );
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_idempotency_expires ON idempotency_keys (expires_at)")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_jobs (
+                job_id TEXT PRIMARY KEY,
+                type TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                request_id TEXT NOT NULL,
+                target_count INTEGER NOT NULL DEFAULT 0,
+                processed INTEGER NOT NULL DEFAULT 0,
+                failed INTEGER NOT NULL DEFAULT 0,
+                payload JSONB,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_jobs_status ON admin_jobs (status)")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_job_items (
+                id BIGSERIAL PRIMARY KEY,
+                job_id TEXT NOT NULL REFERENCES admin_jobs(job_id) ON DELETE CASCADE,
+                user_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'PENDING',
+                error_message TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_job_items_job_id ON admin_job_items (job_id)")
+
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'LOCKED'")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
@@ -1427,6 +1554,323 @@ async def list_notifications(
 
     has_more = (offset + len(items)) < total
     return AdminNotificationsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
+
+
+@app.post("/api/vault/admin/jobs", response_model=AdminJobResponse, status_code=202)
+async def admin_create_job(
+    body: AdminJobCreateRequest,
+    request: Request,
+    response: Response,
+    _auth: str = Depends(verify_admin_password),
+):
+    job_type = (body.type or "").strip().upper()
+    if job_type not in config.ALLOWED_ADMIN_JOB_TYPES:
+        raise HTTPException(status_code=400, detail="INVALID_JOB_TYPE")
+
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/admin/jobs"
+    request_hash = _hash_request_body(body.dict())
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminJobResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        target = body.target
+        user_ids = _dedupe_int_list(list(target.user_ids) if target and target.user_ids else None, max_items=10000)
+        external_user_ids = _dedupe_str_list(list(target.external_user_ids) if target and target.external_user_ids else None, max_items=10000)
+        resolved_user_ids: list[int] = []
+        if user_ids:
+            resolved_user_ids.extend(user_ids)
+        if external_user_ids:
+            resolved_user_ids.extend(_resolve_user_ids_by_external_user_ids(cur, external_user_ids))
+        resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
+        target_count = len(resolved_user_ids)
+
+        job_id = _generate_job_id()
+        payload: Dict[str, Any] = {
+            "type": job_type,
+            "target": target.dict(exclude_none=True) if target else {},
+            "payload": body.payload or {},
+            "dry_run": bool(body.dry_run),
+        }
+
+        cur.execute(
+            """
+            INSERT INTO admin_jobs
+                (job_id, type, status, request_id, target_count, payload, created_at, updated_at)
+            VALUES (%s, %s, 'PENDING', %s, %s, %s, NOW(), NOW())
+            """,
+            (job_id, job_type, key, target_count, Json(payload)),
+        )
+
+        if resolved_user_ids:
+            execute_values(
+                cur,
+                """
+                INSERT INTO admin_job_items (job_id, user_id, status)
+                VALUES %s
+                """,
+                [(job_id, uid, "PENDING") for uid in resolved_user_ids],
+                template="(%s,%s,%s)",
+            )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_JOB_CREATE",
+            endpoint=endpoint,
+            target_user_ids=resolved_user_ids[:1000],
+            request_id=key,
+            request_body=payload,
+            response_status="SUCCESS",
+            response_summary={"job_id": job_id, "target_count": target_count},
+        )
+
+        response_body = {
+            "job_id": job_id,
+            "type": job_type,
+            "status": "PENDING",
+            "request_id": key,
+            "target_count": target_count,
+        }
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=202,
+            response_body=response_body,
+        )
+        conn.commit()
+
+    response.headers["Idempotency-Status"] = "recorded"
+    return AdminJobResponse(**response_body)
+
+
+@app.get("/api/vault/admin/jobs", response_model=AdminJobsListResponse)
+async def list_admin_jobs(
+    status: str | None = None,
+    type: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    order: str = "desc",
+    _auth: str = Depends(verify_admin_password),
+):
+    allowed_status = {"PENDING", "RUNNING", "DONE", "FAILED", "CANCELED"}
+    if status and status not in allowed_status:
+        raise HTTPException(status_code=400, detail="INVALID_STATUS")
+    if type and type not in config.ALLOWED_ADMIN_JOB_TYPES:
+        raise HTTPException(status_code=400, detail="INVALID_JOB_TYPE")
+
+    page = 1 if page < 1 else page
+    page_size = 1 if page_size < 1 else page_size
+    page_size = 200 if page_size > 200 else page_size
+    offset = (page - 1) * page_size
+    order_sql = "DESC" if order.lower() != "asc" else "ASC"
+
+    conditions: list[str] = []
+    params: list = []
+    if status:
+        conditions.append("status=%s")
+        params.append(status)
+    if type:
+        conditions.append("type=%s")
+        params.append(type)
+
+    where_sql = ""
+    if conditions:
+        where_sql = " WHERE " + " AND ".join(conditions)
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT COUNT(*) FROM admin_jobs {where_sql}", tuple(params))
+        total = int(cur.fetchone()[0])
+        cur.execute(
+            f"""
+            SELECT job_id, type, status, request_id, target_count
+              FROM admin_jobs
+              {where_sql}
+          ORDER BY created_at {order_sql}
+             LIMIT %s OFFSET %s
+            """,
+            tuple(params + [page_size, offset]),
+        )
+        rows = cur.fetchall() or []
+
+    items = [
+        {
+            "job_id": row[0],
+            "type": row[1],
+            "status": row[2],
+            "request_id": row[3],
+            "target_count": int(row[4] or 0),
+        }
+        for row in rows
+    ]
+    has_more = (offset + len(items)) < total
+    return AdminJobsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
+
+
+@app.get("/api/vault/admin/jobs/{job_id}", response_model=AdminJobDetailResponse)
+async def get_admin_job(job_id: str, _auth: str = Depends(verify_admin_password)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT job_id, type, status, request_id, target_count, processed, failed, payload, created_at, updated_at
+              FROM admin_jobs
+             WHERE job_id=%s
+            """,
+            (job_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+
+    return AdminJobDetailResponse(
+        job_id=row[0],
+        type=row[1],
+        status=row[2],
+        request_id=row[3],
+        target_count=int(row[4] or 0),
+        processed=int(row[5] or 0),
+        failed=int(row[6] or 0),
+        payload=row[7],
+        created_at=row[8].isoformat() if row[8] else None,
+        updated_at=row[9].isoformat() if row[9] else None,
+    )
+
+
+@app.get("/api/vault/admin/jobs/{job_id}/items", response_model=AdminJobItemsListResponse)
+async def list_admin_job_items(
+    job_id: str,
+    page: int = 1,
+    page_size: int = 50,
+    _auth: str = Depends(verify_admin_password),
+):
+    page = 1 if page < 1 else page
+    page_size = 1 if page_size < 1 else page_size
+    page_size = 200 if page_size > 200 else page_size
+    offset = (page - 1) * page_size
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT 1 FROM admin_jobs WHERE job_id=%s", (job_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+
+        cur.execute(
+            "SELECT COUNT(*) FROM admin_job_items WHERE job_id=%s",
+            (job_id,),
+        )
+        total = int(cur.fetchone()[0])
+        cur.execute(
+            """
+            SELECT id, job_id, user_id, status, error_message, created_at
+              FROM admin_job_items
+             WHERE job_id=%s
+          ORDER BY id ASC
+             LIMIT %s OFFSET %s
+            """,
+            (job_id, page_size, offset),
+        )
+        rows = cur.fetchall() or []
+
+    items = [
+        {
+            "job_item_id": row[0],
+            "job_id": row[1],
+            "user_id": int(row[2]),
+            "status": row[3],
+            "error_message": row[4],
+            "created_at": row[5].isoformat() if row[5] else None,
+        }
+        for row in rows
+    ]
+    has_more = (offset + len(items)) < total
+    return AdminJobItemsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
+
+
+@app.post("/api/vault/admin/jobs/{job_id}/retry", response_model=AdminJobDetailResponse)
+async def retry_admin_job(job_id: str, request: Request, _auth: str = Depends(verify_admin_password)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT status FROM admin_jobs WHERE job_id=%s", (job_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+        status = row[0]
+        if status not in {"FAILED", "CANCELED"}:
+            raise HTTPException(status_code=409, detail="JOB_INVALID_STATE")
+
+        cur.execute(
+            """
+            UPDATE admin_jobs
+               SET status='PENDING',
+                   updated_at=NOW()
+             WHERE job_id=%s
+            """,
+            (job_id,),
+        )
+        cur.execute(
+            """
+            UPDATE admin_job_items
+               SET status='PENDING',
+                   error_message=NULL
+             WHERE job_id=%s AND status='FAILED'
+            """,
+            (job_id,),
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_JOB_RETRY",
+            endpoint=f"/api/vault/admin/jobs/{job_id}/retry",
+            target_user_ids=None,
+            request_id=None,
+            request_body={"job_id": job_id},
+            response_status="SUCCESS",
+            response_summary={"job_id": job_id, "status": "PENDING"},
+        )
+        conn.commit()
+
+        cur.execute(
+            """
+            SELECT job_id, type, status, request_id, target_count, processed, failed, payload, created_at, updated_at
+              FROM admin_jobs
+             WHERE job_id=%s
+            """,
+            (job_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
+
+    return AdminJobDetailResponse(
+        job_id=row[0],
+        type=row[1],
+        status=row[2],
+        request_id=row[3],
+        target_count=int(row[4] or 0),
+        processed=int(row[5] or 0),
+        failed=int(row[6] or 0),
+        payload=row[7],
+        created_at=row[8].isoformat() if row[8] else None,
+        updated_at=row[9].isoformat() if row[9] else None,
+    )
 
 
 @app.get("/api/vault/admin/users")

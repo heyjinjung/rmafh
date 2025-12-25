@@ -8,6 +8,7 @@
 - 범위: 금고 상태 조회/수령, 출석, 입금 훅, 알림 트리거
 
 ## Changelog
+- 2025-12-26: Admin/Job/Idempotency API 추가
 - 2025-12-24: DIAMOND 금고 보상액 70,000원 명시
 - 2025-12-20 v0.2: status 응답에 `platinum_review_done` 반영, PLATINUM 금액 20,000 기준으로 예시/문구 정합화
 
@@ -27,6 +28,7 @@
 - 금액: amount는 정수(원), 0보다 커야 함 → 아니면 400 INVALID_AMOUNT
 - 날짜: occurred_at ISO8601 UTC, 미래 시각 5분 초과시 400 INVALID_TIMESTAMP
 - idempotency: tx_id는 per user 고유, 중복 시 409 DUPLICATE_TX
+- admin idempotency: POST/PATCH/DELETE requires X-Idempotency-Key, reuse returns 409 IDEMPOTENCY_KEY_REUSE
 - 출석: 하루 1회, 서버 기준 일자 중복 시 409 DUPLICATE_ATTENDANCE
 - 만료: expires_at 지난 후 상태 변경 요청은 403 EXPIRED
 - 요청 상관관계: request_id(X-Request-Id) 헤더/바디는 멱등키, 중복 시 409 DUPLICATE_REQUEST
@@ -142,6 +144,48 @@
 	- 200 (shadow=false): {"updated": 1200, "new_expires_at": "..."}
 	- 200 (shadow=true): {"shadow": true, "candidates": 1400, "sample_user_ids": [1,2,3]}
 
+### 4.8 Admin Jobs (v2)
+- POST /api/vault/admin/jobs
+```json
+{
+  "type": "EXTEND_EXPIRY | BULK_UPDATE | NOTIFY | DAILY_IMPORT",
+  "target": { "user_ids": [1,2], "external_user_ids": ["ext-1"] },
+  "payload": { "extend_hours": 24, "reason": "OPS" },
+  "dry_run": false
+}
+```
+- Response 202
+```json
+{ "job_id": "job_20251226_001", "status": "PENDING", "request_id": "req-123" }
+```
+- GET /api/vault/admin/jobs?status=&type=&page=&page_size=
+- GET /api/vault/admin/jobs/{job_id}
+- GET /api/vault/admin/jobs/{job_id}/items
+- POST /api/vault/admin/jobs/{job_id}/retry
+
+### 4.9 Admin Imports (v2)
+- POST /api/vault/admin/imports
+```json
+{ "mode": "shadow" | "apply", "raw_rows": [ ... ] }
+```
+- Response 202
+```json
+{ "job_id": "job_20251226_002", "preview": [], "error_report_url": "..." }
+```
+
+### 4.10 Admin Users (v2)
+- GET /api/vault/admin/users
+```
+query: q, status_gold, status_platinum, status_diamond,
+       expires_from, expires_to, deposit_min, deposit_max,
+       attendance_min, attendance_max, telegram_ok, review_ok,
+       sort, cursor, limit
+```
+- GET /api/vault/admin/users/{user_id}
+
+### 4.11 Admin Audit Logs (v2)
+- GET /api/vault/admin/audit-logs?action=&request_id=&admin_user=&from=&to=&status=
+
 ## 5. 에러 포맷
 ```json
 { "error": { "code": "INVALID_STATE", "message": "Platinum already claimed" } }
@@ -159,6 +203,11 @@
 | DUPLICATE_ATTENDANCE | 409 | 동일 일자 출석 중복 | attendance |
 | DUPLICATE_TX | 409 | tx_id 중복 | deposit-hook |
 | DUPLICATE_REQUEST | 409 | request_id 재사용 | claim · referral-revive · extend-expiry |
+| IDEMPOTENCY_KEY_REUSE | 409 | idempotency key reuse | admin ops |
+| IDEMPOTENCY_IN_PROGRESS | 409 | idempotency in progress | admin ops |
+| IDEMPOTENCY_KEY_REQUIRED | 400 | idempotency key required | admin ops |
+| INVALID_IDEMPOTENCY_KEY | 400 | idempotency key invalid | admin ops |
+| JOB_NOT_FOUND | 404 | job not found | admin jobs |
 | ALREADY_CLAIMED | 409 | 이미 수령 완료 | claim |
 | EXTENSION_LIMIT | 409 | 허용 연장 횟수 초과 | referral-revive · extend-expiry |
 | EXTENSION_FORBIDDEN | 403 | 만료/비대상 구간에서 연장 요청 | referral-revive |

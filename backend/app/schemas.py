@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class ClaimRequest(BaseModel):
@@ -188,3 +188,62 @@ class UserLoginResponse(BaseModel):
     external_user_id: str
     nickname: str
     user_id: int
+
+
+class AdminJobTarget(BaseModel):
+    user_ids: Optional[List[int]] = None
+    external_user_ids: Optional[List[str]] = None
+    segment_id: Optional[str] = None
+
+
+class AdminJobCreateRequest(BaseModel):
+    type: str
+    target: Optional[AdminJobTarget] = None
+    payload: Optional[Dict[str, Any]] = None
+    dry_run: Optional[bool] = False
+
+
+class AdminJobResponse(BaseModel):
+    job_id: str
+    type: Optional[str] = None
+    status: str
+    request_id: str
+    target_count: int
+
+
+class AdminJobItem(BaseModel):
+    job_item_id: int
+    job_id: str
+    user_id: int
+    status: str
+    error_message: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class AdminJobsListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+    items: List[AdminJobResponse]
+
+
+class AdminJobDetailResponse(BaseModel):
+    job_id: str
+    type: str
+    status: str
+    request_id: str
+    target_count: int
+    processed: int
+    failed: int
+    payload: Optional[Dict[str, Any]] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AdminJobItemsListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+    items: List[AdminJobItem]
