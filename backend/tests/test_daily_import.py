@@ -1,3 +1,10 @@
+from uuid import uuid4
+
+
+def _idem_headers():
+    return {"x-idempotency-key": f"test-import-{uuid4()}"}
+
+
 def test_daily_import_unlocks_gold_and_diamond(client):
     body = {
         "rows": [
@@ -12,7 +19,7 @@ def test_daily_import_unlocks_gold_and_diamond(client):
         ]
     }
 
-    resp = client.post("/api/vault/user-daily-import", json=body)
+    resp = client.post("/api/vault/user-daily-import", json=body, headers=_idem_headers())
     assert resp.status_code == 200
     data = resp.json()
     assert data.get("processed") == 1
@@ -43,6 +50,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
                 }
             ]
         },
+        headers=_idem_headers(),
     )
     assert resp.status_code == 200
 
@@ -64,6 +72,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
                 }
             ]
         },
+        headers=_idem_headers(),
     )
     assert resp.status_code == 200
 
@@ -85,6 +94,7 @@ def test_daily_import_unlocks_platinum_after_three_days_and_review(client):
                 }
             ]
         },
+        headers=_idem_headers(),
     )
     assert resp.status_code == 200
 

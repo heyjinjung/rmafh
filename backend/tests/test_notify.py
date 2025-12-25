@@ -1,4 +1,9 @@
 from datetime import datetime, timezone
+from uuid import uuid4
+
+
+def _idem_headers():
+    return {"x-idempotency-key": f"test-notify-{uuid4()}"}
 
 
 def test_notify_enqueues(client, db_conn):
@@ -17,7 +22,7 @@ def test_notify_enqueues(client, db_conn):
     db_conn.commit()
 
     body = {"type": "EXPIRY_D2", "external_user_ids": ["ext-1101", "ext-1102"], "variant_id": "A"}
-    resp = client.post("/api/vault/notify", json=body)
+    resp = client.post("/api/vault/notify", json=body, headers=_idem_headers())
     assert resp.status_code == 200
     data = resp.json()
     assert data.get("enqueued", 0) >= 1
@@ -27,7 +32,7 @@ def test_notify_enqueues(client, db_conn):
     assert count == data.get("enqueued")
 
     # dedup same day should not double insert
-    resp_dup = client.post("/api/vault/notify", json=body)
+    resp_dup = client.post("/api/vault/notify", json=body, headers=_idem_headers())
     assert resp_dup.status_code == 200
     cur.execute("SELECT COUNT(*) FROM notifications_queue WHERE type='EXPIRY_D2'")
     count_after_dup = cur.fetchone()[0]

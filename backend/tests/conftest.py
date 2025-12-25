@@ -90,6 +90,10 @@ def _reset_db_state(db_url):
             # Use DELETE instead of TRUNCATE to avoid lock contention with app pool connections.
             cur.execute("DELETE FROM notifications_queue")
             cur.execute("DELETE FROM compensation_queue")
+            cur.execute("DELETE FROM admin_job_items")
+            cur.execute("DELETE FROM admin_jobs")
+            cur.execute("DELETE FROM admin_audit_log")
+            cur.execute("DELETE FROM idempotency_keys")
             cur.execute("DELETE FROM vault_expiry_extension_log")
             cur.execute("DELETE FROM user_admin_snapshot")
             cur.execute("DELETE FROM vault_status")
@@ -99,6 +103,7 @@ def _reset_db_state(db_url):
             cur.execute("ALTER SEQUENCE notifications_queue_id_seq RESTART WITH 1")
             cur.execute("ALTER SEQUENCE compensation_queue_id_seq RESTART WITH 1")
             cur.execute("ALTER SEQUENCE vault_expiry_extension_log_id_seq RESTART WITH 1")
+            cur.execute("ALTER SEQUENCE admin_job_items_id_seq RESTART WITH 1")
     except psycopg2.Error as exc:  # pragma: no cover
         conn.close()
         pytest.skip(f"database reset skipped (DB busy/locked): {exc}")
