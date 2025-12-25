@@ -33,8 +33,6 @@ const variantLabel = (v) => {
 
 const statusLabel = (s) => {
   switch (s) {
-    case 'ALL':
-      return '전체';
     case 'PENDING':
       return '대기';
     case 'SENT':
@@ -43,23 +41,10 @@ const statusLabel = (s) => {
       return '실패';
     case 'DLQ':
       return 'DLQ';
-    case 'RETRYING':
-      return '재시도 중';
-    case 'CANCELED':
-      return '취소됨';
     default:
       return String(s || '');
   }
 };
-
-const normalizeNotification = (n) => ({
-  id: n.id,
-  type: n.type,
-  variant_id: n.variant_id,
-  status: n.status,
-  scheduled_at: n.scheduled_at,
-  created_at: n.created_at,
-});
 
 export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [type, setType] = useState('ALERT');
@@ -78,10 +63,11 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     try {
       const params = new URLSearchParams({ page: '1', page_size: '10', order: 'desc' });
       const resp = await apiFetch(`/api/vault/admin/notifications?${params.toString()}`);
-      const items = resp?.data?.items || [];
-      setNotifications(items.map(normalizeNotification));
+      const items = Array.isArray(resp?.items) ? resp.items : [];
+      setNotifications(items);
     } catch (err) {
       setError('알림 목록 불러오기 실패');
+      console.error('Load notifications error:', err);
     } finally {
       setLoading(false);
     }
@@ -89,19 +75,25 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const submitNotification = async () => {
     try {
       setSubmitting(true);
       setError(null);
-      const rawTargets = String(targetText || '')
-        .split(/[,\s]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (!rawTargets.length) {
-        setError('대상 아이디를 입력해주세요.');
+
+      if (!targetText.trim()) {
+        setError('대상을 입력하세요.');
+        return;
+      }
+
+      const rawTargets = targetText
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+
+      if (rawTargets.length === 0) {
+        setError('올바른 대상을 입력하세요.');
         return;
       }
 
@@ -138,32 +130,32 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   return (
     <div className="rounded-2xl border bg-white p-5" id="notifications">
       <h2 className="text-lg font-bold mb-4">알림 보내기</h2>
-      <form className="space-y-4" onSubmit={e => {e.preventDefault();submitNotification();}}>
+      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submitNotification(); }}>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="block text-xs font-semibold mb-1">알림 유형</label>
-            <select className="w-full rounded border px-3 py-2" value={type} onChange={e=>setType(e.target.value)}>
+            <select className="w-full rounded border px-3 py-2" value={type} onChange={(e) => setType(e.target.value)}>
               {typeOptions.map(opt => <option key={opt} value={opt}>{typeLabel(opt)}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold mb-1">분류</label>
-            <select className="w-full rounded border px-3 py-2" value={variant} onChange={e=>setVariant(e.target.value)}>
+            <select className="w-full rounded border px-3 py-2" value={variant} onChange={(e) => setVariant(e.target.value)}>
               {variantOptions.map(opt => <option key={opt} value={opt}>{variantLabel(opt)}</option>)}
             </select>
           </div>
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">예약 시간</label>
-          <input type="datetime-local" className="w-full rounded border px-3 py-2" value={scheduledAtLocal} onChange={e=>setScheduledAtLocal(e.target.value)} />
+          <input type="datetime-local" className="w-full rounded border px-3 py-2" value={scheduledAtLocal} onChange={(e) => setScheduledAtLocal(e.target.value)} />
         </div>
         <div>
           <label className="block text-xs font-semibold mb-1">대상(외부 사용자 ID)</label>
-          <input placeholder="예: ext-1001, ext-1002" className="w-full rounded border px-3 py-2" value={targetText} onChange={e=>setTargetText(e.target.value)} />
+          <input placeholder="예: ext-1001, ext-1002" className="w-full rounded border px-3 py-2" value={targetText} onChange={(e) => setTargetText(e.target.value)} />
         </div>
         <div className="flex gap-2">
-          <button type="reset" className="rounded bg-gray-200 px-4 py-2 font-semibold" onClick={()=>setTargetText('')}>초기화</button>
-          <button type="submit" className="rounded bg-blue-600 text-white px-4 py-2 font-semibold" disabled={submitting}>{submitting?'요청 중...':'알림 보내기'}</button>
+          <button type="reset" className="rounded bg-gray-200 px-4 py-2 font-semibold" onClick={() => setTargetText('')}>초기화</button>
+          <button type="submit" className="rounded bg-blue-600 text-white px-4 py-2 font-semibold" disabled={submitting}>{submitting ? '요청 중...' : '알림 보내기'}</button>
         </div>
         {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
       </form>
@@ -173,15 +165,15 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
       <table className="min-w-full text-sm">
         <thead>
           <tr>
-            <th className="px-2 py-1">ID</th>
-            <th className="px-2 py-1">유형</th>
-            <th className="px-2 py-1">분류</th>
-            <th className="px-2 py-1">상태</th>
-            <th className="px-2 py-1">예약/생성</th>
+            <th className="px-2 py-1 text-left">ID</th>
+            <th className="px-2 py-1 text-left">유형</th>
+            <th className="px-2 py-1 text-left">분류</th>
+            <th className="px-2 py-1 text-left">상태</th>
+            <th className="px-2 py-1 text-left">예약/생성</th>
           </tr>
         </thead>
         <tbody>
-          {notifications.slice(0,10).map(n=>(
+          {notifications.slice(0, 10).map(n => (
             <tr key={n.id}>
               <td className="px-2 py-1 font-mono text-xs text-blue-600">{n.id}</td>
               <td className="px-2 py-1 text-xs">{typeLabel(n.type)}</td>
