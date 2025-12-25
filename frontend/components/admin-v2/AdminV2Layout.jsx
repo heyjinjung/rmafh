@@ -57,7 +57,8 @@ export default function AdminV2Layout({ active = 'dashboard', children }) {
             backgroundSize: '32px 32px',
           }}
         />
-        <div className="relative z-10 flex min-h-screen">
+        <div className="relative z-10 flex min-h-screen flex-row-reverse">
+          <AdminV2ContextPanel />
           <AdminV2Sidebar active={active} />
           <div className="flex min-h-screen flex-1 flex-col">
             <AdminV2TopBar />

@@ -1,6 +1,6 @@
 export default function AdminV2ContextPanel() {
   return (
-    <aside className="hidden w-[320px] shrink-0 border-l border-[var(--v2-border)] bg-[var(--v2-surface)]/90 p-6 xl:block">
+    <aside className="hidden w-[320px] shrink-0 border-r border-[var(--v2-border)] bg-[var(--v2-surface)]/90 p-6 xl:block">
       <div className="sticky top-0 space-y-6">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">빠른 메뉴</p>
