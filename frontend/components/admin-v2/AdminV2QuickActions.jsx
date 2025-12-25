@@ -1,7 +1,7 @@
 const actions = [
-  { title: 'Extend Expiry', desc: 'Shadow preview + apply', tone: 'accent' },
-  { title: 'Bulk Update', desc: 'Statuses & flags', tone: 'neutral' },
-  { title: 'Notify', desc: 'Queue with dedup', tone: 'neutral' },
+  { title: '만료 연장', desc: 'Shadow 미리보기 + 적용', tone: 'accent' },
+  { title: '일괄 업데이트', desc: '상태/플래그 변경', tone: 'neutral' },
+  { title: '알림 발송', desc: '중복 제거 후 큐 적재', tone: 'neutral' },
 ];
 
 export default function AdminV2QuickActions() {
@@ -9,11 +9,11 @@ export default function AdminV2QuickActions() {
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Quick Actions</p>
-          <p className="mt-2 text-sm text-[var(--v2-text)]">Launch common admin workflows.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">빠른 작업</p>
+          <p className="mt-2 text-sm text-[var(--v2-text)]">자주 쓰는 운영 작업을 빠르게 실행합니다.</p>
         </div>
         <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">
-          Shortcuts
+          바로가기
         </span>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">

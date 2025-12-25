@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { withIdempotency } from '../../lib/apiClient';
 
 const fallbackCards = [
-  { label: 'Jobs (24h)', value: '-', delta: '' },
-  { label: 'Notifications (24h)', value: '-', delta: '' },
-  { label: 'Failed Jobs', value: '-', delta: '' },
+  { kind: 'jobs', label: '작업(24시간)', value: '-', delta: '' },
+  { kind: 'notifications', label: '알림(24시간)', value: '-', delta: '' },
+  { kind: 'failed', label: '실패 작업', value: '-', delta: '' },
 ];
 
 export default function AdminV2KpiCards({ adminPassword, basePath }) {
@@ -40,9 +40,9 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
         const failedJobs = jobs.filter((j) => String(j.status || '').toUpperCase() === 'FAILED').length;
         const imports = jobs.filter((j) => String(j.type || '').toUpperCase().includes('IMPORT')).length;
         const cardsData = [
-          { label: 'Jobs (recent)', value: jobs.length ? jobs.length.toString() : '0', delta: '' },
-          { label: 'Notifications (recent)', value: notifications.length ? notifications.length.toString() : '0', delta: '' },
-          { label: 'Failed Jobs', value: failedJobs.toString(), delta: imports ? `${imports} imports` : '' },
+          { kind: 'jobs', label: '작업(최근)', value: jobs.length ? jobs.length.toString() : '0', delta: '' },
+          { kind: 'notifications', label: '알림(최근)', value: notifications.length ? notifications.length.toString() : '0', delta: '' },
+          { kind: 'failed', label: '실패 작업', value: failedJobs.toString(), delta: imports ? `가져오기 ${imports}건` : '' },
         ];
         if (!cancelled) {
           setCards(cardsData);
@@ -78,7 +78,7 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map((card) => (
           <div
-            key={card.label}
+            key={card.kind || card.label}
             className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-5 shadow-[0_20px_60px_rgba(0,0,0,0.25)]"
           >
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">{card.label}</p>
@@ -87,20 +87,20 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
               <span className="text-xs text-[var(--v2-accent)]">{card.delta}</span>
             </div>
 
-            {card.label.startsWith('Jobs') ? (
+            {card.kind === 'jobs' ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                {renderBadge('PENDING', badges.jobs.PENDING || 0)}
-                {renderBadge('RUNNING', badges.jobs.RUNNING || 0)}
-                {renderBadge('DONE', badges.jobs.DONE || 0)}
-                {renderBadge('FAILED', badges.jobs.FAILED || 0)}
+                {renderBadge('대기', badges.jobs.PENDING || 0)}
+                {renderBadge('진행', badges.jobs.RUNNING || 0)}
+                {renderBadge('완료', badges.jobs.DONE || 0)}
+                {renderBadge('실패', badges.jobs.FAILED || 0)}
               </div>
             ) : null}
 
-            {card.label.startsWith('Notifications') ? (
+            {card.kind === 'notifications' ? (
               <div className="mt-3 flex flex-wrap gap-2">
-                {renderBadge('PENDING', badges.notifications.PENDING || 0)}
-                {renderBadge('SENT', badges.notifications.SENT || 0)}
-                {renderBadge('FAILED', badges.notifications.FAILED || 0)}
+                {renderBadge('대기', badges.notifications.PENDING || 0)}
+                {renderBadge('전송됨', badges.notifications.SENT || 0)}
+                {renderBadge('실패', badges.notifications.FAILED || 0)}
                 {renderBadge('DLQ', badges.notifications.DLQ || 0)}
               </div>
             ) : null}
@@ -110,17 +110,17 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
 
       <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
         <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Recent Audit (5)</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">최근 감사 로그(5)</p>
           <span className="text-xs text-[var(--v2-muted)]">/api/vault/admin/audit-log</span>
         </div>
         <div className="mt-3 overflow-hidden rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)]">
           <table className="min-w-full table-fixed text-left text-xs">
             <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
               <tr>
-                <th className="px-3 py-2">At</th>
-                <th className="px-3 py-2">Action</th>
-                <th className="px-3 py-2">Endpoint</th>
-                <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">시간</th>
+                <th className="px-3 py-2">액션</th>
+                <th className="px-3 py-2">엔드포인트</th>
+                <th className="px-3 py-2">상태</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">

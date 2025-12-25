@@ -57,7 +57,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
       if (!res.ok) {
         const contentType = res.headers.get('content-type') || '';
         const payload = contentType.includes('application/json') ? await res.json() : await res.text();
-        const err = new Error('Download failed');
+        const err = new Error('다운로드 실패');
         err.status = res.status;
         err.payload = payload;
         err.parsed = typeof payload === 'object' ? payload : undefined;
@@ -164,12 +164,12 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="audit-jobs">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Audit & Jobs</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">Audit trails, job status, retry, and failure downloads.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">감사/작업</p>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">감사 로그, 작업 상태, 재시도, 실패 CSV 다운로드.</p>
         </div>
         <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
-          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
-          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">Export Audit</button>
+          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>새로고침</button>
+          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">감사 내보내기</button>
         </div>
       </div>
 
@@ -185,7 +185,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Jobs</p>
-              <p className="text-sm text-[var(--v2-text)]">Progress, failures, retry hooks.</p>
+              <p className="text-sm text-[var(--v2-text)]">진행률/실패/재시도</p>
             </div>
             <select
               value={jobFilter}
@@ -209,11 +209,11 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm text-[var(--v2-text)]">
                     <span className="font-mono text-[var(--v2-accent)]">{job.id}</span>
-                    <span className="text-xs text-[var(--v2-muted)]">{job.targets.toLocaleString()} targets</span>
+                    <span className="text-xs text-[var(--v2-muted)]">대상 {job.targets.toLocaleString()}명</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-xs text-[var(--v2-muted)]">
-                    <span>processed {job.processed ?? 0} · failed {job.failed ?? 0}</span>
-                    <span>{job.created_at || 'queued'}</span>
+                    <span>처리 {job.processed ?? 0} · 실패 {job.failed ?? 0}</span>
+                    <span>{job.created_at || '대기'}</span>
                   </div>
                   <div className="mt-2 h-2 rounded-full bg-[var(--v2-border)]">
                     <div
@@ -222,15 +222,15 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
-                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => retryJob(job.id)}>Retry</button>
-                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
+                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => retryJob(job.id)}>재시도</button>
+                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>새로고침</button>
                     <button
                       className="rounded border border-[var(--v2-border)] px-3 py-1 disabled:opacity-40"
                       disabled={!canDownloadFailures}
                       onClick={() => downloadFailedItemsCsv(job.id)}
                       title={canDownloadFailures ? '실패 아이템 CSV 다운로드' : '실패 아이템이 없습니다'}
                     >
-                      Download failures CSV
+                      실패 CSV 다운로드
                     </button>
                   </div>
                 </div>
@@ -245,14 +245,14 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Audit Log</p>
-              <p className="text-sm text-[var(--v2-text)]">Filter by request_id/actor/status.</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">감사 로그</p>
+              <p className="text-sm text-[var(--v2-text)]">request_id/담당자/상태로 필터링</p>
             </div>
             <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
               <input
                 value={auditQuery}
                 onChange={(e) => setAuditQuery(e.target.value)}
-                placeholder="request_id / target"
+                placeholder="request_id / 검색어"
                 className="w-[150px] rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-2 py-1 text-xs text-[var(--v2-text)]"
               />
               <select
@@ -271,11 +271,11 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
             <table className="min-w-full table-fixed text-left text-xs">
               <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
                 <tr>
-                  <th className="px-3 py-2">Request</th>
-                  <th className="px-3 py-2">Action/Target</th>
-                  <th className="px-3 py-2">Actor</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">At</th>
+                  <th className="px-3 py-2">요청</th>
+                  <th className="px-3 py-2">액션/대상</th>
+                  <th className="px-3 py-2">담당자</th>
+                  <th className="px-3 py-2">상태</th>
+                  <th className="px-3 py-2">시간</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">
@@ -298,7 +298,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-[var(--v2-muted)]">
             <span>request_id / idempotency 키 추적용</span>
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>Reload</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>다시 불러오기</button>
           </div>
         </div>
       </div>

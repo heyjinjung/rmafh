@@ -43,7 +43,7 @@ export default function AdminV2Page() {
   return (
     <>
       <Head>
-        <title>Vault Admin v2</title>
+        <title>Vault 어드민 v2</title>
       </Head>
       <AdminV2Layout active="dashboard">
         <section className="space-y-6">
@@ -69,19 +69,19 @@ export default function AdminV2Page() {
 
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Overview</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">개요</p>
               <h2 className="mt-2 font-ibm text-3xl font-semibold text-[var(--v2-text)]">
-                Operations Command
+                운영 컨트롤
               </h2>
               <p className="mt-2 text-sm text-[var(--v2-muted)]">
-                Consolidated view for high-volume admin tasks and audit trails.
+                대량 운영 작업과 감사 로그를 한 화면에서 처리합니다.
               </p>
             </div>
             <button
               type="button"
               className="rounded-full border border-[var(--v2-border)] px-4 py-2 text-xs text-[var(--v2-muted)]"
             >
-              Save View
+              뷰 저장
             </button>
           </div>
 
@@ -111,7 +111,7 @@ export default function AdminV2Page() {
             <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Idempotent Client</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">멱등 클라이언트</p>
                   <p className="mt-1 text-sm text-[var(--v2-text)]">
                     withIdempotency 래퍼로 공통 API 호출 + 헤더 세팅 예시.
                   </p>
@@ -120,7 +120,7 @@ export default function AdminV2Page() {
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-[1.2fr_1fr]">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Admin Password</label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">관리자 비밀번호</label>
                   <input
                     type="password"
                     value={adminPassword}
