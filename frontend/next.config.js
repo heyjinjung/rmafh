@@ -7,7 +7,6 @@ const normalizedBasePath = rawBasePath
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
-  trailingSlash: true,
   ...(normalizedBasePath ? { basePath: normalizedBasePath, assetPrefix: normalizedBasePath } : {}),
 };
 
