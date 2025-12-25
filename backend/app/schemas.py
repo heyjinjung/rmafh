@@ -180,6 +180,29 @@ class DailyUserImportResponse(BaseModel):
     vault_rows_updated: int
 
 
+class AdminImportError(BaseModel):
+    row_index: int
+    external_user_id: Optional[str] = None
+    code: str
+    detail: Optional[str] = None
+
+
+class AdminImportRequest(BaseModel):
+    mode: Optional[str] = Field("APPLY", description="APPLY | SHADOW")
+    rows: List[DailyUserImportRow]
+
+
+class AdminImportResponse(BaseModel):
+    shadow: bool
+    total: int
+    processed: int
+    identity_created: int
+    vault_rows_updated: int
+    dedup_removed: int
+    errors: List[AdminImportError] = Field(default_factory=list)
+    job_ids: Optional[List[str]] = None
+
+
 class UserLoginRequest(BaseModel):
     nickname: str = Field(..., min_length=1, max_length=50, description="사용자 닉네임")
 

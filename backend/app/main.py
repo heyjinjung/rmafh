@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
+import logging
 import hashlib
 import json
 import secrets
@@ -33,6 +34,8 @@ from app.schemas import (
     AdminJobDetailResponse,
     AdminJobItemsListResponse,
     AdminJobItem,
+    AdminImportRequest,
+    AdminImportResponse,
     ExtendExpiryRequest,
     ExtendExpiryResponse,
     HealthResponse,
@@ -47,6 +50,7 @@ from app.schemas import (
 )
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
+logger = logging.getLogger("vault.idempotency")
 
 # Allow local/dev origins for FE preview and Docker usage.
 app.add_middleware(
@@ -638,22 +642,50 @@ def _idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash
     if row:
         existing_hash, status, response_status, response_body = row
         if existing_hash != request_hash:
+            logger.warning(
+                "idempotency_key_reuse endpoint=%s scope=%s key=%s status=%s",
+                endpoint,
+                scope,
+                key,
+                status,
+            )
             raise HTTPException(status_code=409, detail="IDEMPOTENCY_KEY_REUSE")
         if status == "DONE":
+            logger.info(
+                "idempotency_replayed endpoint=%s scope=%s key=%s status=%s",
+                endpoint,
+                scope,
+                key,
+                status,
+            )
             return {
                 "status": "replayed",
                 "response_status": int(response_status or 200),
                 "response_body": response_body,
             }
+        logger.info(
+            "idempotency_in_progress endpoint=%s scope=%s key=%s status=%s",
+            endpoint,
+            scope,
+            key,
+            status,
+        )
         return {"status": "in_progress"}
 
+    expires_at = _now() + timedelta(hours=config.IDEMPOTENCY_TTL_HOURS)
     cur.execute(
         """
         INSERT INTO idempotency_keys
-            (key, scope, endpoint, request_hash, status)
-        VALUES (%s, %s, %s, %s, 'IN_PROGRESS')
+            (key, scope, endpoint, request_hash, status, expires_at)
+        VALUES (%s, %s, %s, %s, 'IN_PROGRESS', %s)
         """,
-        (key, scope, endpoint, request_hash),
+        (key, scope, endpoint, request_hash, expires_at),
+    )
+    logger.info(
+        "idempotency_recorded endpoint=%s scope=%s key=%s status=IN_PROGRESS",
+        endpoint,
+        scope,
+        key,
     )
     return {"status": "recorded"}
 
@@ -669,6 +701,13 @@ def _idempotency_finish(cur, *, key: str, scope: str, endpoint: str, response_st
          WHERE key=%s AND scope=%s AND endpoint=%s
         """,
         (response_status, Json(response_body), key, scope, endpoint),
+    )
+    logger.info(
+        "idempotency_done endpoint=%s scope=%s key=%s status=DONE response_status=%s",
+        endpoint,
+        scope,
+        key,
+        response_status,
     )
 
 
@@ -899,6 +938,283 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, _aut
         identity_created=identity_created,
         vault_rows_updated=vault_rows_updated,
     )
+
+
+def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) -> dict[str, Any]:
+    """Apply import chunk (<=10k rows) and return stats."""
+    if not cleaned_rows:
+        return {"processed": 0, "identity_created": 0, "vault_rows_updated": 0, "target_user_ids": []}
+
+    now = _now()
+    default_expires = now + timedelta(hours=72)
+
+    external_ids = [ext for (_, _, ext) in cleaned_rows]
+    mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
+    identity_created = int(mapping.pop("__created_count__", 0))
+
+    snapshot_values = []
+    vault_update_values = []
+
+    for (_, r, ext) in cleaned_rows:
+        user_id = int(mapping[ext])
+        nickname = str(getattr(r, "nickname", "") or "").strip() or None
+        joined_date = _parse_joined_date(getattr(r, "joined_at", None))
+        deposit_total = max(0, _parse_int(getattr(r, "deposit_total", 0), default=0))
+        last_deposit_at = _parse_iso_datetime(getattr(r, "last_deposit_at", None))
+        telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
+        review_ok = _parse_bool(getattr(r, "review_ok", False))
+
+        import_date = _select_import_date(last_deposit_at)
+
+        snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
+        vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at))
+
+    execute_values(
+        cur,
+        """
+        INSERT INTO user_admin_snapshot
+            (user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok, updated_at)
+        VALUES %s
+        ON CONFLICT (user_id) DO UPDATE
+           SET nickname=EXCLUDED.nickname,
+               joined_date=EXCLUDED.joined_date,
+               deposit_total=EXCLUDED.deposit_total,
+               last_deposit_at=EXCLUDED.last_deposit_at,
+               telegram_ok=EXCLUDED.telegram_ok,
+               review_ok=EXCLUDED.review_ok,
+               updated_at=NOW()
+        """,
+        snapshot_values,
+        template="(%s,%s,%s,%s,%s,%s,%s,NOW())",
+    )
+
+    ensure_values = [(int(row[0]), default_expires) for row in snapshot_values]
+    execute_values(
+        cur,
+        """
+        INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
+        VALUES %s
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        ensure_values,
+        template="(%s,%s,'LOCKED','LOCKED','LOCKED')",
+    )
+
+    execute_values(
+        cur,
+        """
+        UPDATE vault_status AS vs
+           SET diamond_deposit_current = v.deposit_total,
+                                 gold_status = CASE
+                                     WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
+                                     WHEN v.telegram_ok THEN 'UNLOCKED'
+                                     ELSE 'LOCKED'
+                                 END,
+                                 platinum_deposit_done = CASE
+                                     WHEN COALESCE(vs.platinum_deposit_done, false) THEN true
+                                     WHEN (
+                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
+                                     ) THEN true
+                                     ELSE false
+                                 END,
+                                 platinum_attendance_days = CASE
+                                     WHEN (
+                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
+                                     )
+                                     THEN LEAST(3, COALESCE(vs.platinum_attendance_days, 0) + 1)
+                                     ELSE vs.platinum_attendance_days
+                                 END,
+                                 last_attended_at = CASE
+                                     WHEN (
+                                         (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                         AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
+                                     )
+                                     THEN (v.import_date::timestamp AT TIME ZONE 'UTC')
+                                     ELSE vs.last_attended_at
+                                 END,
+                                 platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
+                                 platinum_status = CASE
+                                     WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
+                                          AND v.review_ok
+                                          AND (
+                                              (v.deposit_total - COALESCE(vs.platinum_deposit_total_last, 0)) >= 150000
+                                              AND (vs.last_attended_at IS NULL OR (v.import_date - vs.last_attended_at::date) <= 3)
+                                          )
+                                     THEN 'UNLOCKED'
+                                     ELSE vs.platinum_status
+                                 END,
+               diamond_status = CASE
+                                                                         WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                                 ELSE vs.diamond_status
+                               END,
+               expires_at = CASE
+                   WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
+                   ELSE vs.expires_at
+               END,
+               updated_at = NOW()
+                        FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at)
+         WHERE vs.user_id = v.user_id
+        """,
+        vault_update_values,
+                    template="(%s::int,%s::bigint,%s::bool,%s::bool,%s::date,%s::timestamptz)",
+    )
+    vault_rows_updated = int(cur.rowcount or 0)
+
+    return {
+        "processed": len(snapshot_values),
+        "identity_created": identity_created,
+        "vault_rows_updated": vault_rows_updated,
+        "target_user_ids": [int(mapping[ext]) for ext in external_ids],
+    }
+
+
+@app.post("/api/vault/admin/imports", response_model=AdminImportResponse)
+async def admin_imports(body: AdminImportRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
+    mode = (body.mode or "APPLY").upper()
+    if mode not in {"APPLY", "SHADOW"}:
+        raise HTTPException(status_code=400, detail="INVALID_MODE")
+
+    rows = body.rows or []
+    if not rows:
+        raise HTTPException(status_code=400, detail="EMPTY_ROWS")
+
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/admin/imports"
+    request_hash = _hash_request_body(body.model_dump(by_alias=True))
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        if config.APP_ENV == "test":
+            cur.execute("SET LOCAL lock_timeout = '2s'")
+            cur.execute("SET LOCAL statement_timeout = '20s'")
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminImportResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        errors: list[dict[str, Any]] = []
+        dedup_removed = 0
+        cleaned: list[tuple[int, Any, str]] = []
+        seen: set[str] = set()
+        for idx, r in enumerate(rows):
+            ext = _normalize_external_user_id(getattr(r, "external_user_id", None))
+            if not ext:
+                errors.append({"row_index": idx, "external_user_id": None, "code": "MISSING_EXTERNAL_USER_ID", "detail": None})
+                continue
+            if ext in seen:
+                dedup_removed += 1
+                continue
+            seen.add(ext)
+            cleaned.append((idx, r, ext))
+
+        total = len(rows)
+        if not cleaned:
+            response_body = {
+                "shadow": mode == "SHADOW",
+                "total": total,
+                "processed": 0,
+                "identity_created": 0,
+                "vault_rows_updated": 0,
+                "dedup_removed": dedup_removed,
+                "errors": errors,
+                "job_ids": None,
+            }
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
+            )
+            conn.commit()
+            response.headers["Idempotency-Status"] = "recorded"
+            return AdminImportResponse(**response_body)
+
+        chunk_size = 10000
+        chunks: list[list[tuple[int, Any, str]]] = [cleaned[i : i + chunk_size] for i in range(0, len(cleaned), chunk_size)]
+
+        processed_total = 0
+        identity_created_total = 0
+        vault_rows_updated_total = 0
+        target_user_ids: list[int] = []
+        job_ids: list[str] = []
+
+        if mode == "SHADOW":
+            processed_total = len(cleaned)
+        else:
+            for chunk_idx, chunk in enumerate(chunks):
+                stats = _apply_import_chunk(cur, chunk, request)
+                processed_total += stats["processed"]
+                identity_created_total += stats["identity_created"]
+                vault_rows_updated_total += stats["vault_rows_updated"]
+                target_user_ids.extend(stats["target_user_ids"])
+
+                if len(chunks) > 1:
+                    job_id = _generate_job_id()
+                    payload = {"type": "DAILY_IMPORT", "chunk_index": chunk_idx, "chunk_total": len(chunks), "mode": mode}
+                    cur.execute(
+                        """
+                        INSERT INTO admin_jobs
+                            (job_id, type, status, request_id, target_count, processed, failed, payload, created_at, updated_at)
+                        VALUES (%s, %s, 'DONE', %s, %s, %s, 0, %s, NOW(), NOW())
+                        """,
+                        (job_id, "DAILY_IMPORT", key, len(chunk), stats["processed"], Json(payload)),
+                    )
+                    job_ids.append(job_id)
+
+        admin_user = request.client.host if request.client else "unknown"
+
+        if mode != "SHADOW":
+            _log_admin_action(
+                conn=conn,
+                admin_user=admin_user,
+                action="ADMIN_IMPORTS",
+                endpoint=endpoint,
+                target_user_ids=target_user_ids[:1000],
+                request_id=key,
+                request_body={"mode": mode, "total": total, "chunks": len(chunks)},
+                response_status="SUCCESS",
+                response_summary={
+                    "processed": processed_total,
+                    "identity_created": identity_created_total,
+                    "vault_rows_updated": vault_rows_updated_total,
+                    "dedup_removed": dedup_removed,
+                    "job_ids": job_ids or None,
+                },
+            )
+
+        response_body = {
+            "shadow": mode == "SHADOW",
+            "total": total,
+            "processed": processed_total,
+            "identity_created": identity_created_total,
+            "vault_rows_updated": vault_rows_updated_total,
+            "dedup_removed": dedup_removed,
+            "errors": errors,
+            "job_ids": job_ids or None,
+        }
+
+        status_code = 202 if len(chunks) > 1 else 200
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=status_code,
+            response_body=response_body,
+        )
+        conn.commit()
+
+    response.status_code = status_code
+    response.headers["Idempotency-Status"] = "recorded"
+    return AdminImportResponse(**response_body)
 
 
 def _normalize_external_user_id(value: str | None) -> str | None:

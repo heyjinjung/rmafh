@@ -62,6 +62,7 @@ POSTGRES_DB=vault
 
 # Application
 ADMIN_PASSWORD=your_admin_password_here
+IDEMPOTENCY_TTL_HOURS=24
 
 # Ports (기존 프로젝트와 충돌 방지)
 WEB_PORT=3002

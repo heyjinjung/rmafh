@@ -2,12 +2,13 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.0.0
+- 문서 버전: v1.0.1
 - 작성일: 2025-12-26
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
+- 2025-12-26 v1.0.1: 진행 현황 및 완료 항목 반영.
 - 2025-12-26 v1.0.0: 최초 작성 (상세 구현/QA/배포 체크리스트).
 
 ## 2. 사용 가이드
@@ -15,8 +16,16 @@
 - API/DB 변경은 반드시 스키마 버전과 문서 업데이트를 동반한다.
 - 멱등성 키/Job ID는 FE/BE 양쪽 로그에서 추적 가능해야 한다.
 
+## 진행 현황 (2025-12-26)
+- 완료: `docs/API_SPEC_VAULT_V2.md` Admin/Job/Idempotency 반영
+- 완료: idempotency_keys/admin_jobs/admin_job_items 스키마 추가
+- 완료: `/api/vault/admin/jobs` 스캐폴딩 + 목록/상세/아이템/재시도
+- 완료: `/admin/v2` 라우트 + 레이아웃/대시보드 스켈레톤
+- 진행 중: Job 처리 워커/상태 전이, Imports/Operations UI 연결
+- 미착수: QA/부하/배포/보안 항목
+
 ## 3. 사전 준비
-- [ ] 요구사항 확정: `docs/ADMIN_REDESIGN_SPEC_VAULT_V2.md` FINAL 확인
+- [x] 요구사항 확정: `docs/ADMIN_REDESIGN_SPEC_VAULT_V2.md` FINAL 확인
 - [ ] 범위 고정: 이번 릴리즈의 “Must/Should/Could” 구분 확정
 - [ ] 기능 플래그 정의: `ADMIN_V2_ENABLED`, `ADMIN_IDEMPOTENCY_ENABLED`
 - [ ] 테스트 데이터 준비: 대량 CSV 샘플(1k/10k/50k), 실패 케이스 샘플
@@ -24,19 +33,19 @@
 
 ## 4. 백엔드/DB 체크리스트
 ### 4.1 멱등성 레이어
-- [ ] `idempotency_keys` 테이블 생성 및 인덱스 적용
-- [ ] 공통 유틸/미들웨어 설계 (key, scope, endpoint, request_hash)
-- [ ] `Idempotency-Status` 응답 헤더 추가
-- [ ] 동일 키/다른 payload 재사용 시 409 `IDEMPOTENCY_KEY_REUSE`
-- [ ] 만료 정책 적용 (24h 기본, 환경 변수로 조정 가능)
-- [ ] 서버 로그에 key/endpoint/status 기록
+- [x] `idempotency_keys` 테이블 생성 및 인덱스 적용
+- [x] 공통 유틸/미들웨어 설계 (key, scope, endpoint, request_hash)
+- [x] `Idempotency-Status` 응답 헤더 추가 (admin/jobs only)
+- [x] 동일 키/다른 payload 재사용 시 409 `IDEMPOTENCY_KEY_REUSE`
+- [x] 만료 정책 적용 (24h 기본, 환경 변수로 조정 가능)
+- [x] 서버 로그에 key/endpoint/status 기록
 
 ### 4.2 Job 시스템
-- [ ] `admin_jobs` 테이블 생성
+- [x] `admin_jobs` 테이블 생성
 - [ ] Job 상태 전이 정의: PENDING → RUNNING → DONE/FAILED/CANCELED
-- [ ] Job item 테이블 설계 (대상별 성공/실패/에러 메시지)
-- [ ] Job 생성 API 구현: `POST /api/vault/admin/jobs`
-- [ ] Job 조회 API 구현: 목록/상세/아이템/재시도
+- [x] Job item 테이블 설계 (대상별 성공/실패/에러 메시지)
+- [x] Job 생성 API 구현: `POST /api/vault/admin/jobs`
+- [x] Job 조회 API 구현: 목록/상세/아이템/재시도
 - [ ] 대량 작업 실패 시 부분 성공 처리 정책 정의
 
 ### 4.3 CSV 업로드 (Imports)
@@ -65,14 +74,14 @@
 
 ## 5. 프론트엔드 체크리스트
 ### 5.1 라우팅/구조
-- [ ] `/admin/v2` 신규 라우트 추가
+- [x] `/admin/v2` 신규 라우트 추가
 - [ ] 기존 `/admin` 유지 + 전환 플래그 구현
 - [ ] API 클라이언트 공통화 (`withIdempotency`)
 
 ### 5.2 전역 레이아웃
-- [ ] 좌측 네비게이션 + 상단 검색 + 컨텍스트 패널 구현
-- [ ] 글로벌 검색: external_user_id, nickname, user_id 지원
-- [ ] 빠른 실행 (Extend/Notify/Import) 진입 지원
+- [x] 좌측 네비게이션 + 상단 검색 + 컨텍스트 패널 구현 (스켈레톤)
+- [x] 글로벌 검색: external_user_id, nickname, user_id 지원 (skeleton)
+- [x] 빠른 실행 (Extend/Notify/Import) 진입 지원 (skeleton)
 
 ### 5.3 Users (데이터 그리드)
 - [ ] 서버 사이드 페이징/정렬/필터 연동
@@ -115,7 +124,7 @@
 - [ ] 오류 메시지 표준화 (코드/요약/세부)
 
 ## 6. API 스펙/문서 업데이트
-- [ ] `docs/API_SPEC_VAULT_V2.md`에 신규 Admin API 추가
+- [x] `docs/API_SPEC_VAULT_V2.md`에 신규 Admin API 추가
 - [ ] `docs/ADMIN_GUIDE_VAULT_V2.md`에 `/admin/v2` 가이드 추가
 - [ ] `docs/ADMIN_AUDIT_OPERATIONS_GUIDE.md`에 job/idempotency 필드 추가
 - [ ] `docs/CSV_UPLOAD_COLUMN_GUIDE.md`에 업로드 검증 규칙 업데이트

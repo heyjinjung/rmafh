@@ -14,6 +14,7 @@
 ## 환경 변수
 - DATABASE_URL: postgresql://vault:vaultpass@db:5432/vault
 - APP_ENV: local
+- IDEMPOTENCY_TTL_HOURS: 24
 - NEXT_PUBLIC_API_BASE: http://api:8000 (컨테이너 내부에서 FE가 백엔드를 프록시할 때 사용)
 
 ## 마이그레이션

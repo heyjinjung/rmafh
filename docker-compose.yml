@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgresql://vault:vaultpass@db:5432/vault
       APP_ENV: local
       ADMIN_PASSWORD: admin123
+      IDEMPOTENCY_TTL_HOURS: 24
     ports:
       - "18000:8000"
     command: ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000"]
@@ -40,6 +41,7 @@ services:
     environment:
       DATABASE_URL: postgresql://vault:vaultpass@db:5432/vault
       APP_ENV: local
+      IDEMPOTENCY_TTL_HOURS: 24
     command: ["sh", "-c", "python -m app.worker"]
 
   web:
