@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import AdminV2Sidebar from './AdminV2Sidebar';
 import AdminV2TopBar from './AdminV2TopBar';
-import AdminV2ContextPanel from './AdminV2ContextPanel';
 
 const themeVars = {
   '--v2-bg': '#101214',
@@ -57,8 +56,7 @@ export default function AdminV2Layout({ active = 'dashboard', children }) {
             backgroundSize: '32px 32px',
           }}
         />
-        <div className="relative z-10 flex min-h-screen flex-row-reverse">
-          <AdminV2ContextPanel />
+        <div className="relative z-10 flex min-h-screen">
           <AdminV2Sidebar active={active} />
           <div className="flex min-h-screen flex-1 flex-col">
             <AdminV2TopBar />
@@ -67,7 +65,6 @@ export default function AdminV2Layout({ active = 'dashboard', children }) {
               {children}
             </main>
           </div>
-          <AdminV2ContextPanel />
         </div>
 
         {showBackToTop ? (

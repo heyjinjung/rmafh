@@ -28,25 +28,6 @@ export default function AdminV2Page() {
       </Head>
       <AdminV2Layout active="dashboard">
         <section className="space-y-6">
-          {!adminV2Enabled ? (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-warning)]/10 px-4 py-3 text-sm text-[var(--v2-text)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="text-[var(--v2-warning)]">NEXT_PUBLIC_ADMIN_V2_ENABLED=false · v2는 프리뷰 전환 상태입니다.</span>
-                <Link href="/admin" className="text-[var(--v2-text)] underline">
-                  /admin 으로 이동
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/70 px-4 py-3 text-sm text-[var(--v2-muted)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span>v2 플래그 ON · 필요 시 /admin 으로 즉시 전환 가능합니다.</span>
-                <Link href="/admin" className="text-[var(--v2-accent)] underline">
-                  Legacy 콘솔 보기
-                </Link>
-              </div>
-            </div>
-          )}
 
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
