@@ -292,48 +292,8 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">제목</label>
             <input
               value={'(backend 미지원)'}
-              onChange={() => {}}
-              disabled
-              className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
             />
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">본문</label>
-            <textarea
-              value={'(backend 미지원)'}
-              onChange={() => {}}
-              disabled
-              rows={3}
-              className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-            />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
-              <p className="font-semibold text-[var(--v2-accent)]">중복 방지 정책</p>
-              <ul className="mt-2 space-y-1 list-disc list-inside text-[var(--v2-muted)]">
-                <li>페이로드 해시 + variant 기반으로 dedupe_key 자동 생성</li>
-                <li>동일 dedupe_key 기준, 24h 내 재요청 시 200/409 반환</li>
-                <li>예약 발송은 스케줄 타임존을 UTC로 고정</li>
-              </ul>
-            </div>
-            <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
-              <p className="text-[var(--v2-muted)]">멱등성</p>
-              <p className="mt-2 text-[var(--v2-muted)]">요청마다 <span className="font-mono">x-idempotency-key</span>가 자동으로 붙습니다(클라이언트 생성).</p>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-[var(--v2-muted)]">예약 시 Shadow(미리보기) → Apply(적용) 순으로 두 번 실행 권장</div>
-            <div className="space-x-2">
-              <button
-                type="button"
-                onClick={() => setTargetText('')}
-                className="rounded-lg border border-[var(--v2-border)] px-3 py-2 text-sm text-[var(--v2-text)]"
-              >
-                대상 초기화
-              </button>
-              <button
+          // 중복된 load 함수 및 잘못된 중괄호 제거 (파싱 에러 수정)
                 type="button"
                 onClick={submitNotification}
                 disabled={submitting}
