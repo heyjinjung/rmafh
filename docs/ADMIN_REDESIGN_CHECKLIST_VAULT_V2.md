@@ -2,12 +2,13 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.0.4
+- 문서 버전: v1.0.5
 - 작성일: 2025-12-25
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
+- 2025-12-25 v1.0.5: Admin v2 세그먼트 CRUD, Imports 4단계 UI, Operations UI(extend/impact/status/guardrail) 추가.
 - 2025-12-25 v1.0.4: Admin v2 Users 그리드 서버 페이징/필터/정렬, 컬럼 세트/벌크 선택, idempotent FE 클라이언트 래퍼 적용.
 - 2025-12-25 v1.0.3: Job/worker 경로 전반에 config 기반 lock/statement timeout을 적용.
 - 2025-12-25 v1.0.2: Admin import 경로 lock/statement timeout을 config 값으로 적용.
@@ -94,21 +95,21 @@
 - [x] 행 클릭 → 우측 Drawer 상세 패널 연동
 
 ### 5.4 세그먼트/필터
-- [ ] 세그먼트 생성/저장/삭제
-- [ ] 세그먼트 → Operations 작업 생성 흐름
-- [ ] 필터 조건: 상태, 만료, 입금 범위, 출석 범위, 텔레그램/리뷰
+- [x] 세그먼트 생성/저장/삭제
+- [x] 세그먼트 → Operations 작업 생성 흐름
+- [x] 필터 조건: 상태, 만료, 입금 범위, 출석 범위, 텔레그램/리뷰
 
 ### 5.5 Imports UI
-- [ ] 4단계 업로드 흐름 구현 (파일 → 매핑 → 검증 → 실행)
-- [ ] 미리보기(최대 200행) 테이블
-- [ ] 오류 리스트/다운로드 링크 표시
-- [ ] Shadow/Apply 모드 토글 + 위험 확인
+- [x] 4단계 업로드 흐름 구현 (파일 → 매핑 → 검증 → 실행)
+- [x] 미리보기(최대 200행) 테이블
+- [x] 오류 리스트/다운로드 링크 표시
+- [x] Shadow/Apply 모드 토글 + 위험 확인
 
 ### 5.6 Operations UI
-- [ ] Extend-expiry: 대상/시간/사유/Shadow 입력
-- [ ] Impact 프리뷰: 대상 수, 샘플, 예상 만료일
-- [ ] 상태/출석/입금 일괄 변경 UI
-- [ ] 위험 작업 확인(텍스트 입력 + 2단계)
+- [x] Extend-expiry: 대상/시간/사유/Shadow 입력
+- [x] Impact 프리뷰: 대상 수, 샘플, 예상 만료일
+- [x] 상태/출석/입금 일괄 변경 UI
+- [x] 위험 작업 확인(텍스트 입력 + 2단계)
 
 ### 5.7 Notifications UI
 - [ ] 알림 생성 폼 (type/variant/대상/예약)

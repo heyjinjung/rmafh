@@ -8,6 +8,9 @@ import {
   AdminV2QuickActions,
   AdminV2JobsPanel,
   AdminV2UsersGrid,
+  AdminV2SegmentsPanel,
+  AdminV2ImportsFlow,
+  AdminV2OperationsPanel,
 } from '../../components/admin-v2';
 import { withIdempotency } from '../../lib/apiClient';
 
