@@ -2,12 +2,13 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.0.7
+- 문서 버전: v1.0.8
 - 작성일: 2025-12-25
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
+- 2025-12-25 v1.0.8: Admin v2 실제 구현 기준으로 문서의 Admin API 경로/파라미터/필드 정오표 반영 (audit-log, page/page_size/order, imports error_report_csv).
 - 2025-12-25 v1.0.7: E2E admin 플로우 검증 추가 (import+extend, notify 리스트/재시도 가드, audit request_id, job timeout 스모크).
 - 2025-12-25 v1.0.6: Notifications UI, Audit/Jobs UI, 공통 UX(idempotency 위젯/토스트/오류 표준) 스켈레톤 추가.
 - 2025-12-25 v1.0.5: Admin v2 세그먼트 CRUD, Imports 4단계 UI, Operations UI(extend/impact/status/guardrail) 추가.
@@ -169,17 +170,17 @@
 - [ ] 배포/롤백 플랜 승인
 먼저 빠르게 체감시킬 변경(순서 제안)
 
-Admin v2 대시보드 상단에 “최근 Job/Notify/Audit” 카드 + 상태 배지 추가: AdminV2KpiCards.jsx, AdminV2JobsPanel.jsx 확장. 데이터 소스는 /api/vault/admin/jobs?limit=5(상태/updated_at), /api/vault/admin/notifications?limit=5(type/state), 감사 로그는 /api/vault/admin/audit(request_id, actor, action) 목록 노출.
+Admin v2 대시보드 상단에 “최근 Job/Notify/Audit” 카드 + 상태 배지 추가: AdminV2KpiCards.jsx, AdminV2JobsPanel.jsx 확장. 데이터 소스는 /api/vault/admin/jobs?page=1&page_size=5&order=desc(상태/updated_at), /api/vault/admin/notifications?page=1&page_size=5&order=desc(type/state), 감사 로그는 /api/vault/admin/audit-log?page=1&page_size=5&order=desc(request_id, admin_user, action) 목록 노출.
 공통 오류/토스트: withIdempotency(frontend/lib/apiClient.js 예상) 응답에서 code/summary/detail, idempotency-key, Idempotency-Status를 추출해 전역 에러 핸들러로 토스트/패널에 표준 포맷 표시. UI 훅/컴포넌트는 AdminV2CommonUxPanel.jsx 예제/코드와 전역 토스트(예: useToast) 연결.
-CSV 업로드 오류 다운로드: AdminV2ImportsFlow.jsx에 업로드 응답의 오류 리포트 링크(백엔드에서 제공하는 errors_csv 또는 error_download_url)를 버튼으로 노출하고, 파일 다운로드 핸들러 추가. 검증 단계에서 오류 테이블 + “CSV로 저장” 버튼 표시.
+CSV 업로드 오류 다운로드: AdminV2ImportsFlow.jsx에 업로드 응답의 오류 리포트 링크(백엔드에서 제공하는 error_report_csv)를 버튼으로 노출하고, 파일 다운로드 핸들러 추가. 검증 단계에서 오류 테이블 + “CSV로 저장” 버튼 표시.
 화면/컴포넌트별 API 연결 매핑
 
-Dashboard KPI/Recent: AdminV2KpiCards.jsx, AdminV2JobsPanel.jsx → /api/vault/admin/jobs, /api/vault/admin/notifications, /api/vault/admin/audit.
+Dashboard KPI/Recent: AdminV2KpiCards.jsx, AdminV2JobsPanel.jsx → /api/vault/admin/jobs, /api/vault/admin/notifications, /api/vault/admin/audit-log.
 Users/Grid: AdminV2UsersGrid.jsx → 서버 필터/정렬/페이지 파라미터 붙여 /api/vault/admin/users 연동(이미 스켈레톤일 가능성 높음).
 Segments: AdminV2SegmentsPanel.jsx → 세그먼트 CRUD(/api/vault/admin/segments 류) + “이 세그먼트로 Operations 시작” 액션을 Operations 패널로 전달.
 Operations: AdminV2OperationsPanel.jsx → /api/vault/extend-expiry, /api/vault/admin/users/* 일괄 업데이트, /api/vault/notify 생성. shadow/apply 토글과 위험 확인 UI를 서버 파라미터에 매핑.
-Notifications: AdminV2NotificationsPanel.jsx → /api/vault/notify 생성, /api/vault/admin/notifications 목록/필터, 재시도 /api/vault/admin/jobs/{id}/retry 연결.
-Imports: AdminV2ImportsFlow.jsx → /api/vault/admin/imports (mode shadow/apply), 응답의 job_ids/errors/error_download_url를 UI에 표시. 미리보기 테이블에 서버 검증 오류도 표시.
+Notifications: AdminV2NotificationsPanel.jsx → /api/vault/notify 생성, /api/vault/admin/notifications 목록/필터. 재시도는 알림 단위가 아니라 Job(/api/vault/admin/jobs/{id}/retry) 단위로 지원.
+Imports: AdminV2ImportsFlow.jsx → /api/vault/admin/imports (mode SHADOW/APPLY, rows), 응답의 job_ids/errors/error_report_csv를 UI에 표시. 미리보기 테이블에 서버 검증 오류도 표시.
 Common UX: AdminV2CommonUxPanel.jsx → idempotency 데모를 실 UI 토스트/에러 패널과 동일 포맷으로 통합.
 우선순위 제안
 

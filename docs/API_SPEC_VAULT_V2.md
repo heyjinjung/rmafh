@@ -9,6 +9,7 @@
 
 ## Changelog
 - 2025-12-26: Admin/Job/Idempotency API 추가
+- 2025-12-25: Admin Imports/Users/Audit Logs 경로·파라미터·필드 정오표 반영 (audit-log, page/page_size/order, imports rows/error_report_csv).
 - 2025-12-24: DIAMOND 금고 보상액 70,000원 명시
 - 2025-12-20 v0.2: status 응답에 `platinum_review_done` 반영, PLATINUM 금액 20,000 기준으로 예시/문구 정합화
 
@@ -166,25 +167,34 @@
 ### 4.9 Admin Imports (v2)
 - POST /api/vault/admin/imports
 ```json
-{ "mode": "shadow" | "apply", "raw_rows": [ ... ] }
+{ "mode": "SHADOW" | "APPLY", "rows": [ ... ] }
 ```
-- Response 202
+- Response 200/202
 ```json
-{ "job_id": "job_20251226_002", "preview": [], "error_report_url": "..." }
+{
+	"shadow": true,
+	"total": 1200,
+	"processed": 1180,
+	"identity_created": 50,
+	"vault_rows_updated": 1100,
+	"dedup_removed": 10,
+	"errors": [
+		{ "row_index": 12, "external_user_id": "ext-001", "code": "INVALID_ROW", "detail": "..." }
+	],
+	"job_ids": ["job_20251226_002"],
+	"error_report_csv": "..."
+}
 ```
 
 ### 4.10 Admin Users (v2)
 - GET /api/vault/admin/users
 ```
-query: q, status_gold, status_platinum, status_diamond,
-       expires_from, expires_to, deposit_min, deposit_max,
-       attendance_min, attendance_max, telegram_ok, review_ok,
-       sort, cursor, limit
+query: query, status, sort_by, sort_dir, page, page_size
 ```
 - GET /api/vault/admin/users/{user_id}
 
 ### 4.11 Admin Audit Logs (v2)
-- GET /api/vault/admin/audit-logs?action=&request_id=&admin_user=&from=&to=&status=
+- GET /api/vault/admin/audit-log?action=&endpoint=&request_id=&job_id=&idempotency_key=&response_status=&page=&page_size=&order=
 
 ## 5. 에러 포맷
 ```json

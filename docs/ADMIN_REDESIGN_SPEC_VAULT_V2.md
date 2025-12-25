@@ -2,14 +2,15 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 프론트엔드 전면 리디자인 + 멱등성/백엔드 개선 설계
-- 문서 버전: v1.0.1
+- 문서 버전: v1.0.2
 - 문서 상태: FINAL (확정)
-- 변경 관리: v1.0.1 이후 변경은 PR + FE/BE/OPS 승인 필요
+- 변경 관리: v1.0.2 이후 변경은 PR + FE/BE/OPS 승인 필요
 - 작성일: 2025-12-26
 - 작성자: Codex (설계 초안)
 - 검토 대상: FE/BE/OPS
 
 ## Changelog
+- 2025-12-26 v1.0.2: Admin API 경로/요청·응답 스키마 정오표 반영 (audit-log, users page/page_size, imports rows/error_report_csv).
 - 2025-12-26 v1.0.1: 문서 확정, 변경 관리 기준 명시.
 - 2025-12-26 v1.0.0: 신규 어드민 UX 설계, 고용량 데이터 처리 흐름, API/멱등성/DB 변경 정의.
 
@@ -213,14 +214,9 @@ Admin Console
 ```
 GET /api/vault/admin/users
 query:
-  q, status_gold, status_platinum, status_diamond,
-  expires_from, expires_to,
-  deposit_min, deposit_max,
-  attendance_min, attendance_max,
-  telegram_ok, review_ok,
-  sort, cursor, limit
+  query, status, sort_by, sort_dir, page, page_size
 ```
-응답: `items`, `next_cursor`, `total_estimate`
+응답: `users`, `total`, `page`, `page_size`
 
 ### 11.2 사용자 상세
 ```
@@ -248,14 +244,14 @@ POST /api/vault/admin/jobs/{job_id}/retry
 ```
 POST /api/vault/admin/imports
 Headers: X-Idempotency-Key
-Body: { file_id | raw_rows, mode: "shadow" | "apply" }
+Body: { mode: "SHADOW" | "APPLY", rows: [...] }
 ```
-응답: `{ job_id, preview, error_report_url }`
+응답: `{ shadow, total, processed, identity_created, vault_rows_updated, dedup_removed, errors, job_ids?, error_report_csv? }`
 
 ### 11.6 감사 로그
 ```
-GET /api/vault/admin/audit-logs
-query: action, request_id, admin_user, from, to, status
+GET /api/vault/admin/audit-log
+query: action, endpoint, request_id, job_id, idempotency_key, response_status, page, page_size, order
 ```
 
 ## 12. 멱등성 설계 (전 엔드포인트 공통)
