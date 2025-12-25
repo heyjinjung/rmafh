@@ -1,4 +1,9 @@
 from datetime import datetime
+from uuid import uuid4
+
+
+def _idem_headers():
+    return {"x-idempotency-key": f"test-claim-import-{uuid4()}"}
 
 
 def test_status_returns_contract_fields(client):
@@ -52,7 +57,7 @@ def test_claim_flow_after_daily_import_unlocks_and_updates_status(client):
             }
         ]
     }
-    import_resp = client.post("/api/vault/user-daily-import", json=body)
+    import_resp = client.post("/api/vault/user-daily-import", json=body, headers=_idem_headers())
     assert import_resp.status_code == 200
 
     status_before = client.get("/api/vault/status", params={"external_user_id": external_user_id})
@@ -104,6 +109,7 @@ def test_claim_enforces_state_and_idempotency(client):
                 }
             ]
         },
+        headers=_idem_headers(),
     )
     assert import_resp.status_code == 200
 

@@ -1,4 +1,9 @@
 from datetime import datetime, date, timedelta, timezone
+from uuid import uuid4
+
+
+def _idem_headers(prefix: str = "test-admin-user"):
+    return {"x-idempotency-key": f"{prefix}-{uuid4()}"}
 
 
 def _seed_user(cur, user_id, external_user_id, nickname, gold_status, expires_at, deposit_total, joined_date):
@@ -112,3 +117,45 @@ def test_admin_users_pagination_sort_and_filter(client, db_conn):
     filtered = resp_filtered.json()
     assert filtered.get("total") == 1
     assert filtered["users"][0].get("external_user_id") == "ext-1"
+
+
+def test_admin_user_bulk_updates_apply(client):
+    # Create two users via admin API with idempotency
+    users = []
+    for ext in ("ext-bulk-1", "ext-bulk-2"):
+        resp = client.post(
+            "/api/vault/admin/users",
+            json={
+                "external_user_id": ext,
+                "nickname": ext,
+                "joined_date": "2024-01-01",
+                "deposit_total": 0,
+                "telegram_ok": True,
+                "review_ok": True,
+            },
+            headers=_idem_headers(f"create-{ext}"),
+        )
+        assert resp.status_code == 200
+        users.append((resp.json()["user_id"], ext))
+
+    for user_id, ext in users:
+        deposit = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/deposit",
+            json={"platinum_deposit_done": True, "diamond_deposit_current": 600000},
+            headers=_idem_headers(f"deposit-{ext}"),
+        )
+        assert deposit.status_code == 200
+
+        attendance = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/attendance",
+            json={"set_days": 3},
+            headers=_idem_headers(f"attendance-{ext}"),
+        )
+        assert attendance.status_code == 200
+
+        status = client.get("/api/vault/status", params={"external_user_id": ext})
+        assert status.status_code == 200
+        data = status.json()
+        assert data["gold_status"] == "UNLOCKED"
+        assert data["platinum_status"] == "UNLOCKED"
+        assert data["diamond_status"] == "UNLOCKED"

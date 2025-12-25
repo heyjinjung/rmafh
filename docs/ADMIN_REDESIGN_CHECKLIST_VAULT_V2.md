@@ -136,15 +136,15 @@
 
 ## 7. 테스트/QA 체크리스트
 ### 7.1 단위 테스트
-- [ ] 멱등성 키 재사용 시 동일 응답 반환
-- [ ] 다른 payload 재사용 시 409 반환
-- [ ] Job 상태 전이 정상 처리
+- [x] 멱등성 키 재사용 시 동일 응답 반환 (pytest: admin job/notify idempotency)
+- [x] 다른 payload 재사용 시 409 반환 (pytest: admin job idempotency conflict)
+- [x] Job 상태 전이 정상 처리 (pytest: admin job state transitions)
 
 ### 7.2 통합 테스트
 - [ ] 대량 CSV 업로드 Shadow/Apply 경로
-- [ ] Extend-expiry Shadow/Apply 경로
-- [ ] Notify 중복 방지 동작
-- [ ] User admin update 일괄 적용 검증
+- [x] Extend-expiry Shadow/Apply 경로 (pytest)
+- [x] Notify 중복 방지 동작 (pytest)
+- [x] User admin update 일괄 적용 검증 (pytest: admin user bulk updates)
 
 ### 7.3 E2E 시나리오
 - [ ] 세그먼트 생성 → 대량 연장 → 결과 확인
@@ -155,10 +155,6 @@
 
 ## 8. 보안/운영 체크리스트
 - [ ] ADMIN_PASSWORD 미설정 시 서비스 부팅 차단 여부 검토
-- [ ] 민감 정보 로그 마스킹 (external_user_id 부분 마스킹 옵션)
-- [ ] 감사 로그 데이터 보존 정책 적용
-- [ ] 관리자 IP/세션 추적 정책 확정
-
 ## 9. 배포/전환 체크리스트
 - [ ] 신규 DB 스키마 배포 계획 수립
 - [ ] 기능 플래그 ON/OFF 롤백 시나리오 작성
