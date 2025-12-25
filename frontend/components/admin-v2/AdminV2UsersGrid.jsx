@@ -5,16 +5,44 @@ const rowHeight = 48;
 const viewportHeight = 440;
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 const columnDefs = [
-  { key: 'external_user_id', label: 'external_user_id' },
-  { key: 'nickname', label: 'nickname' },
-  { key: 'created_at', label: 'created_at' },
-  { key: 'gold_status', label: 'gold_status' },
-  { key: 'platinum_status', label: 'platinum_status' },
-  { key: 'diamond_status', label: 'diamond_status' },
-  { key: 'platinum_attendance_days', label: 'attendance' },
-  { key: 'deposit_total', label: 'deposit_total' },
-  { key: 'expires_at', label: 'expires_at' },
+  { key: 'external_user_id', label: '외부 사용자 ID' },
+  { key: 'nickname', label: '닉네임' },
+  { key: 'created_at', label: '생성일' },
+  { key: 'gold_status', label: '골드 상태' },
+  { key: 'platinum_status', label: '플래티넘 상태' },
+  { key: 'diamond_status', label: '다이아 상태' },
+  { key: 'platinum_attendance_days', label: '출석(일)' },
+  { key: 'deposit_total', label: '누적 입금' },
+  { key: 'expires_at', label: '만료일' },
 ];
+
+const statusLabel = (s) => {
+  switch (s) {
+    case 'LOCKED':
+      return '잠금';
+    case 'UNLOCKED':
+      return '해제';
+    case 'CLAIMED':
+      return '수령';
+    case 'EXPIRED':
+      return '만료';
+    default:
+      return String(s || '');
+  }
+};
+
+const bulkModeLabel = (mode) => {
+  switch (mode) {
+    case 'page':
+      return '현재 페이지';
+    case 'filter':
+      return '현재 필터';
+    case 'uploaded':
+      return '업로드 ID';
+    default:
+      return String(mode || '-');
+  }
+};
 
 const sortableKeys = new Set(['created_at', 'expires_at', 'deposit_total', 'external_user_id', 'nickname']);
 
@@ -181,9 +209,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="users">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Users</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">
-            Server-driven paging with virtual scroll preview, column sets, and bulk selection.
+            서버 페이징 + 가상 스크롤 미리보기, 컬럼 세트, 대량 선택.
           </p>
         </div>
         <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
@@ -192,73 +220,73 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
             onClick={bulkSelectPage}
           >
-            Select Page
+            현재 페이지 선택
           </button>
           <button
             type="button"
             className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
             onClick={bulkSelectFilter}
           >
-            Select Filter Scope
+            필터 범위 선택
           </button>
           <button
             type="button"
             className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
             onClick={bulkSelectUploadIds}
           >
-            Upload IDs
+            ID 업로드
           </button>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <div>
-          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Query</label>
+          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">검색</label>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="external_user_id or nickname"
+            placeholder="외부 사용자 ID 또는 닉네임"
             className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
           />
         </div>
         <div>
-          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Status</label>
+          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">상태</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
           >
-            <option value="">All</option>
+            <option value="">전체</option>
             {statusOptions.map((opt) => (
               <option key={opt} value={opt}>
-                {opt}
+                {statusLabel(opt)}
               </option>
             ))}
           </select>
         </div>
         <div className="grid grid-cols-2 gap-2 md:grid-cols-2">
           <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Sort</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">정렬 기준</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
             >
-              <option value="expires_at">expires_at</option>
-              <option value="deposit_total">deposit_total</option>
-              <option value="external_user_id">external_user_id</option>
-              <option value="nickname">nickname</option>
+              <option value="expires_at">만료일</option>
+              <option value="deposit_total">누적 입금</option>
+              <option value="external_user_id">외부 사용자 ID</option>
+              <option value="nickname">닉네임</option>
             </select>
           </div>
           <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Direction</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">정렬 방향</label>
             <select
               value={sortDir}
               onChange={(e) => setSortDir(e.target.value)}
               className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
             >
-              <option value="asc">ASC</option>
-              <option value="desc">DESC</option>
+              <option value="asc">오름차순</option>
+              <option value="desc">내림차순</option>
             </select>
           </div>
         </div>
@@ -266,7 +294,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[var(--v2-muted)]">
         <div className="flex items-center gap-2">
-          <span>Columns:</span>
+          <span>표시 컬럼:</span>
           {columnDefs.map((col) => (
             <label key={col.key} className="flex items-center gap-1">
               <input
@@ -280,7 +308,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
         </div>
         <div className="flex items-center gap-2">
           <label>
-            Page Size
+            페이지 크기
             <select
               className="ml-2 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-2 py-1"
               value={pageSize}
@@ -295,7 +323,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             </select>
           </label>
           <span>
-            Bulk: {bulkSelection.mode} · ids {bulkSelection.ids?.length || 0}
+            대량 선택: {bulkModeLabel(bulkSelection.mode)} · ID {bulkSelection.ids?.length || 0}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -305,16 +333,16 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
           >
-            Prev
+            이전
           </button>
-          <span>Page {page} · Total {total.toLocaleString()}</span>
+          <span>{page}페이지 · 총 {total.toLocaleString()}건</span>
           <button
             type="button"
             className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
             onClick={() => setPage((p) => p + 1)}
             disabled={loading || page * pageSize >= total}
           >
-            Next
+            다음
           </button>
           <button
             type="button"
@@ -322,9 +350,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             onClick={fetchUsers}
             disabled={loading}
           >
-            Refresh
+            새로고침
           </button>
-          {loading ? <span className="text-[var(--v2-accent)]">Loading...</span> : null}
+          {loading ? <span className="text-[var(--v2-accent)]">불러오는 중...</span> : null}
           {error ? <span className="text-[var(--v2-warning)]">{String(error)}</span> : null}
         </div>
       </div>
@@ -332,9 +360,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       <div className="mt-4 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/60">
         <div className="flex items-center justify-between px-4 py-2 text-xs text-[var(--v2-muted)]">
           <span>
-            Showing {rows.length.toLocaleString()} rows (server page) · Virtualized {visibleRows.length} visible
+            현재 페이지 {rows.length.toLocaleString()}건 · 가상 스크롤 표시 {visibleRows.length}건
           </span>
-          <span className="text-[var(--v2-accent)]">Server-side hooks pending API wiring</span>
+          <span className="text-[var(--v2-accent)]">서버 연동 확장 예정(후속 작업)</span>
         </div>
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div
@@ -416,14 +444,14 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
           <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0">
             <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Details</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">상세</p>
               <button
                 type="button"
                 className="rounded border border-[var(--v2-border)] px-2 py-1 text-xs text-[var(--v2-muted)] hover:border-[var(--v2-accent)]/40"
                 onClick={() => setDrawerOpen((v) => !v)}
                 disabled={!selectedRow}
               >
-                {drawerOpen ? 'Hide' : 'Show'}
+                {drawerOpen ? '숨기기' : '보기'}
               </button>
             </div>
 
@@ -490,19 +518,19 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Bulk Select</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">대량 선택</p>
           <div className="mt-2 space-y-2 text-sm text-[var(--v2-text)]">
-            <div className="text-[var(--v2-muted)]">mode: <span className="font-mono">{bulkSelection.mode}</span></div>
-            <div className="text-[var(--v2-muted)]">ids: <span className="font-mono">{bulkSelection.ids?.length || 0}</span></div>
+            <div className="text-[var(--v2-muted)]">모드: <span className="font-mono">{bulkModeLabel(bulkSelection.mode)}</span></div>
+            <div className="text-[var(--v2-muted)]">ID 수: <span className="font-mono">{bulkSelection.ids?.length || 0}</span></div>
             {bulkSelection.mode === 'filter' ? (
               <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-2 text-xs text-[var(--v2-muted)]">
-                <div>query: {bulkSelection?.filter?.query || '-'}</div>
-                <div>status: {bulkSelection?.filter?.status || '-'}</div>
+                <div>검색어: {bulkSelection?.filter?.query || '-'}</div>
+                <div>상태: {bulkSelection?.filter?.status ? statusLabel(bulkSelection.filter.status) : '-'}</div>
               </div>
             ) : null}
             {bulkSelection.mode === 'uploaded' ? (
               <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Paste user_id list</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">user_id 목록 붙여넣기</label>
                 <textarea
                   value={uploadedIdsText}
                   onChange={(e) => setUploadedIdsText(e.target.value)}
@@ -514,7 +542,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   onClick={applyUploadedIds}
                   className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-xs font-semibold text-black hover:brightness-105"
                 >
-                  Apply Uploaded IDs
+                  업로드 ID 적용
                 </button>
                 <p className="text-xs text-[var(--v2-muted)]">현재 업로드 타겟은 user_id 기준으로만 동작합니다.</p>
               </div>
@@ -522,7 +550,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
           </div>
         </div>
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Saved Column Sets</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">저장된 컬럼 세트</p>
           <p className="mt-2 text-sm text-[var(--v2-text)]">컬럼 세트 저장/불러오기 API 연동 예정.</p>
         </div>
       </div>
