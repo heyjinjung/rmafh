@@ -1,12 +1,10 @@
 import Head from 'next/head';
-import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import {
   AdminV2Layout,
   AdminV2KpiCards,
   AdminV2UsersGrid,
-  AdminV2SegmentsPanel,
   AdminV2ImportsFlow,
   AdminV2NotificationsPanel,
 } from '../../components/admin-v2';
@@ -16,7 +14,6 @@ export default function AdminV2Page() {
   const basePath = router?.basePath || '';
   const [adminPassword, setAdminPassword] = useState('');
   const [usersTarget, setUsersTarget] = useState(null);
-  const [segmentTarget, setSegmentTarget] = useState(null);
   const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED !== 'false';
 
   // adminPassword가 없으면 비밀번호 입력 창 표시
@@ -107,11 +104,6 @@ export default function AdminV2Page() {
             adminPassword={adminPassword}
             basePath={basePath}
             onTargetChange={setUsersTarget}
-          />
-          <AdminV2SegmentsPanel
-            adminPassword={adminPassword}
-            basePath={basePath}
-            onSegmentChange={setSegmentTarget}
           />
           <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
           <AdminV2ImportsFlow adminPassword={adminPassword} basePath={basePath} />

@@ -2,33 +2,34 @@ import { useEffect, useMemo, useState } from 'react';
 import { withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 
-const typeOptions = ['ALERT', 'REMINDER', 'BROADCAST'];
-const variantOptions = ['EXPIRY', 'DEPOSIT', 'MAINTENANCE'];
+// 백엔드 허용 타입/버전 목록과 일치시킴
+const typeOptions = ['EXPIRY_D2', 'EXPIRY_D0', 'ATTENDANCE_D2', 'TICKET_ZERO', 'SOCIAL_PROOF'];
+const variantOptions = ['', 'A', 'B', 'LOSS_BANNER_A', 'LOSS_BANNER_B', 'SOCIAL_PROOF_A', 'SOCIAL_PROOF_B', 'TICKET_ZERO_A', 'TICKET_ZERO_B'];
 
 const typeLabel = (t) => {
-  switch (t) {
-    case 'ALERT':
-      return '경고';
-    case 'REMINDER':
-      return '리마인더';
-    case 'BROADCAST':
-      return '공지';
-    default:
-      return String(t || '');
-  }
+  const map = {
+    EXPIRY_D2: '만료 2일 전',
+    EXPIRY_D0: '만료 당일',
+    ATTENDANCE_D2: '출석 안내',
+    TICKET_ZERO: '티켓 소진',
+    SOCIAL_PROOF: '소셜 증빙',
+  };
+  return map[t] || String(t || '');
 };
 
 const variantLabel = (v) => {
-  switch (v) {
-    case 'EXPIRY':
-      return '만료';
-    case 'DEPOSIT':
-      return '입금';
-    case 'MAINTENANCE':
-      return '점검';
-    default:
-      return String(v || '');
-  }
+  if (!v) return '없음';
+  const map = {
+    A: 'A',
+    B: 'B',
+    LOSS_BANNER_A: 'LOSS_BANNER_A',
+    LOSS_BANNER_B: 'LOSS_BANNER_B',
+    SOCIAL_PROOF_A: 'SOCIAL_PROOF_A',
+    SOCIAL_PROOF_B: 'SOCIAL_PROOF_B',
+    TICKET_ZERO_A: 'TICKET_ZERO_A',
+    TICKET_ZERO_B: 'TICKET_ZERO_B',
+  };
+  return map[v] || String(v || '');
 };
 
 const statusLabel = (s) => {
@@ -47,13 +48,14 @@ const statusLabel = (s) => {
 };
 
 export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
-  const [type, setType] = useState('ALERT');
-  const [variant, setVariant] = useState('EXPIRY');
+  const [type, setType] = useState('EXPIRY_D2');
+  const [variant, setVariant] = useState('');
   const [targetText, setTargetText] = useState('');
   const [scheduledAtLocal, setScheduledAtLocal] = useState('');
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState(null);
   const [templatePreview, setTemplatePreview] = useState(null);
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
@@ -169,6 +171,24 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     }
   };
 
+  const cancelAll = async () => {
+    if (!notifications.length) return;
+    try {
+      setBulkDeleting(true);
+      await Promise.all(
+        notifications.map((n) =>
+          apiFetch(`/api/vault/admin/notifications/${n.id}/cancel`, { method: 'POST' }).catch(() => null)
+        )
+      );
+      load();
+      pushToast({ ok: true, message: '알림 전체 취소 완료' });
+    } catch (err) {
+      pushToast({ ok: false, message: '전체 취소 실패' });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/90 p-5" id="notifications">
       <div className="mb-5">
@@ -230,6 +250,16 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
 
       <div className="pt-6 border-t border-[var(--v2-border)]">
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">최근 알림</p>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            onClick={cancelAll}
+            disabled={bulkDeleting || loading || notifications.length === 0}
+            className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-1 text-xs text-[var(--v2-text)] hover:border-[var(--v2-warning)]/60 disabled:opacity-50"
+          >
+            전체 삭제
+          </button>
+        </div>
         <div className="mt-4">
           {loading ? <p className="text-sm text-[var(--v2-muted)]">불러오는 중...</p> : null}
           <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/50 overflow-x-auto">

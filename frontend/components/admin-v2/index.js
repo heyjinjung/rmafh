@@ -4,7 +4,6 @@ export { default as AdminV2QuickActions } from './AdminV2QuickActions';
 export { default as AdminV2DataGridPreview } from './AdminV2DataGridPreview';
 export { default as AdminV2JobsPanel } from './AdminV2JobsPanel';
 export { default as AdminV2UsersGrid } from './AdminV2UsersGrid';
-export { default as AdminV2SegmentsPanel } from './AdminV2SegmentsPanel';
 export { default as AdminV2ImportsFlow } from './AdminV2ImportsFlow';
 export { default as AdminV2OperationsPanel } from './AdminV2OperationsPanel';
 export { default as AdminV2NotificationsPanel } from './AdminV2NotificationsPanel';
