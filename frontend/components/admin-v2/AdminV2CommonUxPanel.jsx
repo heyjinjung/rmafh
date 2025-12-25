@@ -68,7 +68,7 @@ export default function AdminV2CommonUxPanel() {
             <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={copyKey}>복사</button>
             <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={regenerate}>재생성</button>
           </div>
-          <p className="text-xs text-[var(--v2-muted)]">서버 응답 헤더 `Idempotency-Status`가 toast 영역에 표기됩니다.</p>
+          <p className="text-xs text-[var(--v2-muted)]">서버 응답 헤더 `Idempotency-Status`가 토스트 영역에 표기됩니다.</p>
         </div>
 
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">

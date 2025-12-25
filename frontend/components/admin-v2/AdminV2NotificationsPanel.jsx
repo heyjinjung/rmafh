@@ -319,8 +319,8 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
               <p className="font-semibold text-[var(--v2-accent)]">중복 방지 정책</p>
               <ul className="mt-2 space-y-1 list-disc list-inside text-[var(--v2-muted)]">
-                <li>payload hash + variant 기반 dedupe_key 자동 생성</li>
-                <li>동일 dedupe_key 24h 내 재요청 시 200/409 반환</li>
+                <li>페이로드 해시 + variant 기반으로 dedupe_key 자동 생성</li>
+                <li>동일 dedupe_key 기준, 24h 내 재요청 시 200/409 반환</li>
                 <li>예약 발송은 스케줄 타임존을 UTC로 고정</li>
               </ul>
             </div>
@@ -331,7 +331,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs text-[var(--v2-muted)]">예약 시 Shadow → Apply 순으로 두 번 실행 권장</div>
+            <div className="text-xs text-[var(--v2-muted)]">예약 시 Shadow(미리보기) → Apply(적용) 순으로 두 번 실행 권장</div>
             <div className="space-x-2">
               <button
                 type="button"
@@ -446,7 +446,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <span>페이지 {page}</span>
               <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => p + 1)}>다음</button>
             </div>
-            <div>Idempotent + 서버 API 연동 완료</div>
+            <div>멱등 처리 + 서버 API 연동 완료</div>
           </div>
         </div>
       </div>
