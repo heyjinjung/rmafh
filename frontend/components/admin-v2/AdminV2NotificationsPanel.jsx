@@ -87,35 +87,28 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [page, setPage] = useState(1);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(null);
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
-  const downloadCsv = () => {
-    try {
-      const header = ['id', 'type', 'variant_id', 'status', 'scheduled_at', 'created_at'];
       const escape = (v) => {
         const s = String(v ?? '');
         if (/[\n\r,"]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
         return s;
       };
 
-      const lines = [header.join(',')].concat(
-        notifications.map((n) => [n.id, n.type, n.variant_id || '', n.status, n.scheduled_at || '', n.created_at || ''].map(escape).join(',')),
-      );
-      const payload = `${lines.join('\n')}\n`;
-
-      const blob = new Blob([payload], { type: 'text/csv;charset=utf-8' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `notifications-page${page}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      pushToast({ ok: false, message: 'CSV 생성 실패' });
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ page: '1', page_size: '10', order: 'desc' });
+      const resp = await apiFetch(`/api/vault/admin/notifications?${params.toString()}`);
+      const items = resp?.data?.items || [];
+      setNotifications(items.map(normalizeNotification));
+    } catch (err) {
+      setError('알림 목록 불러오기 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
     }
   };
 
