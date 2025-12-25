@@ -167,6 +167,43 @@
 
 ### 7.3 E2E 시나리오
 - [ ] 세그먼트 생성 → 대량 연장 → 결과 확인
+	- 목적: Saved Segment 기반으로 Extend Expiry를 Shadow→Apply로 1회씩 실행하고, Users/Audit에서 결과를 검증한다.
+	- 사전 조건
+		- `/admin/v2` 접속 + Admin Password 입력 완료
+		- E2E 대상이 0명이 되지 않도록(=Impact Preview candidates가 0이 되지 않도록) 세그먼트 필터를 단순하게 설정 권장
+	- 절차(클릭/입력 포인트)
+		1) Segments 섹션에서 세그먼트 생성
+			- `Segment Name`에 예: `e2e_unlocked_only` 입력
+			- `Status`에서 1개만 선택(권장: `UNLOCKED`)하고, 나머지 필터(Expires/Deposit/Attendance/Telegram/Review)는 비움
+			- `Save Segment` 클릭
+			- 우측 `Saved Segments` 목록에서 방금 만든 세그먼트의 `Apply` 클릭
+			- 통과 기준: `Apply` 클릭 후 세그먼트가 선택(하이라이트)되고, 이후 Operations에서 세그먼트 타겟팅 오류가 발생하지 않는다.
+		2) Users 섹션에서 검증용 샘플 1명 선정(Apply 전/후 비교용)
+			- `Status` 필터를 세그먼트와 동일하게 맞춤(예: `UNLOCKED`)
+			- 임의의 행 1개를 클릭 → 우측 상세 패널 `Show` → `external_user_id`와 기존 `expires_at` 값을 기록
+		3) Operations 섹션에서 Extend Expiry (Shadow) 실행
+			- `Target Scope`에서 `Saved Segment` 선택(기본값)
+			- `Extend Expiry` 영역에서 `Shadow mode` 체크(기본값 true)
+			- `Days to extend` = 1 (주의: 내부적으로 24h로 변환되며, 1~3일 범위만 허용)
+			- `Reason` = OPS/PROMO/ADMIN 중 선택(권장: OPS)
+			- `Safety` 영역에서 입력칸에 `apply` 입력 → 버튼 활성화 확인
+			- `Submit Extend Expiry (idempotent)` 클릭
+			- 통과 기준: 토스트에 `Extend Expiry (Shadow) 프리뷰`가 표시되고 `candidates: N`(N>0)이 노출된다.
+		4) Audit Log에서 Shadow 실행 기록 확인
+			- `Audit & Jobs` 섹션 → `Audit Log` 영역
+			- 통과 기준: 방금 실행의 request_id(토스트 기준)로 검색 시, `endpoint`가 `.../operations/extend-expiry`이고 `Status=SUCCESS`인 로그가 확인된다.
+		5) Operations 섹션에서 Extend Expiry (Apply) 실행
+			- 동일 설정 유지한 채 `Shadow mode` 체크 해제(false)
+			- `Submit Extend Expiry (idempotent)` 클릭
+			- 통과 기준: 토스트에 `Extend Expiry 적용 완료`가 표시되고 `updated: N`(N>0), `new_expires_at`가 노출된다.
+		6) Users에서 Apply 결과 확인(샘플 1명)
+			- Users `Query`에 2)에서 기록한 `external_user_id`를 입력해 해당 사용자로 좁힘
+			- 행 클릭 → 상세 패널에서 `expires_at`이 Apply 전보다 +1일(또는 +24h) 증가했는지 확인
+			- 통과 기준: `expires_at` 변경이 확인되며, 5)의 `new_expires_at`과 정합(시간대 차이는 허용)하다.
+	- 참고/트러블슈팅
+		- candidates가 0이면: 세그먼트 필터를 단순화(예: Status만 사용)하거나, 운영 DB 데이터 분포(해당 status 존재 여부)를 먼저 확인
+		- Apply 버튼이 비활성/실패하면: `Safety` 입력에 정확히 `apply`(소문자) 입력되어 있는지 확인
+		- 이 플로우는 Job을 생성하지 않는다(Extend Expiry는 audit에 기록). Job 기반 검증은 Bulk Update/Imports 시나리오에서 수행.
 - [ ] CSV 업로드 → Job 완료 → 오류 다운로드
 - [x] 알림 발송 → 리스트 조회 → 재시도
 - [x] 감사 로그에서 request_id 추적
@@ -212,12 +249,60 @@
 		- job worker 관련 문제는 worker 컨테이너/프로세스만 중지하여 신규 처리만 멈추고, 데이터는 보존
 	- DB 롤백 원칙: 이미 적용된 DDL은 일반적으로 되돌리지 않고(리스크 큼), 플래그 OFF로 기능만 차단 후 원인 분석/핫픽스
 
+	### 9.3 운영자 매뉴얼 배포 및 교육 진행(완료 기준 포함)
+	- 목적: 운영자가 “무엇을 눌러도 되는지/안되는지”, “장애 시 어떤 순서로 대응하는지”를 문서+리허설로 숙지.
+	- 배포 대상 문서(최소):
+		- `docs/ADMIN_GUIDE_VAULT_V2.md` (접속/권한/기본 동작)
+		- `docs/ADMIN_AUDIT_OPERATIONS_GUIDE.md` (request_id/job/idempotency 추적)
+		- `docs/RUNBOOK_VAULT_V2.md` (장애 대응/점검)
+		- `docs/SERVER_DEPLOY_XMAS.md` 또는 배포 가이드(환경별 절차/체크)
+		- 본 문서: `docs/ADMIN_REDESIGN_CHECKLIST_VAULT_V2.md` (릴리즈 체크리스트)
+	- 교육(30~45분) 아젠다(권장):
+		1) `/admin` vs `/admin/v2` 전환 원칙 및 기능 플래그 의미
+		2) Operations: 영향(Impact) 확인 → Shadow → Apply 순서
+		3) Jobs/Audit: request_id/job_id/idempotency_key로 추적하는 법
+		4) Notifications: scheduled_at 의미, Retry/Cancel 허용 상태
+		5) 실패 아이템 CSV 다운로드 및 재처리 루틴
+		6) 롤백: UI 차단(플래그 OFF) + worker 중지 + 원인 분석 순서
+	- 완료 기준(체크 요건):
+		- 운영자 1명 이상이 실제로 E2E 1회 수행(세그먼트→대량 연장 또는 알림 예약→취소/재시도)
+		- 교육 자료 링크/녹화/요약(슬랙/노션 등) 공유 완료
+		- “긴급 대응 연락처/담당자”와 “롤백 1줄 요약”이 RUNBOOK에 반영됨
+
 ## 10. 최종 승인 체크리스트
 - [ ] FE/BE/OPS 최종 승인
 - [ ] QA 시나리오 전수 통과
 - [ ] 문서/가이드 업데이트 완료
 - [ ] 배포/롤백 플랜 승인
-먼저 빠르게 체감시킬 변경(순서 제안)
+
+	### 10.1 FE/BE/OPS 최종 승인(완료 기준)
+	- FE 승인: `npm run lint` 경고만(에러 0) + `/admin/v2` 주요 패널 렌더/기능 동작 스모크 완료
+	- BE 승인: `backend: pytest (docker)` 통과 + 신규 API(notifications retry/cancel, job items csv) 스모크 완료
+	- OPS 승인: 모니터링/알림(오류율/Job 실패율) 확인 경로 + 장애 시 조치 순서(runbook) 확인
+
+	### 10.2 QA 시나리오 전수 통과(완료 기준)
+	- E2E 최소 세트:
+		- 세그먼트 생성 → 대량 연장(Shadow/Apply) → 결과 확인(Users/Jobs/Audit)
+		- CSV 업로드 → Job 완료 → 오류 CSV 다운로드
+		- 알림 예약(scheduled_at) → 리스트 조회 → (상태 조건 충족 시) Retry/Cancel
+	- 회귀 체크:
+		- 기존 `/admin` 플로우 영향 없음
+		- Admin password 누락 시 401 일관
+
+	### 10.3 문서/가이드 업데이트 완료(완료 기준)
+	- 다음 문서들의 “실제 구현”과의 정합성 점검 완료(최소 1회):
+		- `docs/API_SPEC_VAULT_V2.md`
+		- `docs/ADMIN_GUIDE_VAULT_V2.md`
+		- `docs/ADMIN_AUDIT_OPERATIONS_GUIDE.md`
+		- `docs/RUNBOOK_VAULT_V2.md`
+		- `docs/ADMIN_REDESIGN_CHECKLIST_VAULT_V2.md`
+
+	### 10.4 배포/롤백 플랜 승인(완료 기준)
+	- 스테이징(또는 로컬 docker)에서 “플래그 ON/OFF” 드라이런 1회 수행
+	- 배포 체크리스트(섹션 9) 기반으로 담당자(OPS/BE/FE) 서명/승인 기록 남김
+
+	## 11. 참고(향후 개선 제안)
+	먼저 빠르게 체감시킬 변경(순서 제안)
 
 Admin v2 대시보드 상단에 “최근 Job/Notify/Audit” 카드 + 상태 배지 추가: AdminV2KpiCards.jsx, AdminV2JobsPanel.jsx 확장. 데이터 소스는 /api/vault/admin/jobs?page=1&page_size=5&order=desc(상태/updated_at), /api/vault/admin/notifications?page=1&page_size=5&order=desc(type/state), 감사 로그는 /api/vault/admin/audit-log?page=1&page_size=5&order=desc(request_id, admin_user, action) 목록 노출.
 공통 오류/토스트: withIdempotency(frontend/lib/apiClient.js 예상) 응답에서 code/summary/detail, idempotency-key, Idempotency-Status를 추출해 전역 에러 핸들러로 토스트/패널에 표준 포맷 표시. UI 훅/컴포넌트는 AdminV2CommonUxPanel.jsx 예제/코드와 전역 토스트(예: useToast) 연결.
