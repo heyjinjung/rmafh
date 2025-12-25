@@ -30,6 +30,20 @@
 			],
 			"isBackground": false,
 			"problemMatcher": []
+		},
+		{
+			"label": "frontend: lint (post user-crud)",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Set-Location frontend; npm -s run lint"
+			],
+			"isBackground": false,
+			"problemMatcher": []
 		}
 	]
 }

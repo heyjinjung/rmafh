@@ -1,8 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
-import { withIdempotency } from '../../lib/apiClient';
-
-const rowHeight = 48;
-const viewportHeight = 440;
+import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
+import { pushToast } from './toastBus';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 const columnDefs = [
   { key: 'external_user_id', label: '외부 사용자 ID' },
@@ -40,9 +38,18 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
   const pageSize = 50;
-  const [scrollTop, setScrollTop] = useState(0);
   const [selectedRow, setSelectedRow] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [panelMode, setPanelMode] = useState('none'); // none | edit | create
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    external_user_id: '',
+    nickname: '',
+    joined_date: '',
+    deposit_total: '0',
+    telegram_ok: false,
+    review_ok: false,
+  });
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -66,7 +73,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       const nextRows = Array.isArray(data?.users) ? data.users : [];
       setRows(nextRows);
       setTotal(Number(data?.total || 0));
-      setScrollTop(0);
     } catch (err) {
       setError(err?.payload || err?.message || '불러오기 실패');
       setRows([]);
@@ -84,14 +90,149 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setPage(1);
   }, [query, statusFilter]);
 
-  const totalHeight = rows.length * rowHeight;
-  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 3);
-  const visibleCount = Math.ceil(viewportHeight / rowHeight) + 6;
-  const endIndex = Math.min(rows.length, startIndex + visibleCount);
-  const visibleRows = rows.slice(startIndex, endIndex);
-  const offsetY = startIndex * rowHeight;
+  const resetFormForCreate = () => {
+    setForm({
+      external_user_id: '',
+      nickname: '',
+      joined_date: '',
+      deposit_total: '0',
+      telegram_ok: false,
+      review_ok: false,
+    });
+  };
 
-  const onScroll = useCallback((e) => setScrollTop(e.currentTarget.scrollTop), []);
+  const setFormFromRow = (row) => {
+    setForm({
+      external_user_id: row?.external_user_id || '',
+      nickname: row?.nickname || '',
+      joined_date: row?.joined_date || '',
+      deposit_total: String(row?.deposit_total ?? 0),
+      telegram_ok: Boolean(row?.telegram_ok),
+      review_ok: Boolean(row?.review_ok),
+    });
+  };
+
+  const openCreate = () => {
+    setSelectedRow(null);
+    setPanelMode('create');
+    resetFormForCreate();
+    setDrawerOpen(true);
+  };
+
+  const onRowClick = (row) => {
+    setSelectedRow(row);
+    setPanelMode('edit');
+    setFormFromRow(row);
+    setDrawerOpen(true);
+  };
+
+  const ensureAuth = () => {
+    if (adminPassword) return true;
+    pushToast({ ok: false, message: '관리자 비밀번호를 먼저 입력하세요.' });
+    return false;
+  };
+
+  const submitCreate = async () => {
+    if (!ensureAuth()) return;
+    const external_user_id = String(form.external_user_id || '').trim();
+    if (!external_user_id) {
+      pushToast({ ok: false, message: '외부 사용자 ID는 필수입니다.' });
+      return;
+    }
+
+    const body = {
+      external_user_id,
+      nickname: form.nickname?.trim() || null,
+      joined_date: form.joined_date?.trim() || null,
+      deposit_total: Number(form.deposit_total || 0),
+      telegram_ok: Boolean(form.telegram_ok),
+      review_ok: Boolean(form.review_ok),
+    };
+
+    try {
+      setSaving(true);
+      await apiFetch('/api/vault/admin/users', { method: 'POST', body });
+      pushToast({ ok: true, message: '사용자 생성 완료' });
+      setDrawerOpen(false);
+      setPanelMode('none');
+      setSelectedRow(null);
+      setQuery(external_user_id);
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '생성 실패', detail: info.detail || info.code });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitUpdate = async () => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const payload = {};
+    const baseNickname = selectedRow?.nickname || '';
+    const baseJoined = selectedRow?.joined_date || '';
+    const baseDeposit = Number(selectedRow?.deposit_total ?? 0);
+    const baseTelegram = Boolean(selectedRow?.telegram_ok);
+    const baseReview = Boolean(selectedRow?.review_ok);
+
+    const nextNickname = form.nickname ?? '';
+    const nextJoined = (form.joined_date ?? '').trim();
+    const nextDeposit = Number(form.deposit_total || 0);
+    const nextTelegram = Boolean(form.telegram_ok);
+    const nextReview = Boolean(form.review_ok);
+
+    if (nextNickname !== baseNickname) payload.nickname = nextNickname;
+    if (nextJoined !== baseJoined) payload.joined_date = nextJoined;
+    if (Number.isFinite(nextDeposit) && nextDeposit !== baseDeposit) payload.deposit_total = nextDeposit;
+    if (nextTelegram !== baseTelegram) payload.telegram_ok = nextTelegram;
+    if (nextReview !== baseReview) payload.review_ok = nextReview;
+
+    if (!Object.keys(payload).length) {
+      pushToast({ ok: false, message: '변경된 내용이 없습니다.' });
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'PATCH', body: payload });
+      pushToast({ ok: true, message: '저장 완료' });
+      setDrawerOpen(false);
+      setPanelMode('none');
+      setSelectedRow(null);
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '저장 실패', detail: info.detail || info.code });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitDelete = async () => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const ok = typeof window !== 'undefined'
+      ? window.confirm(`정말 삭제할까요?\n외부 사용자 ID: ${selectedRow.external_user_id}\nuser_id: ${selectedRow.user_id}`)
+      : false;
+    if (!ok) return;
+
+    try {
+      setSaving(true);
+      await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'DELETE' });
+      pushToast({ ok: true, message: '삭제 완료' });
+      setDrawerOpen(false);
+      setPanelMode('none');
+      setSelectedRow(null);
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '삭제 실패', detail: info.detail || info.code });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const toggleSort = (key) => {
     if (!sortableKeys.has(key)) {
@@ -116,11 +257,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     onTargetChange({ source: 'users-grid', mode: 'page', user_ids: [String(selectedRow.user_id)] });
   }, [onTargetChange, selectedRow]);
 
-  const onRowClick = (row) => {
-    setSelectedRow(row);
-    setDrawerOpen(true);
-  };
-
   return (
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="users">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -128,6 +264,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">검색/정렬 후 클릭해서 편집 대상으로 선택하세요.</p>
         </div>
+        <button
+          type="button"
+          className="rounded-full border border-[var(--v2-border)] px-4 py-2 text-xs text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
+          onClick={openCreate}
+        >
+          사용자 생성
+        </button>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -219,14 +362,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div
             className="relative h-[440px] overflow-auto"
-            onScroll={onScroll}
             role="presentation"
           >
-            <div style={{ height: `${totalHeight}px` }}>
-              <table
-                className="table-fixed min-w-full text-left text-sm"
-                style={{ transform: `translateY(${offsetY}px)` }}
-              >
+            <table className="table-fixed min-w-full text-left text-sm">
                 <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
                   <tr>
                     {columnDefs.map((col) => (
@@ -244,7 +382,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--v2-border)]">
-                  {visibleRows.map((row) => {
+                  {rows.map((row) => {
                     const isSelected = selectedRow?.external_user_id === row.external_user_id;
                     return (
                       <tr
@@ -253,7 +391,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                           'cursor-pointer transition hover:bg-[var(--v2-surface)]',
                           isSelected ? 'bg-[var(--v2-surface)]/80 border-l-2 border-[var(--v2-accent)]' : '',
                         ].join(' ')}
-                        style={{ height: `${rowHeight}px` }}
                         onClick={() => onRowClick(row)}
                       >
                         {columnDefs.map((col) => {
@@ -270,8 +407,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+            </table>
           </div>
 
           <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0">
@@ -288,7 +424,93 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             </div>
 
             {!selectedRow ? (
-              <p className="mt-3 text-sm text-[var(--v2-muted)]">행을 클릭하면 우측 패널에 상세가 표시됩니다.</p>
+              panelMode === 'create' ? (
+                <div className="mt-3 space-y-3 text-sm text-[var(--v2-text)]">
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID (필수)</div>
+                    <input
+                      value={form.external_user_id}
+                      onChange={(e) => setForm((prev) => ({ ...prev, external_user_id: e.target.value }))}
+                      placeholder="예: 12345"
+                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
+                    <input
+                      value={form.nickname}
+                      onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                      placeholder="(선택)"
+                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
+                      <input
+                        value={form.joined_date}
+                        onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                        placeholder="2025-12-25"
+                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
+                      <input
+                        inputMode="numeric"
+                        value={form.deposit_total}
+                        onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.telegram_ok)}
+                        onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                      />
+                      <span>텔레그램 인증</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(form.review_ok)}
+                        onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                      />
+                      <span>리뷰 승인</span>
+                    </label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                      onClick={submitCreate}
+                      disabled={saving}
+                    >
+                      생성
+                    </button>
+                    <button
+                      type="button"
+                      className="flex-1 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 disabled:opacity-50"
+                      onClick={() => {
+                        setDrawerOpen(false);
+                        setPanelMode('none');
+                      }}
+                      disabled={saving}
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-[var(--v2-muted)]">행을 클릭하면 우측 패널에서 편집할 수 있습니다.</p>
+              )
             ) : !drawerOpen ? (
               <p className="mt-3 text-sm text-[var(--v2-muted)]">상세 패널이 숨김 상태입니다.</p>
             ) : (
@@ -297,14 +519,61 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID</div>
                   <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
                 </div>
+
                 <div>
                   <div className="text-xs text-[var(--v2-muted)]">사용자 ID</div>
                   <div className="font-mono">{String(selectedRow.user_id || '')}</div>
                 </div>
+
                 <div>
                   <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
-                  <div>{selectedRow.nickname || '-'}</div>
+                  <input
+                    value={form.nickname}
+                    onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                    className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                  />
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
+                    <input
+                      value={form.joined_date}
+                      onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                      placeholder={selectedRow.joined_date || '2025-12-25'}
+                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
+                    <input
+                      inputMode="numeric"
+                      value={form.deposit_total}
+                      onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.telegram_ok)}
+                      onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                    />
+                    <span>텔레그램 인증</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.review_ok)}
+                      onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                    />
+                    <span>리뷰 승인</span>
+                  </label>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="text-xs text-[var(--v2-muted)]">생성일</div>
@@ -315,33 +584,27 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <div>{selectedRow.expires_at || '-'}</div>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">골드</div>
-                    <div>{selectedRow.gold_status || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">플래티넘</div>
-                    <div>{selectedRow.platinum_status || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">다이아</div>
-                    <div>{selectedRow.diamond_status || '-'}</div>
-                  </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                    onClick={submitUpdate}
+                    disabled={saving}
+                  >
+                    저장
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
+                    onClick={submitDelete}
+                    disabled={saving}
+                  >
+                    삭제
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">출석(플래티넘)</div>
-                    <div>{String(selectedRow.platinum_attendance_days ?? '-')}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">총 입금액</div>
-                    <div>{typeof selectedRow.deposit_total === 'number' ? selectedRow.deposit_total.toLocaleString() : (selectedRow.deposit_total || '-')}</div>
-                  </div>
-                </div>
-                <p className="text-xs text-[var(--v2-muted)]">
-                  참고: 현재 백엔드에 user 상세 조회 API(`GET /api/vault/admin/users/{'{user_id}'}`)가 없어, 리스트 응답 필드만 표시합니다.
-                </p>
+
+                <p className="text-xs text-[var(--v2-muted)]">저장은 user_admin_snapshot(닉네임/가입일/입금/텔레그램/리뷰)을 수정합니다.</p>
               </div>
             )}
           </aside>
