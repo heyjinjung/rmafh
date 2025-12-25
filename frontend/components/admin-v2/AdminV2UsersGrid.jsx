@@ -104,14 +104,17 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   };
 
   const setFormFromRow = (row) => {
-    setForm({
+    console.log('setFormFromRow called with row:', row);
+    const newForm = {
       external_user_id: row?.external_user_id || '',
       nickname: row?.nickname || '',
       joined_date: row?.joined_date || '',
       deposit_total: String(row?.deposit_total ?? 0),
       telegram_ok: Boolean(row?.telegram_ok),
       review_ok: Boolean(row?.review_ok),
-    });
+    };
+    console.log('setFormFromRow new form state:', newForm);
+    setForm(newForm);
   };
 
   const openCreate = () => {
@@ -122,10 +125,12 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   };
 
   const onRowClick = (row) => {
+    console.log('onRowClick called with row:', row);
     setSelectedRow(row);
     setPanelMode('edit');
     setFormFromRow(row);
     setDrawerOpen(true);
+    console.log('onRowClick completed: selectedRow updated');
   };
 
   const ensureAuth = () => {
@@ -556,7 +561,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
                   <input
                     value={form.nickname}
-                    onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                    onChange={(e) => {
+                      console.log('nickname input changed:', e.target.value);
+                      setForm((prev) => ({ ...prev, nickname: e.target.value }));
+                    }}
                     className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                   />
                 </div>
@@ -587,7 +595,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <input
                       type="checkbox"
                       checked={Boolean(form.telegram_ok)}
-                      onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                      onChange={(e) => {
+                        console.log('telegram_ok checkbox changed:', e.target.checked);
+                        setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }));
+                      }}
                     />
                     <span>텔레그램 인증</span>
                   </label>
@@ -595,7 +606,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <input
                       type="checkbox"
                       checked={Boolean(form.review_ok)}
-                      onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                      onChange={(e) => {
+                        console.log('review_ok checkbox changed:', e.target.checked);
+                        setForm((prev) => ({ ...prev, review_ok: e.target.checked }));
+                      }}
                     />
                     <span>리뷰 승인</span>
                   </label>
