@@ -850,13 +850,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">다이아 입금 (50만)</div>
-                    <div className="text-xs text-[var(--v2-muted)]">자동/수동 해금</div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
+                <div className="flex gap-2">
                   <button
                     type="button"
                     className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
