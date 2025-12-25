@@ -1,5 +1,4 @@
-# Frontend build
-FROM node:18-alpine AS builder
+FROM node:18 AS builder
 WORKDIR /app
 ENV NPM_CONFIG_REGISTRY=https://registry.npmjs.org \
 	npm_config_loglevel=error \
@@ -12,8 +11,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Runtime image
-FROM node:18-alpine AS runner
+FROM node:18 AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 # Next.js standalone output
