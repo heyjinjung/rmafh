@@ -6,6 +6,8 @@ from app import config, db
 
 async def process_once(conn):
     cur = conn.cursor()
+    cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
+    cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
     now = datetime.now(timezone.utc)
     cur.execute(
         """

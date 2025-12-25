@@ -2,12 +2,14 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.0.1
-- 작성일: 2025-12-26
+- 문서 버전: v1.0.3
+- 작성일: 2025-12-25
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
+- 2025-12-25 v1.0.3: Job/worker 경로 전반에 config 기반 lock/statement timeout을 적용.
+- 2025-12-25 v1.0.2: Admin import 경로 lock/statement timeout을 config 값으로 적용.
 - 2025-12-26 v1.0.1: 진행 현황 및 완료 항목 반영.
 - 2025-12-26 v1.0.0: 최초 작성 (상세 구현/QA/배포 체크리스트).
 
@@ -16,7 +18,7 @@
 - API/DB 변경은 반드시 스키마 버전과 문서 업데이트를 동반한다.
 - 멱등성 키/Job ID는 FE/BE 양쪽 로그에서 추적 가능해야 한다.
 
-## 진행 현황 (2025-12-26)
+## 진행 현황 (2025-12-25)
 - 완료: `docs/API_SPEC_VAULT_V2.md` Admin/Job/Idempotency 반영
 - 완료: idempotency_keys/admin_jobs/admin_job_items 스키마 추가
 - 완료: `/api/vault/admin/jobs` 스캐폴딩 + 목록/상세/아이템/재시도
@@ -70,7 +72,7 @@
 ### 4.6 성능/쿼리
 - [ ] 사용자 리스트 API 페이지네이션/정렬/필터 인덱스
 - [ ] 대량 업데이트 SQL 배치 처리 (execute_values)
-- [ ] Job 처리 타임아웃/락 타임아웃 설정
+ - [x] Job 처리 타임아웃/락 타임아웃 설정 (관리자 import/관리자 job/worker 경로에 config 기반 lock/statement timeout 적용)
 
 ## 5. 프론트엔드 체크리스트
 ### 5.1 라우팅/구조

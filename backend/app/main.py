@@ -54,6 +54,11 @@ from app.schemas import (
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
 logger = logging.getLogger("vault.idempotency")
 
+
+def _apply_job_timeouts(cur):
+    cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
+    cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
+
 # Allow local/dev origins for FE preview and Docker usage.
 app.add_middleware(
     CORSMiddleware,
@@ -798,8 +803,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
-        cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
+        _apply_job_timeouts(cur)
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
         if idem["status"] == "replayed":
@@ -1104,8 +1108,7 @@ async def admin_imports(body: AdminImportRequest, request: Request, response: Re
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
-        cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
+        _apply_job_timeouts(cur)
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
         if idem["status"] == "replayed":
@@ -1625,9 +1628,7 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '20s'")
+        _apply_job_timeouts(cur)
         now = _now()
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
@@ -1777,9 +1778,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
     inserted = 0
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '20s'")
+        _apply_job_timeouts(cur)
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
         if idem["status"] == "replayed":
@@ -1957,9 +1956,7 @@ async def admin_create_job(
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '20s'")
+        _apply_job_timeouts(cur)
 
         idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
         if idem["status"] == "replayed":
@@ -2665,9 +2662,7 @@ async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '10s'")
+        _apply_job_timeouts(cur)
 
         cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
         if not cur.fetchone():
@@ -2765,9 +2760,7 @@ async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustReque
     delta_days = int(body.delta_days or 0)
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '10s'")
+        _apply_job_timeouts(cur)
 
         cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
         snap_row = cur.fetchone()
@@ -2858,9 +2851,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
 
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '10s'")
+        _apply_job_timeouts(cur)
 
         cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
         snap_row = cur.fetchone()
@@ -2959,9 +2950,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
 async def compensation_enqueue(body: CompensationEnqueueRequest, request: Request, _auth: str = Depends(verify_admin_password)):
     with db.get_conn() as conn:
         cur = conn.cursor()
-        if config.APP_ENV == "test":
-            cur.execute("SET LOCAL lock_timeout = '2s'")
-            cur.execute("SET LOCAL statement_timeout = '10s'")
+        _apply_job_timeouts(cur)
         user_id = body.user_id
         if user_id is None:
             user_id = _resolve_user_id(cur, user_id=None, external_user_id=body.external_user_id, default_user_id=None, create_if_missing=True)
