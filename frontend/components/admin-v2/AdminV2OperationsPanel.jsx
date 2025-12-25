@@ -308,15 +308,15 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
       </ol>
       <div className="space-y-4">
         {/* 대상 직접 입력/필터/CSV/최근 */}
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-2">
-          <b>대상 지정</b>
-          <div className="flex flex-col gap-2 md:flex-row md:gap-4">
-            <input type="text" placeholder="user_id 직접 입력 (쉼표/엔터 구분)" value={manualUserIds} onChange={e => setManualUserIds(e.target.value)} className="rounded border px-2 py-1 flex-1" />
-            <input type="text" placeholder="조건(예: 상태: UNLOCKED, 만료일: 2025-12-31 이전)" value={manualFilter} onChange={e => setManualFilter(e.target.value)} className="rounded border px-2 py-1 flex-1" />
-            <input type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} className="flex-1" />
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">대상 지정</p>
+          <div className="flex flex-col gap-2 md:flex-row md:gap-3">
+            <input type="text" placeholder="user_id 직접 입력 (쉼표/엔터 구분)" value={manualUserIds} onChange={e => setManualUserIds(e.target.value)} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder-[var(--v2-muted)] flex-1" />
+            <input type="text" placeholder="조건(예: 상태: UNLOCKED, 만료일: 2025-12-31 이전)" value={manualFilter} onChange={e => setManualFilter(e.target.value)} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder-[var(--v2-muted)] flex-1" />
+            <input type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] flex-1 file:mr-2 file:rounded file:border-0 file:bg-[var(--v2-accent)] file:px-2 file:py-1 file:text-xs file:font-semibold file:text-black file:cursor-pointer" />
           </div>
-          <div className="flex gap-2 mt-2">
-            <select className="rounded border px-2 py-1 text-xs" onChange={e => {
+          <div className="flex gap-2 flex-wrap">
+            <select className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-text)]" onChange={e => {
               const v = e.target.value;
               if (!v) return;
               setManualUserIds(v);
@@ -324,33 +324,32 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               <option value="">최근 사용 대상 선택</option>
               {recentTargets.map((t, i) => <option key={i} value={t}>{t}</option>)}
             </select>
-            <button type="button" className="rounded border px-2 py-1 text-xs" onClick={() => saveRecentTarget(manualUserIds)}>현재 입력 저장</button>
+            <button type="button" className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] hover:bg-[var(--v2-surface-3)] transition-colors px-3 py-2 text-xs font-semibold text-[var(--v2-text)]" onClick={() => saveRecentTarget(manualUserIds)}>현재 입력 저장</button>
           </div>
-          <div className="text-xs text-[var(--v2-muted)]">user_id 여러 명 입력 시 쉼표(,) 또는 엔터로 구분, 조건은 예시 참고</div>
+          <p className="text-xs text-[var(--v2-muted)]">user_id 여러 명 입력 시 쉼표(,) 또는 엔터로 구분, 조건은 예시 참고</p>
         </div>
         {/* 만료일 연장 */}
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <b>만료일 연장</b>
-          <div className="mt-2 flex gap-3">
-            <input type="number" min="1" max="3" aria-label="연장 일수" value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value) || 1)} className="rounded border px-2 py-1" />
-            <select value={reason} onChange={e => setReason(e.target.value)} className="rounded border px-2 py-1">
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">만료일 연장</p>
+          <div className="flex gap-3 flex-wrap">
+            <input type="number" min="1" max="3" aria-label="연장 일수" value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value) || 1)} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] w-20" />
+            <select value={reason} onChange={e => setReason(e.target.value)} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
               <option value="PROMO">프로모션</option>
               <option value="OPS">운영</option>
               <option value="ADMIN">관리자</option>
             </select>
           </div>
-          <div className="mt-2 text-xs text-[var(--v2-muted)]">예: 1~3일 연장, 사유 선택</div>
-          <button type="button" className="mt-3 w-full rounded bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black" onClick={() => handleApply('expiry')}>
+          <div className="mt-3 w-full rounded-lg bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black hover:brightness-110 transition-all disabled:opacity-50" onClick={() => handleApply('expiry')}>
             적용하기
-          </button>
+          </div>
         </div>
         {/* 상태/출석/입금 변경 */}
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <b>상태/출석/입금 변경</b>
-          <div className="grid gap-3 md:grid-cols-3 mt-2">
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">상태/출석/입금 변경</p>
+          <div className="grid gap-3 md:grid-cols-3">
             <div>
-              <label className="text-xs text-[var(--v2-muted)]">골드</label>
-              <select value={goldStatus} onChange={e => setGoldStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">골드</label>
+              <select value={goldStatus} onChange={e => setGoldStatus(e.target.value)} className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
                 <option value="">변경 없음</option>
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel(s)}</option>
@@ -358,8 +357,8 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               </select>
             </div>
             <div>
-              <label className="text-xs text-[var(--v2-muted)]">플래티넘</label>
-              <select value={platinumStatus} onChange={e => setPlatinumStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">플래티넘</label>
+              <select value={platinumStatus} onChange={e => setPlatinumStatus(e.target.value)} className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
                 <option value="">변경 없음</option>
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel(s)}</option>
@@ -367,8 +366,8 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               </select>
             </div>
             <div>
-              <label className="text-xs text-[var(--v2-muted)]">다이아</label>
-              <select value={diamondStatus} onChange={e => setDiamondStatus(e.target.value)} className="mt-1 w-full rounded border px-2 py-1">
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">다이아</label>
+              <select value={diamondStatus} onChange={e => setDiamondStatus(e.target.value)} className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
                 <option value="">변경 없음</option>
                 {statusOptions.map((s) => (
                   <option key={s} value={s}>{statusLabel(s)}</option>
@@ -378,30 +377,30 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
           </div>
           <div className="grid gap-3 md:grid-cols-2 mt-2">
             <div>
-              <label className="text-xs text-[var(--v2-muted)]">출석 Δ / 상한</label>
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <input type="number" aria-label="출석 Δ" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
-                <input type="number" aria-label="출석 상한" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">출석 Δ / 상한</label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input type="number" aria-label="출석 Δ" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                <input type="number" aria-label="출석 상한" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
               </div>
             </div>
             <div>
-              <label className="text-xs text-[var(--v2-muted)]">입금 Δ / 하한</label>
-              <div className="mt-1 grid grid-cols-2 gap-2">
-                <input type="number" aria-label="입금 Δ" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
-                <input type="number" aria-label="입금 하한" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 Δ / 하한</label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <input type="number" aria-label="입금 Δ" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                <input type="number" aria-label="입금 하한" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
               </div>
             </div>
           </div>
-          <button type="button" className="mt-3 w-full rounded bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black" onClick={() => handleApply('bulk')}>
+          <button type="button" className="mt-3 w-full rounded-lg bg-[var(--v2-accent)] px-4 py-2 text-sm font-bold text-black hover:brightness-110 transition-all" onClick={() => handleApply('bulk')}>
             적용하기
           </button>
         </div>
         {/* 미리보기 */}
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <b>미리보기</b>
-          <div className="mt-2">대상 수: {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}</div>
-          <div className="mt-2">샘플 user_ids: {Array.isArray(preview.sample) && preview.sample.length ? preview.sample.slice(0, 10).join(', ') : '-'}</div>
-          {preview.error && <div className="mt-2 text-[var(--v2-warning)]">{preview.error}</div>}
+        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">미리보기</p>
+          <div className="text-sm text-[var(--v2-text)]">대상 수: {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}</div>
+          <div className="text-sm text-[var(--v2-muted)]">샘플 user_ids: {Array.isArray(preview.sample) && preview.sample.length ? preview.sample.slice(0, 10).join(', ') : '-'}</div>
+          {preview.error && <div className="text-sm text-[var(--v2-warning)]">{preview.error}</div>}
         </div>
       </div>
     </section>

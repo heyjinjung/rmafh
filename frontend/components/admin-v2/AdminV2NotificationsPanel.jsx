@@ -128,67 +128,77 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   };
 
   return (
-    <div className="rounded-2xl border bg-white p-5" id="notifications">
-      <h2 className="text-lg font-bold mb-4">알림 보내기</h2>
-      <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); submitNotification(); }}>
-        <div className="grid gap-4 md:grid-cols-2">
+    <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/90 p-5" id="notifications">
+      <div className="mb-5">
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">알림</p>
+        <h2 className="mt-2 text-lg font-bold text-[var(--v2-text)]">알림 보내기</h2>
+      </div>
+
+      <form className="space-y-4 mb-8" onSubmit={(e) => { e.preventDefault(); submitNotification(); }}>
+        <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <label className="block text-xs font-semibold mb-1">알림 유형</label>
-            <select className="w-full rounded border px-3 py-2" value={type} onChange={(e) => setType(e.target.value)}>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">알림 유형</label>
+            <select className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" value={type} onChange={(e) => setType(e.target.value)}>
               {typeOptions.map(opt => <option key={opt} value={opt}>{typeLabel(opt)}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1">분류</label>
-            <select className="w-full rounded border px-3 py-2" value={variant} onChange={(e) => setVariant(e.target.value)}>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">분류</label>
+            <select className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" value={variant} onChange={(e) => setVariant(e.target.value)}>
               {variantOptions.map(opt => <option key={opt} value={opt}>{variantLabel(opt)}</option>)}
             </select>
           </div>
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1">예약 시간</label>
-          <input type="datetime-local" className="w-full rounded border px-3 py-2" value={scheduledAtLocal} onChange={(e) => setScheduledAtLocal(e.target.value)} />
+          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">예약 시간</label>
+          <input type="datetime-local" className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" value={scheduledAtLocal} onChange={(e) => setScheduledAtLocal(e.target.value)} />
         </div>
         <div>
-          <label className="block text-xs font-semibold mb-1">대상(외부 사용자 ID)</label>
-          <input placeholder="예: ext-1001, ext-1002" className="w-full rounded border px-3 py-2" value={targetText} onChange={(e) => setTargetText(e.target.value)} />
+          <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">대상(외부 사용자 ID)</label>
+          <input placeholder="예: ext-1001, ext-1002" className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder-[var(--v2-muted)]" value={targetText} onChange={(e) => setTargetText(e.target.value)} />
         </div>
-        <div className="flex gap-2">
-          <button type="reset" className="rounded bg-gray-200 px-4 py-2 font-semibold" onClick={() => setTargetText('')}>초기화</button>
-          <button type="submit" className="rounded bg-blue-600 text-white px-4 py-2 font-semibold" disabled={submitting}>{submitting ? '요청 중...' : '알림 보내기'}</button>
+        {error ? <p className="text-sm text-[var(--v2-warning)]">{error}</p> : null}
+        <div className="flex gap-2 pt-2">
+          <button type="reset" className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-4 py-2 text-sm font-semibold text-[var(--v2-text)] hover:bg-[var(--v2-surface-3)] transition-colors" onClick={() => setTargetText('')}>초기화</button>
+          <button type="submit" className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-2 text-sm font-semibold text-black hover:brightness-110 transition-all disabled:opacity-50" disabled={submitting}>{submitting ? '요청 중...' : '알림 보내기'}</button>
         </div>
-        {error ? <p className="text-sm text-red-500 mt-2">{error}</p> : null}
       </form>
 
-      <h3 className="text-md font-bold mt-8 mb-2">최근 알림</h3>
-      {loading ? <p className="text-sm text-gray-400">불러오는 중...</p> : null}
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr>
-            <th className="px-2 py-1 text-left">ID</th>
-            <th className="px-2 py-1 text-left">유형</th>
-            <th className="px-2 py-1 text-left">분류</th>
-            <th className="px-2 py-1 text-left">상태</th>
-            <th className="px-2 py-1 text-left">예약/생성</th>
-          </tr>
-        </thead>
-        <tbody>
-          {notifications.slice(0, 10).map(n => (
-            <tr key={n.id}>
-              <td className="px-2 py-1 font-mono text-xs text-blue-600">{n.id}</td>
-              <td className="px-2 py-1 text-xs">{typeLabel(n.type)}</td>
-              <td className="px-2 py-1 text-xs">{variantLabel(n.variant_id)}</td>
-              <td className="px-2 py-1 text-xs">{statusLabel(n.status)}</td>
-              <td className="px-2 py-1 text-xs">{n.scheduled_at || n.created_at || '-'}</td>
-            </tr>
-          ))}
-          {notifications.length === 0 ? (
-            <tr>
-              <td className="px-2 py-1 text-gray-400" colSpan={5}>알림 없음</td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+      <div className="pt-6 border-t border-[var(--v2-border)]">
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">최근 알림</p>
+        <div className="mt-4">
+          {loading ? <p className="text-sm text-[var(--v2-muted)]">불러오는 중...</p> : null}
+          <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/50 overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="border-b border-[var(--v2-border)]">
+                <tr className="text-[var(--v2-muted)]">
+                  <th className="px-4 py-3 text-left text-xs font-semibold">ID</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold">유형</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold">분류</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold">상태</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold">예약/생성</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--v2-border)]">
+                {notifications.slice(0, 10).map(n => (
+                  <tr key={n.id} className="text-[var(--v2-text)]">
+                    <td className="px-4 py-3 font-mono text-xs text-[var(--v2-accent)]">{n.id}</td>
+                    <td className="px-4 py-3 text-xs">{typeLabel(n.type)}</td>
+                    <td className="px-4 py-3 text-xs">{variantLabel(n.variant_id)}</td>
+                    <td className="px-4 py-3 text-xs">{statusLabel(n.status)}</td>
+                    <td className="px-4 py-3 text-xs text-[var(--v2-muted)]">{n.scheduled_at || n.created_at || '-'}</td>
+                  </tr>
+                ))}
+                {notifications.length === 0 ? (
+                  <tr>
+                    <td className="px-4 py-3 text-[var(--v2-muted)]" colSpan={5}>알림 없음</td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
