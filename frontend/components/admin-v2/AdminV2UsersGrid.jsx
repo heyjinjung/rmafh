@@ -44,6 +44,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelMode, setPanelMode] = useState('none'); // none | edit | create
   const [saving, setSaving] = useState(false);
+  const [extending, setExtending] = useState(false);
+  const [expiryExtendDays, setExpiryExtendDays] = useState(1);
+  const [expiryReason, setExpiryReason] = useState('OPS');
   const [form, setForm] = useState({
     external_user_id: '',
     nickname: '',
@@ -115,6 +118,8 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     };
     console.log('setFormFromRow new form state:', newForm);
     setForm(newForm);
+    setExpiryExtendDays(1);
+    setExpiryReason('OPS');
   };
 
   const openCreate = () => {
@@ -240,6 +245,51 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       pushToast({ ok: false, message: info.summary || '저장 실패', detail: info.detail || info.code });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const makeRequestId = () => `extend-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+
+  const submitExtendExpiry = async () => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const extendHours = Math.trunc(Number(expiryExtendDays) * 24);
+    if (!Number.isFinite(extendHours) || extendHours < 1 || extendHours > 72) {
+      pushToast({ ok: false, message: '연장 시간은 1~72시간(최대 3일)까지 입력하세요.' });
+      return;
+    }
+
+    const reason = String(expiryReason || '').toUpperCase();
+    if (!['OPS', 'PROMO', 'ADMIN'].includes(reason)) {
+      pushToast({ ok: false, message: '이유는 OPS/PROMO/ADMIN 중 하나여야 합니다.' });
+      return;
+    }
+
+    const requestId = makeRequestId();
+    const payload = {
+      request_id: requestId,
+      scope: 'USER_IDS',
+      user_ids: [Number(selectedRow.user_id)],
+      extend_hours: extendHours,
+      reason,
+      shadow: false,
+    };
+
+    try {
+      setExtending(true);
+      const res = await apiFetch('/api/vault/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
+      const newExpiresAt = res?.data?.new_expires_at || res?.data?.expires_at;
+      pushToast({ ok: true, message: '만료일을 연장했습니다.', detail: newExpiresAt ? `새 만료일: ${newExpiresAt.slice(0, 10)}` : undefined });
+      if (newExpiresAt) {
+        setSelectedRow((prev) => (prev ? { ...prev, expires_at: newExpiresAt } : prev));
+      }
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '만료일 연장 실패', detail: info.detail || info.code });
+    } finally {
+      setExtending(false);
     }
   };
 
@@ -636,6 +686,41 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <div className="text-xs text-[var(--v2-muted)]">만료일</div>
                     <div>{selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}</div>
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">만료일 연장</div>
+                    <div className="text-xs text-[var(--v2-muted)]">최대 +3일</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="3"
+                      value={expiryExtendDays}
+                      onChange={(e) => setExpiryExtendDays(Number(e.target.value) || 1)}
+                      className="w-20 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                    />
+                    <select
+                      value={expiryReason}
+                      onChange={(e) => setExpiryReason(e.target.value)}
+                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                    >
+                      <option value="OPS">운영</option>
+                      <option value="PROMO">프로모션</option>
+                      <option value="ADMIN">관리자</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={submitExtendExpiry}
+                      disabled={extending || saving}
+                      className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                    >
+                      연장
+                    </button>
+                  </div>
+                  <p className="text-xs text-[var(--v2-muted)]">선택한 사용자에게만 적용됩니다. (1~72시간, 최대 3일)</p>
                 </div>
 
                 <div className="flex gap-2">
