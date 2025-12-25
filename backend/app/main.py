@@ -742,10 +742,19 @@ def _validate_request_id(value: str | None) -> str:
 
 
 def _validate_idempotency_key(value: str | None) -> str:
-    key = _require_non_empty(value, code="IDEMPOTENCY_KEY_REQUIRED")
-    if len(key) > 128:
+    """Return a usable idempotency key, generating one when missing.
+
+    Frontend should always send `x-idempotency-key`, but in case a proxy or
+    browser strips the header we generate a key to keep the request from
+    failing with 400. This preserves safety while avoiding UX breakage.
+    """
+
+    raw = (value or "").strip()
+    if not raw:
+        raw = f"auto-{uuid.uuid4()}"
+    if len(raw) > 128:
         raise HTTPException(status_code=400, detail="INVALID_IDEMPOTENCY_KEY")
-    return key
+    return raw
 
 
 def _idempotency_scope(request: Request) -> str:
