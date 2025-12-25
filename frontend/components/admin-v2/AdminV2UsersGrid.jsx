@@ -169,7 +169,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
   const submitUpdate = async () => {
     if (!ensureAuth()) return;
-    if (!selectedRow?.user_id) return;
+    if (!selectedRow?.user_id) {
+      console.error('selectedRow is null or no user_id');
+      return;
+    }
 
     const payload = {};
     const baseNickname = selectedRow?.nickname || '';
@@ -184,11 +187,21 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     const nextTelegram = Boolean(form.telegram_ok);
     const nextReview = Boolean(form.review_ok);
 
+    console.log('submitUpdate comparison:', {
+      telegram: { base: baseTelegram, next: nextTelegram, changed: nextTelegram !== baseTelegram },
+      review: { base: baseReview, next: nextReview, changed: nextReview !== baseReview },
+      nickname: { base: baseNickname, next: nextNickname, changed: nextNickname !== baseNickname },
+      joined: { base: baseJoined, next: nextJoined, changed: nextJoined !== baseJoined },
+      deposit: { base: baseDeposit, next: nextDeposit, changed: Number.isFinite(nextDeposit) && nextDeposit !== baseDeposit },
+    });
+
     if (nextNickname !== baseNickname) payload.nickname = nextNickname;
     if (nextJoined !== baseJoined) payload.joined_date = nextJoined;
     if (Number.isFinite(nextDeposit) && nextDeposit !== baseDeposit) payload.deposit_total = nextDeposit;
     if (nextTelegram !== baseTelegram) payload.telegram_ok = nextTelegram;
     if (nextReview !== baseReview) payload.review_ok = nextReview;
+
+    console.log('submitUpdate payload:', payload, 'has keys:', Object.keys(payload).length);
 
     if (!Object.keys(payload).length) {
       pushToast({ ok: false, message: '변경된 내용이 없습니다.' });
