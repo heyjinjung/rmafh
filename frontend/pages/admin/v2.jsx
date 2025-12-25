@@ -21,6 +21,8 @@ export default function AdminV2Page() {
   const basePath = router?.basePath || '';
   const [adminPassword, setAdminPassword] = useState('');
   const [pingResult, setPingResult] = useState(null);
+  const [usersTarget, setUsersTarget] = useState(null);
+  const [segmentTarget, setSegmentTarget] = useState(null);
   const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED !== 'false';
 
   const apiFetch = useMemo(
@@ -86,9 +88,22 @@ export default function AdminV2Page() {
           <AdminV2KpiCards adminPassword={adminPassword} basePath={basePath} />
           <AdminV2QuickActions />
 
-          <AdminV2UsersGrid adminPassword={adminPassword} basePath={basePath} />
-          <AdminV2SegmentsPanel />
-          <AdminV2OperationsPanel />
+          <AdminV2UsersGrid
+            adminPassword={adminPassword}
+            basePath={basePath}
+            onTargetChange={setUsersTarget}
+          />
+          <AdminV2SegmentsPanel
+            adminPassword={adminPassword}
+            basePath={basePath}
+            onSegmentChange={setSegmentTarget}
+          />
+          <AdminV2OperationsPanel
+            adminPassword={adminPassword}
+            basePath={basePath}
+            usersTarget={usersTarget}
+            segmentTarget={segmentTarget}
+          />
           <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
           <AdminV2ImportsFlow adminPassword={adminPassword} basePath={basePath} />
 

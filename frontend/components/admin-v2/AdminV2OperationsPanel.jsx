@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
-export default function AdminV2OperationsPanel() {
+export default function AdminV2OperationsPanel({ usersTarget }) {
   const [targetScope, setTargetScope] = useState('segment');
   const [targetValue, setTargetValue] = useState('');
   const [expiryDays, setExpiryDays] = useState(3);
@@ -14,6 +14,29 @@ export default function AdminV2OperationsPanel() {
   const [attendance, setAttendance] = useState({ delta: 0, cap: 3 });
   const [deposit, setDeposit] = useState({ delta: 0, floor: 0 });
   const [confirmText, setConfirmText] = useState('');
+
+  const linkedTarget = useMemo(() => {
+    if (!usersTarget || typeof usersTarget !== 'object') return null;
+    const mode = usersTarget.mode || 'page';
+    const ids = Array.isArray(usersTarget.user_ids) ? usersTarget.user_ids.map(String) : [];
+    const filter = usersTarget.filter || null;
+    return { mode, ids, filter };
+  }, [usersTarget]);
+
+  useEffect(() => {
+    if (!linkedTarget) return;
+    if (linkedTarget.mode === 'filter') {
+      setTargetScope('filter');
+      const q = linkedTarget.filter?.query ? `query=${linkedTarget.filter.query}` : 'query=-';
+      const s = linkedTarget.filter?.status ? `status=${linkedTarget.filter.status}` : 'status=-';
+      setTargetValue(`${q} ${s}`);
+      return;
+    }
+
+    // page/uploaded → 실제로는 user_id 리스트 타겟
+    setTargetScope('upload');
+    setTargetValue(`${linkedTarget.ids.length} user_id selected`);
+  }, [linkedTarget]);
 
   const impact = useMemo(() => {
     const base = targetScope === 'segment' ? 1240 : targetScope === 'upload' ? 420 : 200;
@@ -35,6 +58,25 @@ export default function AdminV2OperationsPanel() {
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         <div className="space-y-4">
+          <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--v2-text)]">Linked Target (from Users)</p>
+            {linkedTarget ? (
+              <div className="text-xs text-[var(--v2-muted)] space-y-1">
+                <div>mode: <span className="font-mono">{linkedTarget.mode}</span></div>
+                {linkedTarget.mode === 'filter' ? (
+                  <>
+                    <div>query: <span className="font-mono">{linkedTarget.filter?.query || '-'}</span></div>
+                    <div>status: <span className="font-mono">{linkedTarget.filter?.status || '-'}</span></div>
+                  </>
+                ) : (
+                  <div>user_ids: <span className="font-mono">{linkedTarget.ids.length}</span></div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-[var(--v2-muted)]">Users에서 타겟을 선택하면 여기에 연결됩니다.</p>
+            )}
+          </div>
+
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
             <p className="text-sm font-semibold text-[var(--v2-text)]">Target Scope</p>
             <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
@@ -71,7 +113,12 @@ export default function AdminV2OperationsPanel() {
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-[var(--v2-text)]">Extend Expiry</p>
               <label className="inline-flex items-center gap-2 text-xs text-[var(--v2-muted)]">
-                <input type="checkbox" checked={shadow} onChange={(e) => setShadow(e.target.checked)} />
+                <input
+                  type="checkbox"
+                  aria-label="Shadow mode"
+                  checked={shadow}
+                  onChange={(e) => setShadow(e.target.checked)}
+                />
                 Shadow mode
               </label>
             </div>

@@ -23,7 +23,7 @@ const storageKeys = {
   bulk: 'adminV2UserBulkSelection',
 };
 
-export default function AdminV2UsersGrid({ adminPassword, basePath }) {
+export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChange }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('expires_at');
@@ -32,6 +32,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath }) {
   const [pageSize, setPageSize] = useState(50);
   const [scrollTop, setScrollTop] = useState(0);
   const [selectedRow, setSelectedRow] = useState(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath }) {
     const stored = window.localStorage.getItem(storageKeys.bulk);
     return stored ? JSON.parse(stored) : { mode: 'page', ids: [] };
   });
+  const [uploadedIdsText, setUploadedIdsText] = useState('');
 
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
@@ -128,26 +130,51 @@ export default function AdminV2UsersGrid({ adminPassword, basePath }) {
   const toggleBulkSelection = (row) => {
     setBulkSelection((prev) => {
       const ids = new Set(prev.ids || []);
-      if (ids.has(row.user_id)) {
-        ids.delete(row.user_id);
+      const key = String(row.user_id);
+      if (ids.has(key)) {
+        ids.delete(key);
       } else {
-        ids.add(row.user_id);
+        ids.add(key);
       }
       return { ...prev, ids: Array.from(ids) };
     });
   };
 
   const bulkSelectPage = () => {
-    setBulkSelection((prev) => ({ ...prev, mode: 'page', ids: rows.map((r) => r.user_id) }));
+    setBulkSelection((prev) => ({ ...prev, mode: 'page', ids: rows.map((r) => String(r.user_id)) }));
   };
 
   const bulkSelectFilter = () => {
-    setBulkSelection((prev) => ({ ...prev, mode: 'filter', ids: [] }));
+    setBulkSelection((prev) => ({ ...prev, mode: 'filter', ids: [], filter: { query: query.trim(), status: statusFilter } }));
   };
 
   const bulkSelectUploadIds = () => {
-    // Placeholder hook: UI for uploading IDs can populate here
     setBulkSelection((prev) => ({ ...prev, mode: 'uploaded', ids: prev.ids || [] }));
+  };
+
+  const applyUploadedIds = () => {
+    const raw = uploadedIdsText || '';
+    const parts = raw
+      .split(/[\s,\n\r\t]+/)
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const unique = Array.from(new Set(parts));
+    setBulkSelection((prev) => ({ ...prev, mode: 'uploaded', ids: unique }));
+  };
+
+  useEffect(() => {
+    if (typeof onTargetChange !== 'function') return;
+
+    const mode = bulkSelection?.mode || 'page';
+    const ids = Array.isArray(bulkSelection?.ids) ? bulkSelection.ids.map(String) : [];
+    const filter = bulkSelection?.filter || { query: query.trim(), status: statusFilter };
+
+    onTargetChange({ source: 'users-grid', mode, user_ids: ids, filter });
+  }, [bulkSelection, onTargetChange, query, statusFilter]);
+
+  const onRowClick = (row) => {
+    setSelectedRow(row);
+    setDrawerOpen(true);
   };
 
   return (
@@ -309,88 +336,190 @@ export default function AdminV2UsersGrid({ adminPassword, basePath }) {
           </span>
           <span className="text-[var(--v2-accent)]">Server-side hooks pending API wiring</span>
         </div>
-        <div
-          className="relative h-[440px] overflow-auto"
-          onScroll={onScroll}
-          role="presentation"
-        >
-          <div style={{ height: `${totalHeight}px` }}>
-            <table
-              className="table-fixed min-w-full text-left text-sm"
-              style={{ transform: `translateY(${offsetY}px)` }}
-            >
-              <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
-                <tr>
-                  {columnDefs
-                    .filter((col) => visibleColumns.includes(col.key))
-                    .map((col) => (
-                      <th key={col.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
-                        <button
-                          type="button"
-                          onClick={() => toggleSort(col.key)}
-                          className="flex items-center gap-1 text-[var(--v2-text)] hover:text-[var(--v2-accent)]"
-                        >
-                          <span>{col.label}</span>
-                          {sortBy === col.key ? <span className="text-[var(--v2-muted)]">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
-                        </button>
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--v2-border)]">
-                {visibleRows.map((row) => {
-                  const isSelected = selectedRow?.external_user_id === row.external_user_id;
-                  return (
-                    <tr
-                      key={row.external_user_id}
-                      className={[
-                        'cursor-pointer transition hover:bg-[var(--v2-surface)]',
-                        isSelected ? 'bg-[var(--v2-surface)]/80 border-l-2 border-[var(--v2-accent)]' : '',
-                      ].join(' ')}
-                      style={{ height: `${rowHeight}px` }}
-                      onClick={() => setSelectedRow(row)}
-                    >
-                      {columnDefs
-                        .filter((col) => visibleColumns.includes(col.key))
-                        .map((col) => {
-                          const val = row[col.key];
-                          const isNumber = typeof val === 'number';
-                          const display = isNumber ? val.toLocaleString() : (val || '').toString();
-                          return (
-                            <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
-                              {col.key === 'external_user_id' ? (
-                                <span className="font-mono text-[var(--v2-accent)]">{display}</span>
-                              ) : (
-                                display
-                              )}
-                            </td>
-                          );
-                        })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div
+            className="relative h-[440px] overflow-auto"
+            onScroll={onScroll}
+            role="presentation"
+          >
+            <div style={{ height: `${totalHeight}px` }}>
+              <table
+                className="table-fixed min-w-full text-left text-sm"
+                style={{ transform: `translateY(${offsetY}px)` }}
+              >
+                <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
+                  <tr>
+                    {columnDefs
+                      .filter((col) => visibleColumns.includes(col.key))
+                      .map((col) => (
+                        <th key={col.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
+                          <button
+                            type="button"
+                            onClick={() => toggleSort(col.key)}
+                            className="flex items-center gap-1 text-[var(--v2-text)] hover:text-[var(--v2-accent)]"
+                          >
+                            <span>{col.label}</span>
+                            {sortBy === col.key ? <span className="text-[var(--v2-muted)]">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
+                          </button>
+                        </th>
+                      ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--v2-border)]">
+                  {visibleRows.map((row) => {
+                    const isSelected = selectedRow?.external_user_id === row.external_user_id;
+                    const isBulkChecked = (bulkSelection?.ids || []).map(String).includes(String(row.user_id));
+                    return (
+                      <tr
+                        key={row.external_user_id}
+                        className={[
+                          'cursor-pointer transition hover:bg-[var(--v2-surface)]',
+                          isSelected ? 'bg-[var(--v2-surface)]/80 border-l-2 border-[var(--v2-accent)]' : '',
+                        ].join(' ')}
+                        style={{ height: `${rowHeight}px` }}
+                        onClick={() => onRowClick(row)}
+                      >
+                        {columnDefs
+                          .filter((col) => visibleColumns.includes(col.key))
+                          .map((col) => {
+                            const val = row[col.key];
+                            const isNumber = typeof val === 'number';
+                            const display = isNumber ? val.toLocaleString() : (val || '').toString();
+                            return (
+                              <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
+                                {col.key === 'external_user_id' ? (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={isBulkChecked}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        toggleBulkSelection(row);
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className="font-mono text-[var(--v2-accent)]">{display}</span>
+                                  </div>
+                                ) : (
+                                  display
+                                )}
+                              </td>
+                            );
+                          })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
+
+          <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0">
+            <div className="flex items-center justify-between">
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Details</p>
+              <button
+                type="button"
+                className="rounded border border-[var(--v2-border)] px-2 py-1 text-xs text-[var(--v2-muted)] hover:border-[var(--v2-accent)]/40"
+                onClick={() => setDrawerOpen((v) => !v)}
+                disabled={!selectedRow}
+              >
+                {drawerOpen ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {!selectedRow ? (
+              <p className="mt-3 text-sm text-[var(--v2-muted)]">행을 클릭하면 우측 패널에 상세가 표시됩니다.</p>
+            ) : !drawerOpen ? (
+              <p className="mt-3 text-sm text-[var(--v2-muted)]">상세 패널이 숨김 상태입니다.</p>
+            ) : (
+              <div className="mt-3 space-y-3 text-sm text-[var(--v2-text)]">
+                <div>
+                  <div className="text-xs text-[var(--v2-muted)]">external_user_id</div>
+                  <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-[var(--v2-muted)]">user_id</div>
+                  <div className="font-mono">{String(selectedRow.user_id || '')}</div>
+                </div>
+                <div>
+                  <div className="text-xs text-[var(--v2-muted)]">nickname</div>
+                  <div>{selectedRow.nickname || '-'}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">created_at</div>
+                    <div>{selectedRow.created_at || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">expires_at</div>
+                    <div>{selectedRow.expires_at || '-'}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">gold</div>
+                    <div>{selectedRow.gold_status || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">platinum</div>
+                    <div>{selectedRow.platinum_status || '-'}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">diamond</div>
+                    <div>{selectedRow.diamond_status || '-'}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">attendance</div>
+                    <div>{String(selectedRow.platinum_attendance_days ?? '-')}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-[var(--v2-muted)]">deposit_total</div>
+                    <div>{typeof selectedRow.deposit_total === 'number' ? selectedRow.deposit_total.toLocaleString() : (selectedRow.deposit_total || '-')}</div>
+                  </div>
+                </div>
+                <p className="text-xs text-[var(--v2-muted)]">
+                  참고: 현재 백엔드에 user 상세 조회 API(`GET /api/vault/admin/users/{'{user_id}'}`)가 없어, 리스트 응답 필드만 표시합니다.
+                </p>
+              </div>
+            )}
+          </aside>
         </div>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-3">
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Selection</p>
-          {selectedRow ? (
-            <div className="mt-2 space-y-1 text-sm text-[var(--v2-text)]">
-              <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
-              <div>{selectedRow.nickname}</div>
-              <div className="text-[var(--v2-muted)]">Status: {selectedRow.gold_status}</div>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-[var(--v2-muted)]">행을 클릭하면 상세가 여기에 표시됩니다.</p>
-          )}
-        </div>
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Bulk Select</p>
-          <p className="mt-2 text-sm text-[var(--v2-text)]">현재 페이지/필터 전체/업로드 ID 기반 선택 플로우 자리.</p>
+          <div className="mt-2 space-y-2 text-sm text-[var(--v2-text)]">
+            <div className="text-[var(--v2-muted)]">mode: <span className="font-mono">{bulkSelection.mode}</span></div>
+            <div className="text-[var(--v2-muted)]">ids: <span className="font-mono">{bulkSelection.ids?.length || 0}</span></div>
+            {bulkSelection.mode === 'filter' ? (
+              <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-2 text-xs text-[var(--v2-muted)]">
+                <div>query: {bulkSelection?.filter?.query || '-'}</div>
+                <div>status: {bulkSelection?.filter?.status || '-'}</div>
+              </div>
+            ) : null}
+            {bulkSelection.mode === 'uploaded' ? (
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Paste user_id list</label>
+                <textarea
+                  value={uploadedIdsText}
+                  onChange={(e) => setUploadedIdsText(e.target.value)}
+                  placeholder="예: 123\n456\n789 (공백/쉼표/줄바꿈 구분)"
+                  className="h-28 w-full resize-none rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                />
+                <button
+                  type="button"
+                  onClick={applyUploadedIds}
+                  className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-xs font-semibold text-black hover:brightness-105"
+                >
+                  Apply Uploaded IDs
+                </button>
+                <p className="text-xs text-[var(--v2-muted)]">현재 업로드 타겟은 user_id 기준으로만 동작합니다.</p>
+              </div>
+            ) : null}
+          </div>
         </div>
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Saved Column Sets</p>

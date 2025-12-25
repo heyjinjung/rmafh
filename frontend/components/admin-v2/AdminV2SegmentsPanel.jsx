@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-
-const storageKey = 'adminV2Segments';
+import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
+import { pushToast } from './toastBus';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
 const emptyFilters = {
@@ -15,48 +15,102 @@ const emptyFilters = {
   reviewOk: false,
 };
 
-export default function AdminV2SegmentsPanel() {
+function normalizeFiltersForApi(filters) {
+  const toIntOrNull = (v) => {
+    if (v === null || v === undefined) return null;
+    const s = String(v).trim();
+    if (!s) return null;
+    const n = Number(s);
+    return Number.isFinite(n) ? Math.trunc(n) : null;
+  };
+  return {
+    status: Array.isArray(filters?.status) ? filters.status : [],
+    expiresAfter: filters?.expiresAfter ? String(filters.expiresAfter) : null,
+    expiresBefore: filters?.expiresBefore ? String(filters.expiresBefore) : null,
+    depositMin: toIntOrNull(filters?.depositMin),
+    depositMax: toIntOrNull(filters?.depositMax),
+    attendanceMin: toIntOrNull(filters?.attendanceMin),
+    attendanceMax: toIntOrNull(filters?.attendanceMax),
+    telegramOk: Boolean(filters?.telegramOk),
+    reviewOk: Boolean(filters?.reviewOk),
+  };
+}
+
+export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmentChange }) {
   const [segments, setSegments] = useState([]);
   const [name, setName] = useState('');
   const [filters, setFilters] = useState(emptyFilters);
   const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
+    if (!adminPassword) return;
+    const load = async () => {
+      setLoading(true);
       try {
-        setSegments(JSON.parse(stored));
+        const res = await apiFetch('/api/vault/admin/segments');
+        setSegments(res?.data?.items || []);
       } catch (err) {
-        window.localStorage.removeItem(storageKey);
+        const info = extractErrorInfo(err);
+        pushToast({ ok: false, message: info.summary || '세그먼트 목록 불러오기 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+      } finally {
+        setLoading(false);
       }
-    }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(storageKey, JSON.stringify(segments));
-  }, [segments]);
 
   const applySegment = (segment) => {
     setSelected(segment);
-    setFilters(segment.filters);
+    setFilters(segment.filters || emptyFilters);
+    if (typeof onSegmentChange === 'function') {
+      onSegmentChange({ segment_id: segment.segment_id, name: segment.name, filters: segment.filters || {} });
+    }
   };
 
-  const saveSegment = () => {
+  const saveSegment = async () => {
+    if (!adminPassword) {
+      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      return;
+    }
     if (!name.trim()) return;
-    const next = { name: name.trim(), filters: filters };
-    setSegments((prev) => {
-      const others = prev.filter((s) => s.name !== next.name);
-      return [...others, next];
-    });
-    setSelected(next);
+    try {
+      const payload = { name: name.trim(), filters: normalizeFiltersForApi(filters) };
+      const res = await apiFetch('/api/vault/admin/segments', { method: 'POST', body: payload });
+      const saved = res?.data;
+      setSegments((prev) => {
+        const others = prev.filter((s) => s.segment_id !== saved.segment_id);
+        return [saved, ...others];
+      });
+      setSelected(saved);
+      pushToast({ ok: true, message: '세그먼트 저장 완료', detail: saved?.name || '-', idempotencyKey: res.idempotencyKey });
+      if (typeof onSegmentChange === 'function') {
+        onSegmentChange({ segment_id: saved.segment_id, name: saved.name, filters: saved.filters || {} });
+      }
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '세그먼트 저장 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    }
   };
 
-  const deleteSegment = (segmentName) => {
-    setSegments((prev) => prev.filter((s) => s.name !== segmentName));
-    if (selected?.name === segmentName) {
-      setSelected(null);
+  const deleteSegment = async (segment) => {
+    if (!adminPassword) {
+      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      return;
+    }
+    try {
+      await apiFetch(`/api/vault/admin/segments/${segment.segment_id}`, { method: 'DELETE' });
+      setSegments((prev) => prev.filter((s) => s.segment_id !== segment.segment_id));
+      if (selected?.segment_id === segment.segment_id) {
+        setSelected(null);
+        if (typeof onSegmentChange === 'function') onSegmentChange(null);
+      }
+      pushToast({ ok: true, message: '세그먼트 삭제 완료', detail: segment?.name || '-' });
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '세그먼트 삭제 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
     }
   };
 
@@ -88,7 +142,7 @@ export default function AdminV2SegmentsPanel() {
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Segments</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">Create, save, and reuse filter sets across operations.</p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Local draft</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Backend persisted</span>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
@@ -107,12 +161,13 @@ export default function AdminV2SegmentsPanel() {
               <button
                 type="button"
                 onClick={saveSegment}
+                disabled={!adminPassword}
                 className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-2 text-sm font-semibold text-black shadow-[0_0_16px_rgba(183,247,90,0.35)] hover:brightness-105"
               >
                 Save Segment
               </button>
             </div>
-            <p className="mt-2 text-xs text-[var(--v2-muted)]">Segments are stored locally until backend persistence is wired.</p>
+            <p className="mt-2 text-xs text-[var(--v2-muted)]">Segments are saved to backend and can be targeted by segment_id.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-4">
@@ -235,14 +290,16 @@ export default function AdminV2SegmentsPanel() {
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Saved Segments</p>
             <div className="mt-3 space-y-2 text-sm">
-              {segments.length === 0 ? (
+              {loading ? (
+                <p className="text-[var(--v2-muted)]">불러오는 중...</p>
+              ) : segments.length === 0 ? (
                 <p className="text-[var(--v2-muted)]">저장된 세그먼트가 없습니다. 필터를 설정하고 저장하세요.</p>
               ) : (
                 segments.map((segment) => {
-                  const active = selected?.name === segment.name;
+                  const active = selected?.segment_id === segment.segment_id;
                   return (
                     <div
-                      key={segment.name}
+                      key={segment.segment_id}
                       className={[
                         'flex items-center justify-between rounded-lg border px-3 py-2',
                         active
@@ -264,7 +321,7 @@ export default function AdminV2SegmentsPanel() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => deleteSegment(segment.name)}
+                          onClick={() => deleteSegment(segment)}
                           className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-warning)] hover:border-[var(--v2-warning)]/60"
                         >
                           Delete

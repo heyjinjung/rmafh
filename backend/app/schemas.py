@@ -37,6 +37,55 @@ class ExtendExpiryResponse(BaseModel):
     new_expires_at: Optional[str] = None
 
 
+class AdminSegmentFilters(BaseModel):
+    status: List[str] = []
+    expiresAfter: Optional[str] = None
+    expiresBefore: Optional[str] = None
+    depositMin: Optional[int] = None
+    depositMax: Optional[int] = None
+    attendanceMin: Optional[int] = None
+    attendanceMax: Optional[int] = None
+    telegramOk: bool = False
+    reviewOk: bool = False
+
+
+class AdminSegmentCreateRequest(BaseModel):
+    name: str
+    filters: AdminSegmentFilters
+
+
+class AdminSegmentItem(BaseModel):
+    segment_id: str
+    name: str
+    filters: Dict[str, Any]
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AdminSegmentsListResponse(BaseModel):
+    items: List[AdminSegmentItem]
+
+
+class AdminUsersFilter(BaseModel):
+    query: Optional[str] = None
+    status: Optional[str] = None
+
+
+class AdminExtendExpiryTarget(BaseModel):
+    mode: str  # user_ids | filter | segment
+    user_ids: Optional[List[int]] = None
+    filter: Optional[AdminUsersFilter] = None
+    segment_id: Optional[str] = None
+
+
+class AdminExtendExpiryRequest(BaseModel):
+    request_id: str
+    target: AdminExtendExpiryTarget
+    extend_hours: int
+    reason: str  # OPS | PROMO | ADMIN
+    shadow: bool = False
+
+
 class NotifyRequest(BaseModel):
     type: str
     user_ids: Optional[List[int]] = None

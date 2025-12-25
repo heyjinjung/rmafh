@@ -320,8 +320,9 @@ CREATE TABLE admin_jobs (
 
 ## 14. 프론트엔드 구현 가이드
 ### 14.1 상태/데이터
-- `@tanstack/react-query` 기반 서버 상태 관리
-- 대량 목록은 cursor 기반 페이징 + `react-virtual`
+- (현재 구현) `useState/useEffect` 기반 서버 상태 관리 + `page/page_size` 서버 페이징
+- (현재 구현) 대량 목록은 간이 virtualization(table slice)로 처리
+- (향후 개선) `@tanstack/react-query` 도입 및 cursor 기반 페이징/`react-virtual` 전환 가능
 
 ### 14.2 API 클라이언트
 - 공통 `withIdempotency()` 헬퍼

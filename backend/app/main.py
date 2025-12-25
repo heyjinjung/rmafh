@@ -6,6 +6,7 @@ import json
 import io
 import csv
 import secrets
+import uuid
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,10 +51,117 @@ from app.schemas import (
     DailyUserImportResponse,
     UserLoginRequest,
     UserLoginResponse,
+    AdminSegmentCreateRequest,
+    AdminSegmentItem,
+    AdminSegmentsListResponse,
+    AdminExtendExpiryRequest,
 )
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
 logger = logging.getLogger("vault.idempotency")
+
+
+def _parse_int_optional(value: Any) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        return int(cleaned)
+    return int(value)
+
+
+def _parse_date_optional(value: Any) -> datetime.date | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        # yyyy-mm-dd
+        return datetime.fromisoformat(cleaned).date()
+    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
+        # date-like
+        return value
+    raise ValueError("INVALID_DATE")
+
+
+def _build_user_target_sql(target: dict) -> tuple[str, list]:
+    """Return (where_sql, params) for vault_status/user_identity/user_admin_snapshot join."""
+
+    where: list[str] = [
+        "(vs.gold_status!='CLAIMED' OR vs.platinum_status!='CLAIMED' OR vs.diamond_status!='CLAIMED')"
+    ]
+    params: list[Any] = []
+
+    mode = (target.get("mode") or "").lower()
+    if mode == "filter":
+        filt = target.get("filter") or {}
+        q = (filt.get("query") or "").strip()
+        st = (filt.get("status") or "").strip()
+        if q:
+            like = f"%{q}%"
+            where.append("(ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s)")
+            params.extend([like, like])
+        if st and st.upper() not in {"ALL", "ANY"}:
+            where.append("COALESCE(vs.gold_status, 'LOCKED') = %s")
+            params.append(st.upper())
+        return " AND ".join(where), params
+
+    if mode == "segment":
+        filters = target.get("segment_filters") or {}
+        statuses = filters.get("status") or []
+        if statuses:
+            where.append("COALESCE(vs.gold_status, 'LOCKED') = ANY(%s)")
+            params.append([str(s).upper() for s in statuses])
+
+        expires_after = _parse_date_optional(filters.get("expiresAfter"))
+        expires_before = _parse_date_optional(filters.get("expiresBefore"))
+        if expires_after:
+            where.append("vs.expires_at::date >= %s")
+            params.append(expires_after)
+        if expires_before:
+            where.append("vs.expires_at::date <= %s")
+            params.append(expires_before)
+
+        deposit_min = _parse_int_optional(filters.get("depositMin"))
+        deposit_max = _parse_int_optional(filters.get("depositMax"))
+        if deposit_min is not None:
+            where.append("uas.deposit_total >= %s")
+            params.append(deposit_min)
+        if deposit_max is not None:
+            where.append("uas.deposit_total <= %s")
+            params.append(deposit_max)
+
+        attendance_min = _parse_int_optional(filters.get("attendanceMin"))
+        attendance_max = _parse_int_optional(filters.get("attendanceMax"))
+        capped_attendance_sql = """
+            CASE
+              WHEN uas.joined_date IS NULL THEN COALESCE(vs.platinum_attendance_days, 0)
+              ELSE LEAST(
+                COALESCE(vs.platinum_attendance_days, 0),
+                GREATEST(0, (CURRENT_DATE - uas.joined_date))
+              )
+            END
+        """.strip()
+        if attendance_min is not None:
+            where.append(f"({capped_attendance_sql}) >= %s")
+            params.append(attendance_min)
+        if attendance_max is not None:
+            where.append(f"({capped_attendance_sql}) <= %s")
+            params.append(attendance_max)
+
+        if bool(filters.get("telegramOk")):
+            where.append("uas.telegram_ok = TRUE")
+        if bool(filters.get("reviewOk")):
+            where.append("uas.review_ok = TRUE")
+
+        return " AND ".join(where), params
+
+    raise HTTPException(status_code=400, detail="INVALID_TARGET_MODE")
 
 
 def _apply_job_timeouts(cur):
@@ -1537,6 +1645,19 @@ def _ensure_schema():
         )
         cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_job_items_job_id ON admin_job_items (job_id)")
 
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_segments (
+                segment_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                filters JSONB NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_admin_segments_updated_at ON admin_segments (updated_at)")
+
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'LOCKED'")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
@@ -2490,6 +2611,307 @@ async def get_all_users(
             })
 
         return {"users": users, "total": total, "page": page, "page_size": page_size}
+
+
+@app.get("/api/vault/admin/segments", response_model=AdminSegmentsListResponse)
+async def list_admin_segments(_auth: str = Depends(verify_admin_password)):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+        cur.execute(
+            """
+            SELECT segment_id, name, filters, created_at, updated_at
+              FROM admin_segments
+             ORDER BY updated_at DESC, created_at DESC
+            """
+        )
+        rows = cur.fetchall()
+        items = [
+            {
+                "segment_id": r[0],
+                "name": r[1],
+                "filters": r[2] or {},
+                "created_at": r[3].isoformat() if r[3] else None,
+                "updated_at": r[4].isoformat() if r[4] else None,
+            }
+            for r in rows
+        ]
+        return AdminSegmentsListResponse(items=[AdminSegmentItem(**i) for i in items])
+
+
+@app.post("/api/vault/admin/segments", response_model=AdminSegmentItem)
+async def upsert_admin_segment(body: AdminSegmentCreateRequest, request: Request, _auth: str = Depends(verify_admin_password)):
+    name = (body.name or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="SEGMENT_NAME_REQUIRED")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+        seg_id = str(uuid.uuid4())
+        cur.execute(
+            """
+            INSERT INTO admin_segments (segment_id, name, filters)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (name) DO UPDATE SET
+                filters = EXCLUDED.filters,
+                updated_at = NOW()
+            RETURNING segment_id, name, filters, created_at, updated_at
+            """,
+            (seg_id, name, Json(body.filters.model_dump() if hasattr(body.filters, "model_dump") else body.filters.dict())),
+        )
+        row = cur.fetchone()
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="SEGMENT_UPSERT",
+            endpoint="/api/vault/admin/segments",
+            target_user_ids=None,
+            request_id=None,
+            request_body={"name": name},
+            response_status="SUCCESS",
+            response_summary={"segment_id": row[0], "name": row[1]},
+        )
+
+        conn.commit()
+
+    return AdminSegmentItem(
+        segment_id=row[0],
+        name=row[1],
+        filters=row[2] or {},
+        created_at=row[3].isoformat() if row[3] else None,
+        updated_at=row[4].isoformat() if row[4] else None,
+    )
+
+
+@app.delete("/api/vault/admin/segments/{segment_id}")
+async def delete_admin_segment(segment_id: str, request: Request, _auth: str = Depends(verify_admin_password)):
+    segment_id = (segment_id or "").strip()
+    if not segment_id:
+        raise HTTPException(status_code=400, detail="SEGMENT_ID_REQUIRED")
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+        cur.execute("DELETE FROM admin_segments WHERE segment_id=%s", (segment_id,))
+        deleted = cur.rowcount
+        conn.commit()
+    if deleted == 0:
+        raise HTTPException(status_code=404, detail="SEGMENT_NOT_FOUND")
+
+    admin_user = request.client.host if request.client else "unknown"
+    with db.get_conn() as conn2:
+        _log_admin_action(
+            conn=conn2,
+            admin_user=admin_user,
+            action="SEGMENT_DELETE",
+            endpoint="/api/vault/admin/segments",
+            target_user_ids=None,
+            request_id=None,
+            request_body={"segment_id": segment_id},
+            response_status="SUCCESS",
+            response_summary={"deleted": True},
+        )
+        conn2.commit()
+    return {"deleted": True}
+
+
+@app.post("/api/vault/admin/operations/extend-expiry", response_model=ExtendExpiryResponse)
+async def admin_extend_expiry(body: AdminExtendExpiryRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
+    request_id = _validate_request_id(getattr(body, "request_id", None))
+    if body.reason not in {"OPS", "PROMO", "ADMIN"}:
+        raise HTTPException(status_code=400, detail="INVALID_REASON")
+    if not (1 <= body.extend_hours <= 72):
+        raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
+
+    key = _validate_idempotency_key(request_id)
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/admin/operations/extend-expiry"
+    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+    target_mode = (body.target.mode or "").lower()
+    target_dict: dict = {"mode": target_mode}
+    user_ids = _dedupe_int_list(list(body.target.user_ids) if body.target.user_ids else None, max_items=10000)
+    if target_mode == "user_ids":
+        if not user_ids:
+            raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
+    elif target_mode == "filter":
+        target_dict["filter"] = body.target.filter.model_dump() if body.target.filter else {}
+    elif target_mode == "segment":
+        seg_id = (body.target.segment_id or "").strip()
+        if not seg_id:
+            raise HTTPException(status_code=400, detail="SEGMENT_ID_REQUIRED")
+        target_dict["segment_id"] = seg_id
+    else:
+        raise HTTPException(status_code=400, detail="INVALID_TARGET_MODE")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+        now = _now()
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return ExtendExpiryResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        rows: list[tuple[int, datetime]] = []
+        resolved_meta: dict[str, Any] = {"mode": target_mode}
+        if target_mode == "user_ids":
+            cur.execute(
+                """
+                SELECT user_id, expires_at
+                  FROM vault_status
+                 WHERE user_id = ANY(%s)
+                   AND (gold_status!='CLAIMED' OR platinum_status!='CLAIMED' OR diamond_status!='CLAIMED')
+                """,
+                (user_ids,),
+            )
+            rows = cur.fetchall()
+            resolved_meta["user_ids_count"] = len(user_ids)
+        else:
+            if target_mode == "segment":
+                cur.execute("SELECT name, filters FROM admin_segments WHERE segment_id=%s", (target_dict["segment_id"],))
+                seg_row = cur.fetchone()
+                if not seg_row:
+                    raise HTTPException(status_code=404, detail="SEGMENT_NOT_FOUND")
+                target_dict["segment_filters"] = seg_row[1] or {}
+                resolved_meta["segment_name"] = seg_row[0]
+
+            where_sql, params = _build_user_target_sql(target_dict)
+            cur.execute(
+                """
+                SELECT vs.user_id, vs.expires_at
+                  FROM vault_status vs
+                  JOIN user_identity ui ON ui.user_id = vs.user_id
+                  JOIN user_admin_snapshot uas ON uas.user_id = vs.user_id
+                 WHERE """
+                + where_sql,
+                tuple(params),
+            )
+            rows = cur.fetchall()
+            resolved_meta["candidates"] = len(rows)
+
+        if body.shadow:
+            sample_ids = [r[0] for r in rows[:10]]
+            response_body = {"shadow": True, "candidates": len(rows), "sample_user_ids": sample_ids}
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
+            )
+            conn.commit()
+            response.headers["Idempotency-Status"] = "recorded"
+            return ExtendExpiryResponse(**response_body)
+
+        if not rows:
+            response_body = {"shadow": False, "updated": 0, "new_expires_at": None}
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
+            )
+            conn.commit()
+            response.headers["Idempotency-Status"] = "recorded"
+            return ExtendExpiryResponse(**response_body)
+
+        update_values = []
+        log_values = []
+        new_expires_at = None
+        for user_id, expires_at in rows:
+            new_expires = expires_at + timedelta(hours=body.extend_hours)
+            new_expires_at = new_expires
+            update_values.append((user_id, new_expires, body.reason, now))
+            log_values.append(
+                (
+                    user_id,
+                    expires_at,
+                    new_expires,
+                    body.reason,
+                    f"{request_id}:{user_id}",
+                    Json(
+                        {
+                            "base_request_id": request_id,
+                            "target": resolved_meta,
+                            "extend_hours": body.extend_hours,
+                        }
+                    ),
+                )
+            )
+
+        execute_values(
+            cur,
+            """
+            UPDATE vault_status AS vs
+               SET expires_at=data.new_expires_at,
+                   expiry_extend_count=vs.expiry_extend_count+1,
+                   last_extension_reason=data.reason,
+                   last_extension_at=data.now
+              FROM (VALUES %s) AS data(user_id, new_expires_at, reason, now)
+             WHERE vs.user_id = data.user_id
+            """,
+            update_values,
+            template="(%s,%s,%s,%s)",
+        )
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO vault_expiry_extension_log
+                (user_id, prev_expires_at, new_expires_at, reason, request_id, shadow, metadata)
+            VALUES %s
+            ON CONFLICT (request_id) DO NOTHING
+            """,
+            log_values,
+            template="(%s,%s,%s,%s,%s,false,%s)",
+        )
+
+        updated = len(update_values)
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="EXTEND_EXPIRY",
+            endpoint=endpoint,
+            target_user_ids=[r[0] for r in rows[:1000]],
+            request_id=key,
+            request_body={
+                "target": resolved_meta,
+                "extend_hours": body.extend_hours,
+                "reason": body.reason,
+                "shadow": body.shadow,
+            },
+            response_status="SUCCESS",
+            response_summary={"updated": updated, "new_expires_at": new_expires_at.isoformat() if new_expires_at else None},
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "shadow": False,
+            "updated": updated,
+            "new_expires_at": new_expires_at.isoformat() if new_expires_at else None,
+        }
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
+        )
+        conn.commit()
+        response.headers["Idempotency-Status"] = "recorded"
+        return ExtendExpiryResponse(**response_body)
 
 
 @app.post("/api/vault/admin/users", response_model=AdminUserResponse)
