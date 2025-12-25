@@ -8,6 +8,16 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   ...(normalizedBasePath ? { basePath: normalizedBasePath, assetPrefix: normalizedBasePath } : {}),
+  async rewrites() {
+    return {
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: `${process.env.NEXT_PUBLIC_API_BASE || 'http://api:8000'}/api/:path*`,
+        },
+      ],
+    };
+  },
 };
 
 module.exports = nextConfig;
