@@ -143,6 +143,21 @@ def test_e2e_notify_list_and_retry_guard(client, db_conn):
 
 
 def test_e2e_admin_audit_logs_capture_request_id(client, db_conn):
+    # Ensure target user exists so job creation succeeds
+    create = client.post(
+        "/api/vault/admin/users",
+        json={
+            "external_user_id": "ext-audit-1",
+            "nickname": "audit",
+            "joined_date": "2024-01-01",
+            "deposit_total": 0,
+            "telegram_ok": True,
+            "review_ok": True,
+        },
+        headers=_idem_headers("audit-create"),
+    )
+    assert create.status_code == 200
+
     headers = _idem_headers("audit-job")
     body = {"type": "NOTIFY", "target": {"external_user_ids": ["ext-audit-1"]}}
     created = client.post("/api/vault/admin/jobs", json=body, headers=headers)
@@ -164,6 +179,20 @@ def test_e2e_admin_audit_logs_capture_request_id(client, db_conn):
 
 def test_e2e_job_timeout_not_hanging(client):
     # Basic smoke: admin job creation responds quickly (statement/lock timeout applied server-side)
+    create = client.post(
+        "/api/vault/admin/users",
+        json={
+            "external_user_id": "ext-timeout-1",
+            "nickname": "timeout",
+            "joined_date": "2024-01-01",
+            "deposit_total": 0,
+            "telegram_ok": True,
+            "review_ok": True,
+        },
+        headers=_idem_headers("timeout-create"),
+    )
+    assert create.status_code == 200
+
     headers = _idem_headers("timeout-job")
     body = {"type": "NOTIFY", "target": {"external_user_ids": ["ext-timeout-1"]}}
     resp = client.post("/api/vault/admin/jobs", json=body, headers=headers)

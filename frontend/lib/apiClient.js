@@ -5,6 +5,19 @@ function generateIdempotencyKey() {
   return `idem-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
 }
 
+function parseErrorPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    return {};
+  }
+  const { code, summary, detail, request_id: requestId } = payload;
+  return {
+    code,
+    summary: summary || payload.message,
+    detail,
+    requestId,
+  };
+}
+
 /**
  * Simple fetch wrapper that injects admin password + idempotency key headers.
  * Intended for client-side usage; call from within components/hooks.
@@ -44,9 +57,24 @@ export function withIdempotency({ adminPassword, basePath = '' } = {}) {
       err.idempotencyKey = key;
       err.idempotencyStatus = idemStatus;
       err.payload = payload;
+      err.parsed = parseErrorPayload(payload);
       throw err;
     }
 
     return { data: payload, idempotencyKey: key, idempotencyStatus: idemStatus };
+  };
+}
+
+export function extractErrorInfo(err) {
+  if (!err) return {};
+  const base = err.parsed || parseErrorPayload(err.payload);
+  return {
+    code: base.code,
+    summary: base.summary || err.message,
+    detail: base.detail,
+    requestId: base.requestId,
+    idempotencyKey: err.idempotencyKey,
+    idempotencyStatus: err.idempotencyStatus,
+    status: err.status,
   };
 }

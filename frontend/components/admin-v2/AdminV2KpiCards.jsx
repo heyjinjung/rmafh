@@ -1,10 +1,48 @@
-const cards = [
-  { label: 'Jobs Today', value: '84', delta: '+12%' },
-  { label: 'Imports', value: '18', delta: '+3' },
-  { label: 'Failed', value: '2', delta: '-5' },
+import { useEffect, useMemo, useState } from 'react';
+import { withIdempotency } from '../../lib/apiClient';
+
+const fallbackCards = [
+  { label: 'Jobs (24h)', value: '-', delta: '' },
+  { label: 'Notifications (24h)', value: '-', delta: '' },
+  { label: 'Failed Jobs', value: '-', delta: '' },
 ];
 
-export default function AdminV2KpiCards() {
+export default function AdminV2KpiCards({ adminPassword, basePath }) {
+  const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
+  const [cards, setCards] = useState(fallbackCards);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const [jobsResp, notiResp] = await Promise.all([
+          apiFetch('/api/vault/admin/jobs?limit=20').catch(() => null),
+          apiFetch('/api/vault/admin/notifications?limit=20').catch(() => null),
+        ]);
+
+        const jobs = jobsResp?.data?.items || jobsResp?.data?.jobs || jobsResp?.data || [];
+        const notifications = notiResp?.data?.items || notiResp?.data?.notifications || notiResp?.data || [];
+
+        const failedJobs = jobs.filter((j) => (j.status || j.state) === 'FAILED').length;
+        const imports = jobs.filter((j) => (j.type || '').includes('IMPORT')).length;
+        const cardsData = [
+          { label: 'Jobs (recent)', value: jobs.length ? jobs.length.toString() : '0', delta: '' },
+          { label: 'Notifications (recent)', value: notifications.length ? notifications.length.toString() : '0', delta: '' },
+          { label: 'Failed Jobs', value: failedJobs.toString(), delta: imports ? `${imports} imports` : '' },
+        ];
+        if (!cancelled) setCards(cardsData);
+      } catch (err) {
+        if (!cancelled) setCards(fallbackCards);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [apiFetch]);
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {cards.map((card) => (

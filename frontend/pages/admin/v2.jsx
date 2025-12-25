@@ -83,7 +83,7 @@ export default function AdminV2Page() {
             </button>
           </div>
 
-          <AdminV2KpiCards />
+          <AdminV2KpiCards adminPassword={adminPassword} basePath={basePath} />
           <AdminV2QuickActions />
 
           <AdminV2UsersGrid adminPassword={adminPassword} basePath={basePath} />
@@ -142,7 +142,7 @@ export default function AdminV2Page() {
                 </div>
               </div>
             </div>
-            <AdminV2JobsPanel />
+            <AdminV2JobsPanel adminPassword={adminPassword} basePath={basePath} />
           </div>
 
           <AdminV2CommonUxPanel />

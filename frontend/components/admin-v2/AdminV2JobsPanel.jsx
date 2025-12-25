@@ -1,28 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { withIdempotency } from '../../lib/apiClient';
 
-const jobRows = [
-  { id: 'job_20251226_001', type: 'EXTEND_EXPIRY', status: 'RUNNING', targets: 1200, done: 420, failed: 2, started_at: '2025-12-26T02:01Z' },
-  { id: 'job_20251226_002', type: 'DAILY_IMPORT', status: 'PENDING', targets: 840, done: 0, failed: 0, started_at: null },
-  { id: 'job_20251226_003', type: 'NOTIFY', status: 'FAILED', targets: 54, done: 30, failed: 24, started_at: '2025-12-25T23:40Z' },
-];
+const normalizeJob = (j) => ({
+  id: j.job_id || j.id,
+  type: j.type,
+  status: j.status || j.state,
+  targets: j.target_count ?? j.total ?? j.targets ?? 0,
+  done: j.done ?? j.success ?? j.completed ?? 0,
+  failed: j.failed ?? j.errors ?? j.failures ?? 0,
+  started_at: j.started_at || j.created_at,
+  updated_at: j.updated_at,
+  failure_download_url: j.failures_csv || j.failure_download_url,
+});
 
-const auditRows = [
-  { id: 'audit_701', actor: 'admin@vault', action: 'EXTEND_EXPIRY', target: 'segment:expiring_3d', status: 'OK', request_id: 'req_123', at: '2025-12-26T02:05Z' },
-  { id: 'audit_702', actor: 'admin@vault', action: 'NOTIFY', target: 'upload:ids.csv', status: 'FAILED', request_id: 'req_124', at: '2025-12-26T01:55Z' },
-  { id: 'audit_703', actor: 'ops@vault', action: 'IMPORT', target: 'file:test.csv', status: 'OK', request_id: 'req_125', at: '2025-12-26T01:40Z' },
-];
+const normalizeAudit = (row) => ({
+  id: row.id,
+  actor: row.actor || row.admin || row.user,
+  action: row.action,
+  target: row.target,
+  status: row.status,
+  request_id: row.request_id || row.idempotency_key,
+  at: row.created_at || row.at,
+});
 
-export default function AdminV2JobsPanel() {
+export default function AdminV2JobsPanel({ adminPassword, basePath }) {
+  const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
   const [jobFilter, setJobFilter] = useState('ALL');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditStatus, setAuditStatus] = useState('ALL');
+  const [jobs, setJobs] = useState([]);
+  const [auditRows, setAuditRows] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const filteredJobs = jobRows.filter((j) => (jobFilter === 'ALL' ? true : j.status === jobFilter));
+  const load = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [jobsResp, auditResp] = await Promise.all([
+        apiFetch('/api/vault/admin/jobs?limit=10').catch(() => null),
+        apiFetch('/api/vault/admin/audit?limit=10').catch(() => null),
+      ]);
+
+      const jobsData = jobsResp?.data?.items || jobsResp?.data?.jobs || jobsResp?.data || [];
+      const auditData = auditResp?.data?.items || auditResp?.data?.logs || auditResp?.data || [];
+
+      setJobs(jobsData.map(normalizeJob));
+      setAuditRows(auditData.map(normalizeAudit));
+    } catch (err) {
+      setError(err?.parsed?.summary || err?.message || '로드 실패');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const filteredJobs = jobs.filter((j) => (jobFilter === 'ALL' ? true : j.status === jobFilter));
   const filteredAudit = auditRows.filter((row) => {
-    const qOk = auditQuery ? row.request_id.includes(auditQuery) || row.target.includes(auditQuery) : true;
+    const qOk = auditQuery ? (row.request_id || '').includes(auditQuery) || (row.target || '').includes(auditQuery) : true;
     const sOk = auditStatus === 'ALL' ? true : row.status === auditStatus;
     return qOk && sOk;
   });
+
+  const retryJob = async (jobId) => {
+    try {
+      await apiFetch(`/api/vault/admin/jobs/${jobId}/retry`, { method: 'POST' });
+      load();
+    } catch (err) {
+      setError(err?.parsed?.summary || err?.message);
+    }
+  };
+
+  const downloadFailures = (job) => {
+    if (job.failure_download_url && typeof window !== 'undefined') {
+      window.open(job.failure_download_url, '_blank');
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="audit-jobs">
@@ -32,10 +89,17 @@ export default function AdminV2JobsPanel() {
           <p className="mt-1 text-sm text-[var(--v2-text)]">Audit trails, job status, retry, and failure downloads.</p>
         </div>
         <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
+          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
           <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">Export Audit</button>
-          <button className="rounded-full border border-[var(--v2-border)] px-3 py-1">View All</button>
         </div>
       </div>
+
+      {loading ? (
+        <p className="mt-3 text-sm text-[var(--v2-muted)]">불러오는 중...</p>
+      ) : null}
+      {error ? (
+        <p className="mt-3 text-sm text-[var(--v2-warning)]">{error}</p>
+      ) : null}
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
@@ -78,13 +142,16 @@ export default function AdminV2JobsPanel() {
                     />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
-                    <button className="rounded border border-[var(--v2-border)] px-3 py-1">Download Failures</button>
-                    <button className="rounded border border-[var(--v2-border)] px-3 py-1">Retry</button>
-                    <button className="rounded border border-[var(--v2-border)] px-3 py-1">Refresh</button>
+                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => downloadFailures(job)}>Download Failures</button>
+                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => retryJob(job.id)}>Retry</button>
+                    <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
                   </div>
                 </div>
               );
             })}
+            {filteredJobs.length === 0 ? (
+              <p className="text-sm text-[var(--v2-muted)]">표시할 Job이 없습니다.</p>
+            ) : null}
           </div>
         </div>
 
@@ -134,12 +201,17 @@ export default function AdminV2JobsPanel() {
                     <td className="px-3 py-2">{row.at}</td>
                   </tr>
                 ))}
+                {filteredAudit.length === 0 ? (
+                  <tr>
+                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={5}>표시할 감사 로그가 없습니다.</td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-[var(--v2-muted)]">
-            <span>Job/Audit API 연동 전: 스키마 필드 검증용 자리</span>
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1">Download</button>
+            <span>request_id / idempotency 키 추적용</span>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>Reload</button>
           </div>
         </div>
       </div>
