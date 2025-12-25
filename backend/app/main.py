@@ -4078,7 +4078,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
 
         new_platinum_status = platinum_status
         if platinum_status not in {"CLAIMED", "EXPIRED"}:
-            if new_platinum_deposit_done and int(attendance_days or 0) >= 3 and review_ok:
+            if new_platinum_deposit_done:
                 new_platinum_status = "UNLOCKED"
 
         new_diamond_status = diamond_status

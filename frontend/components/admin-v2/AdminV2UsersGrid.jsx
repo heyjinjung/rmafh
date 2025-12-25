@@ -711,18 +711,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
                       className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                     />
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--v2-muted)]">
-                      <button
-                        type="button"
-                        className="rounded border border-[var(--v2-border)] px-2 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
-                        onClick={() => setForm((prev) => ({ ...prev, deposit_total: '150000' }))}
-                      >
-                        150,000원으로 설정
-                      </button>
-                      <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full" style={{ background: platinumDepositDone ? 'var(--v2-accent)' : 'var(--v2-border)' }} />
-                        {platinumDepositDone ? '플레티넘 입금 확인됨' : '미확인'}</span>
-                    </div>
                   </div>
                 </div>
 
@@ -831,14 +819,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       150,000 + 해금
                     </button>
                   </div>
-                  <p className="text-xs text-[var(--v2-muted)]">누적 입금이 150,000원 이상이면 자동 확인됩니다. 부족한 경우 버튼으로 바로 해금할 수 있습니다.</p>
-                </div>
-
-                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">다이아 입금 (50만)</div>
-                    <div className="text-xs text-[var(--v2-muted)]">자동/수동 해금</div>
-                  </div>
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -868,10 +848,15 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       500,000 + 해금
                     </button>
                   </div>
-                  <p className="text-xs text-[var(--v2-muted)]">누적 입금이 500,000원 이상이면 자동 해금됩니다. 부족한 경우 버튼으로 바로 해금할 수 있습니다.</p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">다이아 입금 (50만)</div>
+                    <div className="text-xs text-[var(--v2-muted)]">자동/수동 해금</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
                   <button
                     type="button"
                     className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
@@ -889,8 +874,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     삭제
                   </button>
                 </div>
-
-                <p className="text-xs text-[var(--v2-muted)]">저장은 user_admin_snapshot(닉네임/가입일/입금/텔레그램/리뷰)을 수정합니다.</p>
               </div>
             )}
           </aside>
