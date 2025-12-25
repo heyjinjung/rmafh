@@ -31,25 +31,7 @@ const statusLabel = (s) => {
   }
 };
 
-const bulkModeLabel = (mode) => {
-  switch (mode) {
-    case 'page':
-      return '현재 페이지';
-    case 'filter':
-      return '현재 필터';
-    case 'uploaded':
-      return '업로드 ID';
-    default:
-      return String(mode || '-');
-  }
-};
-
 const sortableKeys = new Set(['created_at', 'expires_at', 'deposit_total', 'external_user_id', 'nickname']);
-
-const storageKeys = {
-  columns: 'adminV2UserColumns',
-  bulk: 'adminV2UserBulkSelection',
-};
 
 export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChange }) {
   const [query, setQuery] = useState('');
@@ -57,7 +39,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [sortBy, setSortBy] = useState('expires_at');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const pageSize = 50;
   const [scrollTop, setScrollTop] = useState(0);
   const [selectedRow, setSelectedRow] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -65,18 +47,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  // Persisted UI state for columns and bulk selection
-  const [visibleColumns, setVisibleColumns] = useState(() => {
-    if (typeof window === 'undefined') return columnDefs.map((c) => c.key);
-    const stored = window.localStorage.getItem(storageKeys.columns);
-    return stored ? JSON.parse(stored) : columnDefs.map((c) => c.key);
-  });
-  const [bulkSelection, setBulkSelection] = useState(() => {
-    if (typeof window === 'undefined') return { mode: 'page', ids: [] };
-    const stored = window.localStorage.getItem(storageKeys.bulk);
-    return stored ? JSON.parse(stored) : { mode: 'page', ids: [] };
-  });
-  const [uploadedIdsText, setUploadedIdsText] = useState('');
 
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
@@ -114,18 +84,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setPage(1);
   }, [query, statusFilter]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(storageKeys.columns, JSON.stringify(visibleColumns));
-    }
-  }, [visibleColumns]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(storageKeys.bulk, JSON.stringify(bulkSelection));
-    }
-  }, [bulkSelection]);
-
   const totalHeight = rows.length * rowHeight;
   const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - 3);
   const visibleCount = Math.ceil(viewportHeight / rowHeight) + 6;
@@ -149,56 +107,14 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     }
   };
 
-  const toggleColumn = (key) => {
-    setVisibleColumns((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
-  };
-
-  const toggleBulkSelection = (row) => {
-    setBulkSelection((prev) => {
-      const ids = new Set(prev.ids || []);
-      const key = String(row.user_id);
-      if (ids.has(key)) {
-        ids.delete(key);
-      } else {
-        ids.add(key);
-      }
-      return { ...prev, ids: Array.from(ids) };
-    });
-  };
-
-  const bulkSelectPage = () => {
-    setBulkSelection((prev) => ({ ...prev, mode: 'page', ids: rows.map((r) => String(r.user_id)) }));
-  };
-
-  const bulkSelectFilter = () => {
-    setBulkSelection((prev) => ({ ...prev, mode: 'filter', ids: [], filter: { query: query.trim(), status: statusFilter } }));
-  };
-
-  const bulkSelectUploadIds = () => {
-    setBulkSelection((prev) => ({ ...prev, mode: 'uploaded', ids: prev.ids || [] }));
-  };
-
-  const applyUploadedIds = () => {
-    const raw = uploadedIdsText || '';
-    const parts = raw
-      .split(/[\s,\n\r\t]+/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-    const unique = Array.from(new Set(parts));
-    setBulkSelection((prev) => ({ ...prev, mode: 'uploaded', ids: unique }));
-  };
-
   useEffect(() => {
     if (typeof onTargetChange !== 'function') return;
-
-    const mode = bulkSelection?.mode || 'page';
-    const ids = Array.isArray(bulkSelection?.ids) ? bulkSelection.ids.map(String) : [];
-    const filter = bulkSelection?.filter || { query: query.trim(), status: statusFilter };
-
-    onTargetChange({ source: 'users-grid', mode, user_ids: ids, filter });
-  }, [bulkSelection, onTargetChange, query, statusFilter]);
+    if (!selectedRow?.user_id) {
+      onTargetChange(null);
+      return;
+    }
+    onTargetChange({ source: 'users-grid', mode: 'page', user_ids: [String(selectedRow.user_id)] });
+  }, [onTargetChange, selectedRow]);
 
   const onRowClick = (row) => {
     setSelectedRow(row);
@@ -210,32 +126,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">
-            서버 페이징 + 가상 스크롤 미리보기, 컬럼 세트, 대량 선택.
-          </p>
-        </div>
-        <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
-          <button
-            type="button"
-            className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
-            onClick={bulkSelectPage}
-          >
-            현재 페이지 선택
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
-            onClick={bulkSelectFilter}
-          >
-            필터 범위 선택
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/40"
-            onClick={bulkSelectUploadIds}
-          >
-            ID 업로드
-          </button>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">검색/정렬 후 클릭해서 편집 대상으로 선택하세요.</p>
         </div>
       </div>
 
@@ -294,39 +185,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-[var(--v2-muted)]">
         <div className="flex items-center gap-2">
-          <span>표시 컬럼:</span>
-          {columnDefs.map((col) => (
-            <label key={col.key} className="flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={visibleColumns.includes(col.key)}
-                onChange={() => toggleColumn(col.key)}
-              />
-              <span>{col.label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <label>
-            페이지 크기
-            <select
-              className="ml-2 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-2 py-1"
-              value={pageSize}
-              onChange={(e) => {
-                setPageSize(Number(e.target.value));
-                setPage(1);
-              }}
-            >
-              {[25, 50, 100, 200].map((n) => (
-                <option key={n} value={n}>{n}</option>
-              ))}
-            </select>
-          </label>
-          <span>
-            대량 선택: {bulkModeLabel(bulkSelection.mode)} · ID {bulkSelection.ids?.length || 0}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
           <button
             type="button"
             className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
@@ -358,12 +216,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/60">
-        <div className="flex items-center justify-between px-4 py-2 text-xs text-[var(--v2-muted)]">
-          <span>
-            현재 페이지 {rows.length.toLocaleString()}건 · 가상 스크롤 표시 {visibleRows.length}건
-          </span>
-          <span className="text-[var(--v2-accent)]">서버 연동 확장 예정(후속 작업)</span>
-        </div>
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div
             className="relative h-[440px] overflow-auto"
@@ -377,9 +229,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
               >
                 <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
                   <tr>
-                    {columnDefs
-                      .filter((col) => visibleColumns.includes(col.key))
-                      .map((col) => (
+                    {columnDefs.map((col) => (
                         <th key={col.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
                           <button
                             type="button"
@@ -396,7 +246,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                 <tbody className="divide-y divide-[var(--v2-border)]">
                   {visibleRows.map((row) => {
                     const isSelected = selectedRow?.external_user_id === row.external_user_id;
-                    const isBulkChecked = (bulkSelection?.ids || []).map(String).includes(String(row.user_id));
                     return (
                       <tr
                         key={row.external_user_id}
@@ -407,30 +256,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         style={{ height: `${rowHeight}px` }}
                         onClick={() => onRowClick(row)}
                       >
-                        {columnDefs
-                          .filter((col) => visibleColumns.includes(col.key))
-                          .map((col) => {
+                        {columnDefs.map((col) => {
                             const val = row[col.key];
                             const isNumber = typeof val === 'number';
                             const display = isNumber ? val.toLocaleString() : (val || '').toString();
                             return (
                               <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
-                                {col.key === 'external_user_id' ? (
-                                  <div className="flex items-center gap-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={isBulkChecked}
-                                      onChange={(e) => {
-                                        e.stopPropagation();
-                                        toggleBulkSelection(row);
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                    />
-                                    <span className="font-mono text-[var(--v2-accent)]">{display}</span>
-                                  </div>
-                                ) : (
-                                  display
-                                )}
+                                {col.key === 'external_user_id' ? <span className="font-mono text-[var(--v2-accent)]">{display}</span> : display}
                               </td>
                             );
                           })}
@@ -513,45 +345,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
               </div>
             )}
           </aside>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-3">
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">대량 선택</p>
-          <div className="mt-2 space-y-2 text-sm text-[var(--v2-text)]">
-            <div className="text-[var(--v2-muted)]">모드: <span className="font-mono">{bulkModeLabel(bulkSelection.mode)}</span></div>
-            <div className="text-[var(--v2-muted)]">ID 수: <span className="font-mono">{bulkSelection.ids?.length || 0}</span></div>
-            {bulkSelection.mode === 'filter' ? (
-              <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-2 text-xs text-[var(--v2-muted)]">
-                <div>검색어: {bulkSelection?.filter?.query || '-'}</div>
-                <div>상태: {bulkSelection?.filter?.status ? statusLabel(bulkSelection.filter.status) : '-'}</div>
-              </div>
-            ) : null}
-            {bulkSelection.mode === 'uploaded' ? (
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">user_id 목록 붙여넣기</label>
-                <textarea
-                  value={uploadedIdsText}
-                  onChange={(e) => setUploadedIdsText(e.target.value)}
-                  placeholder="예: 123\n456\n789 (공백/쉼표/줄바꿈 구분)"
-                  className="h-28 w-full resize-none rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                />
-                <button
-                  type="button"
-                  onClick={applyUploadedIds}
-                  className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-xs font-semibold text-black hover:brightness-105"
-                >
-                  업로드 ID 적용
-                </button>
-                <p className="text-xs text-[var(--v2-muted)]">현재 업로드 타겟은 user_id 기준으로만 동작합니다.</p>
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">저장된 컬럼 세트</p>
-          <p className="mt-2 text-sm text-[var(--v2-text)]">컬럼 세트 저장/불러오기 API 연동 예정.</p>
         </div>
       </div>
     </div>
