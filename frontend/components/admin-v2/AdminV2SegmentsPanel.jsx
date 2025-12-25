@@ -3,6 +3,21 @@ import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
+const statusLabel = (s) => {
+  switch (s) {
+    case 'LOCKED':
+      return '잠금';
+    case 'UNLOCKED':
+      return '해제';
+    case 'CLAIMED':
+      return '수령';
+    case 'EXPIRED':
+      return '만료';
+    default:
+      return String(s || '');
+  }
+};
+
 const emptyFilters = {
   status: [],
   expiresAfter: '',
@@ -72,7 +87,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
 
   const saveSegment = async () => {
     if (!adminPassword) {
-      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      pushToast({ ok: false, message: '관리자 비밀번호를 먼저 입력하세요.' });
       return;
     }
     if (!name.trim()) return;
@@ -97,7 +112,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
 
   const deleteSegment = async (segment) => {
     if (!adminPassword) {
-      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      pushToast({ ok: false, message: '관리자 비밀번호를 먼저 입력하세요.' });
       return;
     }
     try {
@@ -116,14 +131,14 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
 
   const summary = useMemo(() => {
     const parts = [];
-    if (filters.status.length) parts.push(`status: ${filters.status.join(',')}`);
-    if (filters.expiresAfter) parts.push(`expires >= ${filters.expiresAfter}`);
-    if (filters.expiresBefore) parts.push(`expires <= ${filters.expiresBefore}`);
-    if (filters.depositMin || filters.depositMax) parts.push(`deposit ${filters.depositMin || 0} - ${filters.depositMax || '∞'}`);
-    if (filters.attendanceMin || filters.attendanceMax) parts.push(`attendance ${filters.attendanceMin || 0} - ${filters.attendanceMax || '∞'}`);
-    if (filters.telegramOk) parts.push('telegram ok');
-    if (filters.reviewOk) parts.push('review ok');
-    return parts.join(' · ') || 'No filters selected';
+    if (filters.status.length) parts.push(`상태: ${filters.status.map(statusLabel).join(', ')}`);
+    if (filters.expiresAfter) parts.push(`만료일 ≥ ${filters.expiresAfter}`);
+    if (filters.expiresBefore) parts.push(`만료일 ≤ ${filters.expiresBefore}`);
+    if (filters.depositMin || filters.depositMax) parts.push(`입금 ${filters.depositMin || 0} ~ ${filters.depositMax || '∞'}`);
+    if (filters.attendanceMin || filters.attendanceMax) parts.push(`출석 ${filters.attendanceMin || 0} ~ ${filters.attendanceMax || '∞'}`);
+    if (filters.telegramOk) parts.push('텔레그램 OK');
+    if (filters.reviewOk) parts.push('리뷰 OK');
+    return parts.join(' · ') || '선택된 필터가 없습니다';
   }, [filters]);
 
   const toggleStatus = (status) => {
@@ -139,10 +154,10 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
     <section id="segments" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Segments</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">Create, save, and reuse filter sets across operations.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">세그먼트</p>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">필터 세트를 저장하고 운영 작업에서 재사용합니다.</p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Backend persisted</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">백엔드 저장</span>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
@@ -150,11 +165,11 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex-1">
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Segment Name</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">세그먼트 이름</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. unlocked_whales"
+                  placeholder="예: unlocked_whales"
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
                 />
               </div>
@@ -164,16 +179,16 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                 disabled={!adminPassword}
                 className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-2 text-sm font-semibold text-black shadow-[0_0_16px_rgba(183,247,90,0.35)] hover:brightness-105"
               >
-                Save Segment
+                세그먼트 저장
               </button>
             </div>
-            <p className="mt-2 text-xs text-[var(--v2-muted)]">Segments are saved to backend and can be targeted by segment_id.</p>
+            <p className="mt-2 text-xs text-[var(--v2-muted)]">세그먼트는 백엔드에 저장되며 segment_id로 타겟팅할 수 있습니다.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-4">
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Status</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">상태</label>
                 <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
                   {statusOptions.map((s) => {
                     const active = filters.status.includes(s);
@@ -189,7 +204,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                             : 'border-[var(--v2-border)] bg-[var(--v2-surface)] text-[var(--v2-text)]',
                         ].join(' ')}
                       >
-                        {s}
+                        {statusLabel(s)}
                       </button>
                     );
                   })}
@@ -197,7 +212,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Expires After</label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">만료일 이후</label>
                   <input
                     type="date"
                     value={filters.expiresAfter}
@@ -206,7 +221,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                   />
                 </div>
                 <div>
-                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Expires Before</label>
+                  <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">만료일 이전</label>
                   <input
                     type="date"
                     value={filters.expiresBefore}
@@ -219,7 +234,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
 
             <div className="grid gap-3 md:grid-cols-3">
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Deposit Min</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 최소</label>
                 <input
                   type="number"
                   min="0"
@@ -229,7 +244,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                 />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Deposit Max</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 최대</label>
                 <input
                   type="number"
                   min="0"
@@ -239,7 +254,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                 />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Attendance Range</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">출석 범위</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <input
                     type="number"
@@ -247,7 +262,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                     value={filters.attendanceMin}
                     onChange={(e) => setFilters((prev) => ({ ...prev, attendanceMin: e.target.value }))}
                     className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    placeholder="min"
+                    placeholder="최소"
                   />
                   <input
                     type="number"
@@ -255,7 +270,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                     value={filters.attendanceMax}
                     onChange={(e) => setFilters((prev) => ({ ...prev, attendanceMax: e.target.value }))}
                     className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    placeholder="max"
+                    placeholder="최대"
                   />
                 </div>
               </div>
@@ -268,7 +283,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                   checked={filters.telegramOk}
                   onChange={(e) => setFilters((prev) => ({ ...prev, telegramOk: e.target.checked }))}
                 />
-                Telegram OK
+                텔레그램 OK
               </label>
               <label className="inline-flex items-center gap-2">
                 <input
@@ -276,7 +291,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                   checked={filters.reviewOk}
                   onChange={(e) => setFilters((prev) => ({ ...prev, reviewOk: e.target.checked }))}
                 />
-                Review OK
+                리뷰 OK
               </label>
             </div>
 
@@ -288,7 +303,7 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
 
         <div className="space-y-4">
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Saved Segments</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">저장된 세그먼트</p>
             <div className="mt-3 space-y-2 text-sm">
               {loading ? (
                 <p className="text-[var(--v2-muted)]">불러오는 중...</p>
@@ -317,14 +332,14 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
                           onClick={() => applySegment(segment)}
                           className="rounded border border-[var(--v2-border)] px-3 py-1 hover:border-[var(--v2-accent)]/60"
                         >
-                          Apply
+                          적용
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteSegment(segment)}
                           className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-warning)] hover:border-[var(--v2-warning)]/60"
                         >
-                          Delete
+                          삭제
                         </button>
                       </div>
                     </div>
@@ -335,11 +350,11 @@ export default function AdminV2SegmentsPanel({ adminPassword, basePath, onSegmen
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Segment → Operations</p>
-            <p className="mt-2">Apply a segment, then launch Operations or Imports to reuse the filter scope. Backend wiring will send the segment payload.</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">세그먼트 → 운영</p>
+            <p className="mt-2">세그먼트를 적용한 뒤, 운영 또는 가져오기에서 동일한 필터 범위를 재사용할 수 있습니다.</p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-[var(--v2-muted)]">
-              <li>Scopes: current filter, saved segment, uploaded ID list</li>
-              <li>Future: persist to backend, shareable links, audit trail</li>
+              <li>범위: 현재 필터 / 저장 세그먼트 / 업로드 ID 목록</li>
+              <li>추후: 링크 공유, 감사 로그 강화 등</li>
             </ul>
           </div>
         </div>
