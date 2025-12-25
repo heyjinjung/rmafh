@@ -42,19 +42,7 @@ export default function AdminV2Sidebar({ active }) {
         })}
       </nav>
 
-      <div className="mt-10 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">빠른 상태</p>
-        <div className="mt-3 space-y-3 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--v2-muted)]">대기 작업</span>
-            <span className="font-semibold text-[var(--v2-accent)]">12</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--v2-muted)]">오늘 실패</span>
-            <span className="font-semibold text-[var(--v2-warning)]">2</span>
-          </div>
-        </div>
-      </div>
+        {/* ...기존 코드... (v2 플래그 안내 및 Legacy 콘솔 링크 삭제) */}
     </aside>
   );
 }

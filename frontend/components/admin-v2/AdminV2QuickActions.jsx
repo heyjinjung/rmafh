@@ -5,6 +5,39 @@ const actions = [
 ];
 
 export default function AdminV2QuickActions() {
+  // API 호출 및 피드백 함수
+  const handleAction = async (type) => {
+    let url = '';
+    let body = {};
+    switch (type) {
+      case '만료 연장':
+        url = '/api/vault/admin/jobs';
+        body = { jobType: 'EXTEND_EXPIRY' };
+        break;
+      case '일괄 업데이트':
+        url = '/api/vault/admin/jobs';
+        body = { jobType: 'BULK_UPDATE' };
+        break;
+      case '알림 발송':
+        url = '/api/vault/admin/jobs';
+        body = { jobType: 'NOTIFY' };
+        break;
+      default:
+        return;
+    }
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('작업 실패');
+      alert(`${type} 작업이 성공적으로 실행되었습니다.`);
+    } catch (e) {
+      alert(`${type} 작업 중 오류 발생: ${e.message}`);
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex items-center justify-between">
@@ -21,12 +54,13 @@ export default function AdminV2QuickActions() {
           <button
             key={action.title}
             type="button"
-            className={[
+            className={[ 
               'rounded-xl border px-4 py-3 text-left text-sm font-semibold transition',
               action.tone === 'accent'
                 ? 'border-[var(--v2-accent)]/40 bg-[var(--v2-surface-2)] text-[var(--v2-accent)]'
                 : 'border-[var(--v2-border)] bg-[var(--v2-surface-2)] text-[var(--v2-text)]',
             ].join(' ')}
+            onClick={() => handleAction(action.title)}
           >
             <div>{action.title}</div>
             <div className="mt-1 text-xs font-normal text-[var(--v2-muted)]">{action.desc}</div>

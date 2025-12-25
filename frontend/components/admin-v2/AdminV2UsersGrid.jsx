@@ -395,8 +395,15 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       >
                         {columnDefs.map((col) => {
                             const val = row[col.key];
-                            const isNumber = typeof val === 'number';
-                            const display = isNumber ? val.toLocaleString() : (val || '').toString();
+                            let display = '';
+                            if (col.key === 'created_at' || col.key === 'expires_at') {
+                              // ISO8601 → YYYY-MM-DD
+                              display = val ? val.slice(0, 10) : '';
+                            } else if (typeof val === 'number') {
+                              display = val.toLocaleString();
+                            } else {
+                              display = (val || '').toString();
+                            }
                             return (
                               <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
                                 {col.key === 'external_user_id' ? <span className="font-mono text-[var(--v2-accent)]">{display}</span> : display}
