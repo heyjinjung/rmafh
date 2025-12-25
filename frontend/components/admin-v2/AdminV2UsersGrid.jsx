@@ -462,48 +462,48 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             ) : (
               <div className="mt-3 space-y-3 text-sm text-[var(--v2-text)]">
                 <div>
-                  <div className="text-xs text-[var(--v2-muted)]">external_user_id</div>
+                  <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID</div>
                   <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-[var(--v2-muted)]">user_id</div>
+                  <div className="text-xs text-[var(--v2-muted)]">사용자 ID</div>
                   <div className="font-mono">{String(selectedRow.user_id || '')}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-[var(--v2-muted)]">nickname</div>
+                  <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
                   <div>{selectedRow.nickname || '-'}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">created_at</div>
+                    <div className="text-xs text-[var(--v2-muted)]">생성일</div>
                     <div>{selectedRow.created_at || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">expires_at</div>
+                    <div className="text-xs text-[var(--v2-muted)]">만료일</div>
                     <div>{selectedRow.expires_at || '-'}</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">gold</div>
+                    <div className="text-xs text-[var(--v2-muted)]">골드</div>
                     <div>{selectedRow.gold_status || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">platinum</div>
+                    <div className="text-xs text-[var(--v2-muted)]">플래티넘</div>
                     <div>{selectedRow.platinum_status || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">diamond</div>
+                    <div className="text-xs text-[var(--v2-muted)]">다이아</div>
                     <div>{selectedRow.diamond_status || '-'}</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">attendance</div>
+                    <div className="text-xs text-[var(--v2-muted)]">출석(플래티넘)</div>
                     <div>{String(selectedRow.platinum_attendance_days ?? '-')}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-[var(--v2-muted)]">deposit_total</div>
+                    <div className="text-xs text-[var(--v2-muted)]">총 입금액</div>
                     <div>{typeof selectedRow.deposit_total === 'number' ? selectedRow.deposit_total.toLocaleString() : (selectedRow.deposit_total || '-')}</div>
                   </div>
                 </div>

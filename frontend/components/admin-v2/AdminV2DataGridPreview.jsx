@@ -10,7 +10,7 @@ const columns = [
 const rows = [
   {
     external_user_id: 'ext-1024',
-    nickname: 'User 1024',
+    nickname: '사용자 1024',
     status: 'UNLOCKED',
     attendance: '2 / 5',
     deposit_total: '120,000',
@@ -18,7 +18,7 @@ const rows = [
   },
   {
     external_user_id: 'ext-2048',
-    nickname: 'User 2048',
+    nickname: '사용자 2048',
     status: 'LOCKED',
     attendance: '0 / 3',
     deposit_total: '45,000',
@@ -26,7 +26,7 @@ const rows = [
   },
   {
     external_user_id: 'ext-4096',
-    nickname: 'User 4096',
+    nickname: '사용자 4096',
     status: 'EXPIRED',
     attendance: '3 / 7',
     deposit_total: '580,000',
@@ -39,14 +39,14 @@ export default function AdminV2DataGridPreview() {
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Users</p>
-          <p className="mt-2 text-sm text-[var(--v2-text)]">High-density grid with filters & segments.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
+          <p className="mt-2 text-sm text-[var(--v2-text)]">필터/세그먼트가 포함된 고밀도 그리드 미리보기.</p>
         </div>
         <button
           type="button"
           className="rounded-full border border-[var(--v2-border)] px-4 py-1 text-xs text-[var(--v2-muted)]"
         >
-          Configure Columns
+          컬럼 설정
         </button>
       </div>
       <div className="mt-4 overflow-hidden rounded-xl border border-[var(--v2-border)]">

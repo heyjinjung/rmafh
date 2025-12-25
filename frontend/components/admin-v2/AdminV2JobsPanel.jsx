@@ -32,6 +32,24 @@ const normalizeAudit = (row) => ({
   at: row.created_at,
 });
 
+const jobStatusLabel = (s) => {
+  const v = String(s || '').toUpperCase();
+  if (v === 'ALL') return '전체';
+  if (v === 'PENDING') return '대기';
+  if (v === 'RUNNING') return '진행중';
+  if (v === 'FAILED') return '실패';
+  if (v === 'DONE') return '완료';
+  return s || '-';
+};
+
+const auditStatusLabel = (s) => {
+  const v = String(s || '').toUpperCase();
+  if (v === 'ALL') return '전체';
+  if (v === 'SUCCESS') return '성공';
+  if (v === 'ERROR') return '오류';
+  return s || '-';
+};
+
 export default function AdminV2JobsPanel({ adminPassword, basePath }) {
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
   const [jobFilter, setJobFilter] = useState('ALL');
@@ -184,7 +202,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Jobs</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">작업</p>
               <p className="text-sm text-[var(--v2-text)]">진행률/실패/재시도</p>
             </div>
             <select
@@ -193,19 +211,19 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
               className="rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-2 py-1 text-xs text-[var(--v2-text)]"
             >
               {['ALL', 'PENDING', 'RUNNING', 'FAILED', 'DONE'].map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>{jobStatusLabel(opt)}</option>
               ))}
             </select>
           </div>
           <div className="mt-3 space-y-3">
             {filteredJobs.map((job) => {
-              const progress = job.targets ? Math.round((job.done / job.targets) * 100) : 0;
+              const progress = job.targets ? Math.round(((job.processed ?? 0) / job.targets) * 100) : 0;
               const canDownloadFailures = Number(job.failed || 0) > 0;
               return (
                 <div key={job.id} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3">
                   <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
                     <span>{job.type}</span>
-                    <span>{job.status}</span>
+                    <span>{jobStatusLabel(job.status)}</span>
                   </div>
                   <div className="mt-2 flex items-center justify-between text-sm text-[var(--v2-text)]">
                     <span className="font-mono text-[var(--v2-accent)]">{job.id}</span>
@@ -261,7 +279,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
                 className="rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-2 py-1 text-xs text-[var(--v2-text)]"
               >
                 {['ALL', 'SUCCESS', 'ERROR'].map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{auditStatusLabel(s)}</option>
                 ))}
               </select>
             </div>
@@ -297,7 +315,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
             </table>
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-[var(--v2-muted)]">
-            <span>request_id / idempotency 키 추적용</span>
+            <span>request_id / 멱등 키 추적용</span>
             <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>다시 불러오기</button>
           </div>
         </div>

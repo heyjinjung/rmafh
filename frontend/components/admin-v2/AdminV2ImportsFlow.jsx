@@ -157,13 +157,13 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
         setValidationResult(data);
         pushToast({ ok: true, message: '서버 검증(SHADOW) 완료', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
       } else {
-        pushToast({ ok: true, message: 'Import 실행(APPLY) 요청 완료', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
+        pushToast({ ok: true, message: '가져오기 실행(APPLY) 요청 완료', detail: res.idempotencyKey, idempotencyKey: res.idempotencyKey });
       }
     } catch (err) {
       const info = extractErrorInfo(err);
       setServerError(info);
       setSubmitState({ ok: false, message: info.summary, idempotencyKey: info.idempotencyKey });
-      pushToast({ ok: false, message: info.summary || 'Import 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+      pushToast({ ok: false, message: info.summary || '가져오기 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
     } finally {
       setSubmitState((prev) => ({ ...prev, loading: false }));
     }
@@ -179,7 +179,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">가져오기</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">4-step flow: file → mapping → 검증 → 실행.</p>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">4단계 흐름: 파일 → 매핑 → 검증 → 실행.</p>
         </div>
         <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">단계 {step} / 4</span>
       </div>

@@ -325,7 +325,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               </ul>
             </div>
             <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
-              <p className="text-[var(--v2-muted)]">Idempotency</p>
+              <p className="text-[var(--v2-muted)]">멱등성</p>
               <p className="mt-2 text-[var(--v2-muted)]">요청마다 <span className="font-mono">x-idempotency-key</span>가 자동으로 붙습니다(클라이언트 생성).</p>
             </div>
           </div>

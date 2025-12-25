@@ -85,9 +85,9 @@ export default function AdminV2CommonUxPanel() {
                 <div className={latest.ok ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-warning)]'}>
                   {latest.message}
                 </div>
-                <div className="text-[var(--v2-muted)]">detail: {latest.detail}</div>
-                {latest.requestId ? <div className="text-[var(--v2-muted)]">request_id: {latest.requestId}</div> : null}
-                {latest.idempotencyKey ? <div className="text-[var(--v2-muted)]">idem-key: {latest.idempotencyKey}</div> : null}
+                <div className="text-[var(--v2-muted)]">상세: {latest.detail}</div>
+                {latest.requestId ? <div className="text-[var(--v2-muted)]">요청 ID: {latest.requestId}</div> : null}
+                {latest.idempotencyKey ? <div className="text-[var(--v2-muted)]">멱등 키: {latest.idempotencyKey}</div> : null}
                 <div className="text-xs text-[var(--v2-muted)]">링크 예: {detailLink}</div>
               </div>
             ) : (
@@ -95,7 +95,7 @@ export default function AdminV2CommonUxPanel() {
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-muted)]">
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => pushToast({ ok: true, message: 'Apply 완료', detail: detailLink })}>성공 시뮬레이션</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => pushToast({ ok: true, message: '적용 완료', detail: detailLink })}>성공 시뮬레이션</button>
             <input
               value={detailLink}
               onChange={(e) => setDetailLink(e.target.value)}

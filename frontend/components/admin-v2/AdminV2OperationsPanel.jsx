@@ -292,11 +292,11 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
             <p className="text-sm font-semibold text-[var(--v2-text)]">연동 타겟 (Users에서)</p>
             {linkedTarget ? (
               <div className="text-xs text-[var(--v2-muted)] space-y-1">
-                <div>mode: <span className="font-mono">{linkedTarget.mode}</span></div>
+                <div>모드: <span className="font-mono">{linkedTarget.mode}</span></div>
                 {linkedTarget.mode === 'filter' ? (
                   <>
-                    <div>query: <span className="font-mono">{linkedTarget.filter?.query || '-'}</span></div>
-                    <div>status: <span className="font-mono">{linkedTarget.filter?.status || '-'}</span></div>
+                    <div>검색어: <span className="font-mono">{linkedTarget.filter?.query || '-'}</span></div>
+                    <div>상태: <span className="font-mono">{linkedTarget.filter?.status || '-'}</span></div>
                   </>
                 ) : (
                   <div>user_ids: <span className="font-mono">{linkedTarget.ids.length}</span></div>
@@ -345,7 +345,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               <label className="inline-flex items-center gap-2 text-xs text-[var(--v2-muted)]">
                 <input
                   type="checkbox"
-                  aria-label="Shadow mode"
+                  aria-label="Shadow 모드"
                   checked={shadow}
                   onChange={(e) => setShadow(e.target.checked)}
                 />
@@ -376,14 +376,14 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 </select>
               </div>
             </div>
-            <p className="text-xs text-[var(--v2-muted)]">Shadow: 미리보기 + 감사로그만. Apply: 실제 반영 + 감사로그.</p>
+            <p className="text-xs text-[var(--v2-muted)]">Shadow(미리보기): 미리보기 + 감사로그만. Apply(적용): 실제 반영 + 감사로그.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
             <p className="text-sm font-semibold text-[var(--v2-text)]">상태 / 출석 / 입금</p>
             <div className="grid gap-3 md:grid-cols-3">
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Gold</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">골드</label>
                 <select
                   value={goldStatus}
                   onChange={(e) => setGoldStatus(e.target.value)}
@@ -398,7 +398,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 </select>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Platinum</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">플래티넘</label>
                 <select
                   value={platinumStatus}
                   onChange={(e) => setPlatinumStatus(e.target.value)}
@@ -413,7 +413,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 </select>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Diamond</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">다이아</label>
                 <select
                   value={diamondStatus}
                   onChange={(e) => setDiamondStatus(e.target.value)}
@@ -511,7 +511,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
             >
               {submitting ? '처리 중...' : '일괄 변경 제출 (멱등)'}
             </button>
-            <p className="text-xs text-[var(--v2-muted)]">Extend Expiry는 audit에 기록되고, Bulk Update는 admin job + job items를 생성합니다.</p>
+            <p className="text-xs text-[var(--v2-muted)]">만료일 연장은 감사 로그에 기록되고, 일괄 변경은 admin job + job items를 생성합니다.</p>
           </div>
         </div>
       </div>
