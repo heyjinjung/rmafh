@@ -101,6 +101,7 @@ class NotifyRequest(BaseModel):
     external_user_ids: Optional[List[str]] = None
     variant_id: Optional[str] = None
     scheduled_at: Optional[str] = None
+    message_override: Optional[str] = None  # 커스텀 메시지 (옵션)
 
 
 class NotifyResponse(BaseModel):
@@ -117,6 +118,12 @@ class AdminNotificationItem(BaseModel):
     scheduled_at: Optional[str] = None
     created_at: Optional[str] = None
     payload: Optional[dict] = None
+    # 메시지 템플릿 필드
+    title: Optional[str] = None
+    body: Optional[str] = None
+    cta_text: Optional[str] = None
+    icon_emoji: Optional[str] = None
+    category: Optional[str] = None
 
 
 class AdminNotificationsListResponse(BaseModel):

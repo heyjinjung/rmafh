@@ -1967,6 +1967,25 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
     dedup_suffix = body.variant_id or "base"
     dedup_day = scheduled_at.date()
     inserted = 0
+    
+    # 메시지 템플릿 로드
+    template_message = None
+    with db.get_conn() as template_conn:
+        tc = template_conn.cursor()
+        tc.execute(
+            "SELECT title, body, cta_text, icon_emoji, category FROM notification_templates WHERE type=%s AND enabled=TRUE",
+            (body.type,)
+        )
+        template_row = tc.fetchone()
+        if template_row:
+            template_message = {
+                "title": template_row[0],
+                "body": template_row[1],
+                "cta_text": template_row[2],
+                "icon_emoji": template_row[3],
+                "category": template_row[4]
+            }
+    
     with db.get_conn() as conn:
         cur = conn.cursor()
         _apply_job_timeouts(cur)
@@ -1985,6 +2004,16 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
         resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
         for uid in resolved_user_ids or []:
             dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{dedup_day}"
+            # 커스텀 메시지 또는 템플릿 메시지 사용
+            payload_dict = {
+                "type": body.type,
+                "variant_id": body.variant_id,
+            }
+            if getattr(body, "message_override", None):
+                payload_dict["message"] = body.message_override
+            elif template_message:
+                payload_dict.update(template_message)
+            
             cur.execute(
                 """
                 INSERT INTO notifications_queue
@@ -1992,7 +2021,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
                 VALUES (%s, %s, NULL, %s, %s, %s, %s, 'PENDING')
                 ON CONFLICT (dedup_key) DO NOTHING
                 """,
-                (uid, body.type, body.variant_id, dedup_key, Json({"type": body.type, "variant_id": body.variant_id}), scheduled_at),
+                (uid, body.type, body.variant_id, dedup_key, Json(payload_dict), scheduled_at),
             )
             if cur.rowcount > 0:
                 inserted += 1
@@ -2111,19 +2140,25 @@ async def list_notifications(
 
     items = []
     for row in rows:
-        items.append(
-            {
-                "id": row[0],
-                "user_id": row[1],
-                "external_user_id": row[2],
-                "type": row[3],
-                "variant_id": row[4],
-                "status": row[5],
-                "scheduled_at": row[6].isoformat() if row[6] else None,
-                "created_at": row[7].isoformat() if row[7] else None,
-                "payload": row[8],
-            }
-        )
+        payload = row[8] or {}
+        item = {
+            "id": row[0],
+            "user_id": row[1],
+            "external_user_id": row[2],
+            "type": row[3],
+            "variant_id": row[4],
+            "status": row[5],
+            "scheduled_at": row[6].isoformat() if row[6] else None,
+            "created_at": row[7].isoformat() if row[7] else None,
+            "payload": payload,
+            # payload에서 메시지 필드 추출
+            "title": payload.get("title"),
+            "body": payload.get("body"),
+            "cta_text": payload.get("cta_text"),
+            "icon_emoji": payload.get("icon_emoji"),
+            "category": payload.get("category"),
+        }
+        items.append(item)
 
     has_more = (offset + len(items)) < total
     return AdminNotificationsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
