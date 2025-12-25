@@ -62,6 +62,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
@@ -380,6 +381,43 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     }
   };
 
+  const deleteAllUsers = async () => {
+    if (!ensureAuth()) return;
+    if (!rows.length) {
+      pushToast({ ok: false, message: '삭제할 사용자가 없습니다.' });
+      return;
+    }
+
+    const ok = typeof window !== 'undefined'
+      ? window.confirm(`현재 필터/페이지의 ${rows.length}명을 삭제합니다. 이 작업은 되돌릴 수 없습니다.`)
+      : false;
+    if (!ok) return;
+
+    try {
+      setBulkDeleting(true);
+      let success = 0;
+      let failed = 0;
+      for (const row of rows) {
+        try {
+          await apiFetch(`/api/vault/admin/users/${row.user_id}`, { method: 'DELETE' });
+          success += 1;
+          if (selectedRow?.user_id === row.user_id) {
+            setSelectedRow(null);
+            setDrawerOpen(false);
+            setPanelMode('none');
+          }
+        } catch (err) {
+          failed += 1;
+          console.error('bulk delete failed for', row.user_id, err);
+        }
+      }
+      pushToast({ ok: failed === 0, message: `삭제 완료 ${success}건${failed ? `, 실패 ${failed}건` : ''}` });
+      fetchUsers();
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   const toggleSort = (key) => {
     if (!sortableKeys.has(key)) {
       setSortBy('created_at');
@@ -410,13 +448,24 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">검색/정렬 후 클릭해서 편집 대상으로 선택하세요.</p>
         </div>
-        <button
-          type="button"
-          className="rounded-full border border-[var(--v2-border)] px-4 py-2 text-xs text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
-          onClick={openCreate}
-        >
-          사용자 생성
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-full border border-[var(--v2-border)] px-4 py-2 text-xs text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
+            onClick={openCreate}
+            disabled={bulkDeleting || loading}
+          >
+            사용자 생성
+          </button>
+          <button
+            type="button"
+            className="rounded-full border border-[var(--v2-border)] px-4 py-2 text-xs text-[var(--v2-warning)] hover:border-[var(--v2-warning)]/60 disabled:opacity-50"
+            onClick={deleteAllUsers}
+            disabled={bulkDeleting || loading || rows.length === 0}
+          >
+            전체 삭제
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -670,183 +719,176 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             ) : !drawerOpen ? (
               <p className="mt-3 text-sm text-[var(--v2-muted)]">상세 패널이 숨김 상태입니다.</p>
             ) : (
-              <div className="mt-3 space-y-3 text-sm text-[var(--v2-text)]">
-                <div>
-                  <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID</div>
-                  <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
+              <div className="mt-3 space-y-4 text-sm text-[var(--v2-text)]">
+                <div className="grid gap-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 md:grid-cols-[1fr_1fr]">
+                  <div className="space-y-2">
+                    <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID</div>
+                    <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
+                    <div className="text-xs text-[var(--v2-muted)]">사용자 ID</div>
+                    <div className="font-mono">{String(selectedRow.user_id || '')}</div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)]">생성일</div>
+                        <div>{selectedRow.created_at ? selectedRow.created_at.slice(0, 10) : '-'}</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)]">만료일</div>
+                        <div>{selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.telegram_ok)}
+                          onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                        />
+                        <span>텔레그램 인증</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(form.review_ok)}
+                          onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                        />
+                        <span>리뷰 승인</span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <div className="text-xs text-[var(--v2-muted)]">사용자 ID</div>
-                  <div className="font-mono">{String(selectedRow.user_id || '')}</div>
-                </div>
-
-                <div>
-                  <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
-                  <input
-                    value={form.nickname}
-                    onChange={(e) => {
-                      console.log('nickname input changed:', e.target.value);
-                      setForm((prev) => ({ ...prev, nickname: e.target.value }));
-                    }}
-                    className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
+                <div className="grid gap-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
                     <input
-                      value={form.joined_date}
-                      onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
-                      placeholder={selectedRow.joined_date || '2025-12-25'}
-                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                      value={form.nickname}
+                      onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                      className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                     />
                   </div>
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
-                    <input
-                      inputMode="numeric"
-                      value={form.deposit_total}
-                      onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
-                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
+                      <input
+                        value={form.joined_date}
+                        onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                        placeholder={selectedRow.joined_date || '2025-12-25'}
+                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
+                      <input
+                        inputMode="numeric"
+                        value={form.deposit_total}
+                        onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.telegram_ok)}
-                      onChange={(e) => {
-                        console.log('telegram_ok checkbox changed:', e.target.checked);
-                        setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }));
-                      }}
-                    />
-                    <span>텔레그램 인증</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.review_ok)}
-                      onChange={(e) => {
-                        console.log('review_ok checkbox changed:', e.target.checked);
-                        setForm((prev) => ({ ...prev, review_ok: e.target.checked }));
-                      }}
-                    />
-                    <span>리뷰 승인</span>
-                  </label>
-                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">만료일 연장</div>
+                      <div className="text-xs text-[var(--v2-muted)]">최대 +3일</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="3"
+                        value={expiryExtendDays}
+                        onChange={(e) => setExpiryExtendDays(Number(e.target.value) || 1)}
+                        className="w-20 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                      />
+                      <select
+                        value={expiryReason}
+                        onChange={(e) => setExpiryReason(e.target.value)}
+                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
+                      >
+                        <option value="OPS">운영</option>
+                        <option value="PROMO">프로모션</option>
+                        <option value="ADMIN">관리자</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={submitExtendExpiry}
+                        disabled={extending || saving}
+                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                      >
+                        연장
+                      </button>
+                    </div>
+                    <p className="text-xs text-[var(--v2-muted)]">선택한 사용자에게만 적용됩니다. (1~72시간, 최대 3일)</p>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">생성일</div>
-                    <div>{selectedRow.created_at ? selectedRow.created_at.slice(0, 10) : '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">만료일</div>
-                    <div>{selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}</div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">만료일 연장</div>
-                    <div className="text-xs text-[var(--v2-muted)]">최대 +3일</div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <input
-                      type="number"
-                      min="1"
-                      max="3"
-                      value={expiryExtendDays}
-                      onChange={(e) => setExpiryExtendDays(Number(e.target.value) || 1)}
-                      className="w-20 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    />
-                    <select
-                      value={expiryReason}
-                      onChange={(e) => setExpiryReason(e.target.value)}
-                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    >
-                      <option value="OPS">운영</option>
-                      <option value="PROMO">프로모션</option>
-                      <option value="ADMIN">관리자</option>
-                    </select>
-                    <button
-                      type="button"
-                      onClick={submitExtendExpiry}
-                      disabled={extending || saving}
-                      className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                    >
-                      연장
-                    </button>
-                  </div>
-                  <p className="text-xs text-[var(--v2-muted)]">선택한 사용자에게만 적용됩니다. (1~72시간, 최대 3일)</p>
-                </div>
-
-                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">플레티넘 입금 (15만)</div>
-                    <div className="text-xs text-[var(--v2-muted)]">자동/수동 해금</div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => submitDepositUpdate({ platinum_deposit_done: true })}
-                      disabled={depositSaving || saving}
-                      className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                    >
-                      플레티넘 해금
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => submitDepositUpdate({ platinum_deposit_done: false })}
-                      disabled={depositSaving || saving}
-                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
-                    >
-                      해금 해제
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm((prev) => ({ ...prev, deposit_total: '150000' }));
-                        submitDepositUpdate({ platinum_deposit_done: true });
-                      }}
-                      disabled={depositSaving || saving}
-                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
-                    >
-                      150,000 + 해금
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : 500000 })}
-                      disabled={depositSaving || saving || diamondDepositCurrent >= 500000}
-                      className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                    >
-                      다이아 해금
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => submitDepositUpdate({ diamond_deposit_current: 0 })}
-                      disabled={depositSaving || saving || diamondDepositCurrent < 500000}
-                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
-                    >
-                      해금 해제
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setForm((prev) => ({ ...prev, deposit_total: '500000' }));
-                        submitDepositUpdate({ diamond_deposit_current: 500000 });
-                      }}
-                      disabled={depositSaving || saving}
-                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
-                    >
-                      500,000 + 해금
-                    </button>
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">플레티넘 입금 (15만)</div>
+                      <div className="text-[10px] text-[var(--v2-muted)]">자동/수동 해금</div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => submitDepositUpdate({ platinum_deposit_done: true })}
+                        disabled={depositSaving || saving}
+                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                      >
+                        플레티넘 해금
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitDepositUpdate({ platinum_deposit_done: false })}
+                        disabled={depositSaving || saving}
+                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
+                      >
+                        해금 해제
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({ ...prev, deposit_total: '150000' }));
+                          submitDepositUpdate({ platinum_deposit_done: true });
+                        }}
+                        disabled={depositSaving || saving}
+                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
+                      >
+                        150,000 + 해금
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : 500000 })}
+                        disabled={depositSaving || saving || diamondDepositCurrent >= 500000}
+                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                      >
+                        다이아 해금
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitDepositUpdate({ diamond_deposit_current: 0 })}
+                        disabled={depositSaving || saving || diamondDepositCurrent < 500000}
+                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
+                      >
+                        해금 해제
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((prev) => ({ ...prev, deposit_total: '500000' }));
+                          submitDepositUpdate({ diamond_deposit_current: 500000 });
+                        }}
+                        disabled={depositSaving || saving}
+                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
+                      >
+                        500,000 + 해금
+                      </button>
+                    </div>
                   </div>
                 </div>
 
