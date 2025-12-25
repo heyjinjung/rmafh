@@ -42,6 +42,50 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const downloadFailedItemsCsv = async (jobId) => {
+    try {
+      const res = await fetch(
+        `${basePath || ''}/api/vault/admin/jobs/${jobId}/items?format=csv&failed_only=true`,
+        {
+          method: 'GET',
+          headers: {
+            ...(adminPassword ? { 'x-admin-password': adminPassword } : {}),
+          },
+        },
+      );
+
+      if (!res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        const payload = contentType.includes('application/json') ? await res.json() : await res.text();
+        const err = new Error('Download failed');
+        err.status = res.status;
+        err.payload = payload;
+        err.parsed = typeof payload === 'object' ? payload : undefined;
+        throw err;
+      }
+
+      const cd = res.headers.get('content-disposition') || '';
+      const match = cd.match(/filename="?([^";]+)"?/i);
+      const filename = match?.[1] || `${jobId}-items-failed.csv`;
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      pushToast({ ok: true, message: 'CSV 다운로드 시작', detail: filename });
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setError(info.summary || 'CSV 다운로드 실패');
+      pushToast({ ok: false, message: info.summary || 'CSV 다운로드 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    }
+  };
+
   const load = async () => {
     setLoading(true);
     setError(null);
@@ -156,6 +200,7 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
           <div className="mt-3 space-y-3">
             {filteredJobs.map((job) => {
               const progress = job.targets ? Math.round((job.done / job.targets) * 100) : 0;
+              const canDownloadFailures = Number(job.failed || 0) > 0;
               return (
                 <div key={job.id} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3">
                   <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
@@ -179,6 +224,14 @@ export default function AdminV2JobsPanel({ adminPassword, basePath }) {
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
                     <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => retryJob(job.id)}>Retry</button>
                     <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
+                    <button
+                      className="rounded border border-[var(--v2-border)] px-3 py-1 disabled:opacity-40"
+                      disabled={!canDownloadFailures}
+                      onClick={() => downloadFailedItemsCsv(job.id)}
+                      title={canDownloadFailures ? '실패 아이템 CSV 다운로드' : '실패 아이템이 없습니다'}
+                    >
+                      Download failures CSV
+                    </button>
                   </div>
                 </div>
               );

@@ -100,6 +100,7 @@ class NotifyRequest(BaseModel):
     user_ids: Optional[List[int]] = None
     external_user_ids: Optional[List[str]] = None
     variant_id: Optional[str] = None
+    scheduled_at: Optional[str] = None
 
 
 class NotifyResponse(BaseModel):
@@ -124,6 +125,11 @@ class AdminNotificationsListResponse(BaseModel):
     page_size: int
     has_more: bool
     items: List[AdminNotificationItem]
+
+
+class AdminNotificationActionResponse(BaseModel):
+    id: int
+    status: str
 
 
 class AdminAuditLogItem(BaseModel):

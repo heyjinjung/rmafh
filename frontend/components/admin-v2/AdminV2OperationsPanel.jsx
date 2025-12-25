@@ -15,13 +15,14 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
   const [expiryDays, setExpiryDays] = useState(3);
   const [reason, setReason] = useState('PROMO');
   const [shadow, setShadow] = useState(true);
-  const [goldStatus, setGoldStatus] = useState('UNLOCKED');
-  const [platinumStatus, setPlatinumStatus] = useState('LOCKED');
-  const [diamondStatus, setDiamondStatus] = useState('LOCKED');
+  const [goldStatus, setGoldStatus] = useState('');
+  const [platinumStatus, setPlatinumStatus] = useState('');
+  const [diamondStatus, setDiamondStatus] = useState('');
   const [attendance, setAttendance] = useState({ delta: 0, cap: 3 });
   const [deposit, setDeposit] = useState({ delta: 0, floor: 0 });
   const [confirmText, setConfirmText] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [preview, setPreview] = useState({ loading: false, candidates: null, sample: null, error: null });
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
   const linkedTarget = useMemo(() => {
@@ -47,13 +48,120 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
     setTargetValue(`${linkedTarget.ids.length} user_id selected`);
   }, [linkedTarget]);
 
-  const impact = useMemo(() => {
-    const base = targetScope === 'segment' ? 1240 : targetScope === 'upload' ? 420 : 200;
-    const preview = Math.max(0, base - (shadow ? 0 : Math.floor(base * 0.02)));
-    return { total: base, preview };
-  }, [shadow, targetScope]);
+  const resolvedTarget = useMemo(() => {
+    if (targetScope === 'upload') {
+      const ids = (linkedTarget?.ids || []).map((v) => Number(v)).filter((n) => Number.isFinite(n));
+      if (!ids.length) return null;
+      return { mode: 'user_ids', user_ids: ids };
+    }
+    if (targetScope === 'filter') {
+      const filter = linkedTarget?.filter || null;
+      if (!filter) return null;
+      return { mode: 'filter', filter: { query: filter.query || null, status: filter.status || null } };
+    }
+
+    const segId = segmentTarget?.segment_id;
+    if (!segId) return null;
+    return { mode: 'segment', segment_id: segId };
+  }, [linkedTarget, segmentTarget, targetScope]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const run = async () => {
+      if (!adminPassword) {
+        setPreview({ loading: false, candidates: null, sample: null, error: null });
+        return;
+      }
+      if (!resolvedTarget) {
+        setPreview({ loading: false, candidates: null, sample: null, error: null });
+        return;
+      }
+
+      try {
+        setPreview((prev) => ({ ...prev, loading: true, error: null }));
+        const res = await apiFetch('/api/vault/admin/targets/preview', {
+          method: 'POST',
+          body: { target: resolvedTarget },
+        });
+        const data = res?.data;
+        if (cancelled) return;
+        setPreview({
+          loading: false,
+          candidates: Number.isFinite(data?.candidates) ? data.candidates : null,
+          sample: Array.isArray(data?.sample_user_ids) ? data.sample_user_ids : null,
+          error: null,
+        });
+      } catch (err) {
+        const info = extractErrorInfo(err);
+        if (cancelled) return;
+        setPreview({ loading: false, candidates: null, sample: null, error: info.summary || info.detail || '프리뷰 실패' });
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminPassword, apiFetch, resolvedTarget]);
 
   const canExecute = confirmText.trim().toLowerCase() === 'apply';
+
+  const submitBulkUpdate = async () => {
+    if (!adminPassword) {
+      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      return;
+    }
+    if (!resolvedTarget) {
+      pushToast({ ok: false, message: '대상(Target)을 먼저 선택/Apply 해주세요.' });
+      return;
+    }
+
+    const requestId = makeRequestId();
+
+    const status = {};
+    if (goldStatus) status.gold_status = goldStatus;
+    if (platinumStatus) status.platinum_status = platinumStatus;
+    if (diamondStatus) status.diamond_status = diamondStatus;
+
+    const attendancePayload = {};
+    if (Number.isFinite(attendance?.delta) && Number(attendance.delta) !== 0) attendancePayload.delta = Number(attendance.delta);
+    if (Number.isFinite(attendance?.cap) && Number(attendance.cap) > 0 && Number(attendance.cap) !== 3) attendancePayload.cap = Number(attendance.cap);
+
+    const depositPayload = {};
+    if (Number.isFinite(deposit?.delta) && Number(deposit.delta) !== 0) depositPayload.delta = Number(deposit.delta);
+    if (Number.isFinite(deposit?.floor) && Number(deposit.floor) !== 0) depositPayload.floor = Number(deposit.floor);
+
+    const payload = {
+      request_id: requestId,
+      target: resolvedTarget,
+      ...(Object.keys(status).length ? { status } : {}),
+      ...(Object.keys(attendancePayload).length ? { attendance: attendancePayload } : {}),
+      ...(Object.keys(depositPayload).length ? { deposit: depositPayload } : {}),
+    };
+
+    if (!payload.status && !payload.attendance && !payload.deposit) {
+      pushToast({ ok: false, message: '변경할 값이 없습니다. Status/Attendance/Deposit 중 하나를 지정하세요.' });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const res = await apiFetch('/api/vault/admin/operations/bulk-update', { method: 'POST', body: payload, idempotencyKey: requestId });
+      const data = res?.data;
+      pushToast({
+        ok: true,
+        message: 'Bulk Update 요청 완료',
+        detail: `job_id: ${data?.job_id || '-'} / processed: ${data?.processed ?? '-'} / failed: ${data?.failed ?? '-'}`,
+        requestId,
+        idempotencyKey: res?.idempotencyKey,
+      });
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '요청 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const submitExtendExpiry = async () => {
     if (!adminPassword) {
@@ -266,6 +374,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setGoldStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
+                  <option value="">NO CHANGE</option>
                   {statusOptions.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -276,6 +385,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setPlatinumStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
+                  <option value="">NO CHANGE</option>
                   {statusOptions.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -286,6 +396,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setDiamondStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
+                  <option value="">NO CHANGE</option>
                   {statusOptions.map((s) => <option key={s}>{s}</option>)}
                 </select>
               </div>
@@ -335,13 +446,18 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Impact Preview</p>
             <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
               <span className="text-[var(--v2-muted)]">Target count (est.)</span>
-              <span className="font-semibold text-[var(--v2-accent)]">{impact.total.toLocaleString()}</span>
+              <span className="font-semibold text-[var(--v2-accent)]">
+                {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}
+              </span>
             </div>
             <div className="mt-2 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-              <span className="text-[var(--v2-muted)]">Preview-only in Shadow</span>
-              <span className="font-semibold text-[var(--v2-text)]">{impact.preview.toLocaleString()}</span>
+              <span className="text-[var(--v2-muted)]">Sample user_ids</span>
+              <span className="font-semibold text-[var(--v2-text)]">
+                {Array.isArray(preview.sample) && preview.sample.length ? `${preview.sample.slice(0, 10).join(', ')}` : '-'}
+              </span>
             </div>
-            <p className="mt-2 text-xs text-[var(--v2-muted)]">Backend will calculate exact counts per segment and attach to job payload for audit.</p>
+            {preview.error ? <p className="mt-2 text-xs text-[var(--v2-warning)]">{String(preview.error)}</p> : null}
+            <p className="mt-2 text-xs text-[var(--v2-muted)]">Backend will calculate exact candidates per target (segment/filter/user_ids).</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)] space-y-3">
@@ -358,9 +474,17 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               onClick={submitExtendExpiry}
               className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_18px_rgba(183,247,90,0.35)] disabled:opacity-50"
             >
-              {submitting ? 'Submitting...' : 'Submit Operation (idempotent)'}
+              {submitting ? 'Submitting...' : 'Submit Extend Expiry (idempotent)'}
             </button>
-            <p className="text-xs text-[var(--v2-warning)]">Audit + job creation to be wired. All operations must log idempotency key and scope.</p>
+            <button
+              type="button"
+              disabled={!canExecute}
+              onClick={submitBulkUpdate}
+              className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-4 py-3 text-sm font-semibold text-[var(--v2-text)] disabled:opacity-50"
+            >
+              {submitting ? 'Submitting...' : 'Submit Bulk Update (idempotent)'}
+            </button>
+            <p className="text-xs text-[var(--v2-muted)]">Extend Expiry는 audit에 기록되고, Bulk Update는 admin job + job items를 생성합니다.</p>
           </div>
         </div>
       </div>

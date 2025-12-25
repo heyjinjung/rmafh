@@ -9,6 +9,7 @@ import secrets
 import uuid
 
 from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -31,6 +32,7 @@ from app.schemas import (
     AdminUserUpdateRequest,
     AdminUserResponse,
     AdminNotificationsListResponse,
+    AdminNotificationActionResponse,
     AdminAuditLogListResponse,
     AdminJobCreateRequest,
     AdminJobResponse,
@@ -1955,7 +1957,15 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
     request_hash = _hash_request_body(body.model_dump(by_alias=True))
 
     now = _now()
+    scheduled_at = None
+    if getattr(body, "scheduled_at", None):
+        scheduled_at = _parse_iso_datetime(getattr(body, "scheduled_at", None))
+        if scheduled_at is None:
+            raise HTTPException(status_code=400, detail="INVALID_SCHEDULED_AT")
+    if scheduled_at is None:
+        scheduled_at = now
     dedup_suffix = body.variant_id or "base"
+    dedup_day = scheduled_at.date()
     inserted = 0
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -1974,7 +1984,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
             resolved_user_ids.extend(_resolve_user_ids_by_external_user_ids(cur, external_user_ids))
         resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
         for uid in resolved_user_ids or []:
-            dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{now.date()}"
+            dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{dedup_day}"
             cur.execute(
                 """
                 INSERT INTO notifications_queue
@@ -1982,7 +1992,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
                 VALUES (%s, %s, NULL, %s, %s, %s, %s, 'PENDING')
                 ON CONFLICT (dedup_key) DO NOTHING
                 """,
-                (uid, body.type, body.variant_id, dedup_key, Json({"type": body.type, "variant_id": body.variant_id}), now),
+                (uid, body.type, body.variant_id, dedup_key, Json({"type": body.type, "variant_id": body.variant_id}), scheduled_at),
             )
             if cur.rowcount > 0:
                 inserted += 1
@@ -1996,7 +2006,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
             endpoint="/api/vault/notify",
             target_user_ids=resolved_user_ids[:1000],  # 최대 1000개만 저장
             request_id=key,
-            request_body={"type": body.type, "variant_id": body.variant_id},
+            request_body={"type": body.type, "variant_id": body.variant_id, "scheduled_at": scheduled_at.isoformat() if scheduled_at else None},
             response_status="SUCCESS",
             response_summary={"enqueued": inserted, "total_targets": len(resolved_user_ids)},
             idempotency_key=key,
@@ -2029,7 +2039,7 @@ async def list_notifications(
     order: str = "desc",
     _auth: str = Depends(verify_admin_password),
 ):
-    allowed_status = {"PENDING", "SENT", "FAILED", "DLQ", "RETRYING"}
+    allowed_status = {"PENDING", "SENT", "FAILED", "DLQ", "RETRYING", "CANCELED"}
     if status and status not in allowed_status:
         raise HTTPException(status_code=400, detail="INVALID_STATUS")
     if type and type not in config.ALLOWED_NOTIFY_TYPES:
@@ -2117,6 +2127,93 @@ async def list_notifications(
 
     has_more = (offset + len(items)) < total
     return AdminNotificationsListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
+
+
+@app.post("/api/vault/admin/notifications/{notification_id}/retry", response_model=AdminNotificationActionResponse)
+async def retry_notification(
+    notification_id: int,
+    request: Request,
+    _auth: str = Depends(verify_admin_password),
+):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT status FROM notifications_queue WHERE id=%s", (notification_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="NOTIFICATION_NOT_FOUND")
+        status = row[0]
+        if status not in {"FAILED", "DLQ"}:
+            raise HTTPException(status_code=409, detail="NOTIFICATION_INVALID_STATE")
+
+        cur.execute(
+            """
+            UPDATE notifications_queue
+               SET status='PENDING',
+                   scheduled_at=NOW()
+             WHERE id=%s
+            """,
+            (notification_id,),
+        )
+        conn.commit()
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="NOTIFY_RETRY",
+            endpoint=f"/api/vault/admin/notifications/{notification_id}/retry",
+            target_user_ids=[],
+            request_id=None,
+            request_body={"notification_id": notification_id},
+            response_status="SUCCESS",
+            response_summary={"status": "PENDING"},
+            idempotency_key=None,
+        )
+
+    return AdminNotificationActionResponse(id=notification_id, status="PENDING")
+
+
+@app.post("/api/vault/admin/notifications/{notification_id}/cancel", response_model=AdminNotificationActionResponse)
+async def cancel_notification(
+    notification_id: int,
+    request: Request,
+    _auth: str = Depends(verify_admin_password),
+):
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT status FROM notifications_queue WHERE id=%s", (notification_id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="NOTIFICATION_NOT_FOUND")
+        status = row[0]
+        if status not in {"PENDING", "RETRYING"}:
+            raise HTTPException(status_code=409, detail="NOTIFICATION_INVALID_STATE")
+
+        cur.execute(
+            """
+            UPDATE notifications_queue
+               SET status='CANCELED'
+             WHERE id=%s
+            """,
+            (notification_id,),
+        )
+        conn.commit()
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="NOTIFY_CANCEL",
+            endpoint=f"/api/vault/admin/notifications/{notification_id}/cancel",
+            target_user_ids=[],
+            request_id=None,
+            request_body={"notification_id": notification_id},
+            response_status="SUCCESS",
+            response_summary={"status": "CANCELED"},
+            idempotency_key=None,
+        )
+
+    return AdminNotificationActionResponse(id=notification_id, status="CANCELED")
 
 
 @app.post("/api/vault/admin/jobs", response_model=AdminJobResponse, status_code=202)
@@ -2318,10 +2415,16 @@ async def get_admin_job(job_id: str, _auth: str = Depends(verify_admin_password)
 @app.get("/api/vault/admin/jobs/{job_id}/items", response_model=AdminJobItemsListResponse)
 async def list_admin_job_items(
     job_id: str,
+    format: str = "json",
+    failed_only: bool = False,
     page: int = 1,
     page_size: int = 50,
     _auth: str = Depends(verify_admin_password),
 ):
+    fmt = (format or "json").lower()
+    if fmt not in {"json", "csv"}:
+        raise HTTPException(status_code=400, detail="INVALID_FORMAT")
+
     page = 1 if page < 1 else page
     page_size = 1 if page_size < 1 else page_size
     page_size = 200 if page_size > 200 else page_size
@@ -2333,22 +2436,58 @@ async def list_admin_job_items(
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="JOB_NOT_FOUND")
 
-        cur.execute(
-            "SELECT COUNT(*) FROM admin_job_items WHERE job_id=%s",
-            (job_id,),
-        )
+        where_sql = "WHERE job_id=%s"
+        params: list[Any] = [job_id]
+        if failed_only:
+            where_sql += " AND status='FAILED'"
+
+        cur.execute(f"SELECT COUNT(*) FROM admin_job_items {where_sql}", tuple(params))
         total = int(cur.fetchone()[0])
-        cur.execute(
-            """
-            SELECT id, job_id, user_id, status, error_message, created_at
-              FROM admin_job_items
-             WHERE job_id=%s
-          ORDER BY id ASC
-             LIMIT %s OFFSET %s
-            """,
-            (job_id, page_size, offset),
-        )
-        rows = cur.fetchall() or []
+
+        if fmt == "csv":
+            cur.execute(
+                f"""
+                SELECT id, job_id, user_id, status, error_message, created_at
+                  FROM admin_job_items
+                 {where_sql}
+              ORDER BY id ASC
+                """,
+                tuple(params),
+            )
+            rows = cur.fetchall() or []
+        else:
+            cur.execute(
+                f"""
+                SELECT id, job_id, user_id, status, error_message, created_at
+                  FROM admin_job_items
+                 {where_sql}
+              ORDER BY id ASC
+                 LIMIT %s OFFSET %s
+                """,
+                tuple(params + [page_size, offset]),
+            )
+            rows = cur.fetchall() or []
+
+    if fmt == "csv":
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(["job_item_id", "job_id", "user_id", "status", "error_message", "created_at"])
+        for row in rows:
+            writer.writerow(
+                [
+                    row[0],
+                    row[1],
+                    int(row[2]),
+                    row[3],
+                    row[4] or "",
+                    row[5].isoformat() if row[5] else "",
+                ]
+            )
+
+        payload = buf.getvalue()
+        filename = f"{job_id}-items{'-failed' if failed_only else ''}.csv"
+        headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+        return StreamingResponse(iter([payload]), media_type="text/csv; charset=utf-8", headers=headers)
 
     items = [
         {

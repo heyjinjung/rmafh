@@ -5,7 +5,7 @@ import { pushToast } from './toastBus';
 const typeOptions = ['ALERT', 'REMINDER', 'BROADCAST'];
 const variantOptions = ['EXPIRY', 'DEPOSIT', 'DAILY_IMPORT', 'MAINTENANCE'];
 const targetModes = ['EXTERNAL_USER_IDS', 'USER_IDS'];
-const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED', 'DLQ', 'RETRYING'];
+const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED', 'DLQ', 'RETRYING', 'CANCELED'];
 
 const normalizeNotification = (n) => ({
   id: n.id,
@@ -21,6 +21,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [variant, setVariant] = useState('EXPIRY');
   const [targetMode, setTargetMode] = useState('EXTERNAL_USER_IDS');
   const [targetText, setTargetText] = useState('');
+  const [scheduledAtLocal, setScheduledAtLocal] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -29,6 +30,34 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
+
+  const downloadCsv = () => {
+    try {
+      const header = ['id', 'type', 'variant_id', 'status', 'scheduled_at', 'created_at'];
+      const escape = (v) => {
+        const s = String(v ?? '');
+        if (/[\n\r,"]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
+        return s;
+      };
+
+      const lines = [header.join(',')].concat(
+        notifications.map((n) => [n.id, n.type, n.variant_id || '', n.status, n.scheduled_at || '', n.created_at || ''].map(escape).join(',')),
+      );
+      const payload = `${lines.join('\n')}\n`;
+
+      const blob = new Blob([payload], { type: 'text/csv;charset=utf-8' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `notifications-page${page}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      pushToast({ ok: false, message: 'CSV 생성 실패' });
+    }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -57,6 +86,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
   const submitNotification = async () => {
     try {
       setSubmitting(true);
+      setError(null);
       const rawTargets = String(targetText || '')
         .split(/[,\s]+/)
         .map((s) => s.trim())
@@ -67,9 +97,21 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
         return;
       }
 
+      let scheduledAtIso;
+      if (String(scheduledAtLocal || '').trim()) {
+        const d = new Date(scheduledAtLocal);
+        if (!Number.isFinite(d.getTime())) {
+          setError('scheduled_at 형식이 올바르지 않습니다.');
+          pushToast({ ok: false, message: 'scheduled_at 형식이 올바르지 않습니다.' });
+          return;
+        }
+        scheduledAtIso = d.toISOString();
+      }
+
       const payload = {
         type,
         variant_id: variant || undefined,
+        scheduled_at: scheduledAtIso,
         user_ids: targetMode === 'USER_IDS' ? rawTargets.map((v) => Number(v)).filter((n) => Number.isFinite(n)) : undefined,
         external_user_ids: targetMode === 'EXTERNAL_USER_IDS' ? rawTargets : undefined,
       };
@@ -84,6 +126,32 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
       pushToast({ ok: false, message: info.summary || '요청 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const retryNotification = async (notificationId) => {
+    try {
+      setError(null);
+      await apiFetch(`/api/vault/admin/notifications/${notificationId}/retry`, { method: 'POST' });
+      pushToast({ ok: true, message: '재시도 요청 완료', detail: String(notificationId) });
+      load();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setError(info.summary || '재시도 실패');
+      pushToast({ ok: false, message: info.summary || '재시도 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    }
+  };
+
+  const cancelNotification = async (notificationId) => {
+    try {
+      setError(null);
+      await apiFetch(`/api/vault/admin/notifications/${notificationId}/cancel`, { method: 'POST' });
+      pushToast({ ok: true, message: '취소 완료', detail: String(notificationId) });
+      load();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      setError(info.summary || '취소 실패');
+      pushToast({ ok: false, message: info.summary || '취소 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
     }
   };
 
@@ -127,12 +195,11 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               </select>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Schedule (UTC)</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Schedule</label>
               <input
                 type="datetime-local"
-                value={''}
-                onChange={() => {}}
-                disabled
+                value={scheduledAtLocal}
+                onChange={(e) => setScheduledAtLocal(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               />
             </div>
@@ -163,7 +230,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             <div>
               <div className="mt-6 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-muted)]">
                 <p className="text-[var(--v2-text)]">백엔드 지원 범위</p>
-                <p className="mt-1">현재 알림 생성은 <span className="font-mono">/api/vault/notify</span>만 지원하며, Segment/예약/본문 템플릿은 미지원입니다.</p>
+                <p className="mt-1">현재 알림 생성은 <span className="font-mono">/api/vault/notify</span>(예약 <span className="font-mono">scheduled_at</span> 포함)만 지원하며, Segment/본문 템플릿은 미지원입니다.</p>
               </div>
             </div>
           </div>
@@ -266,20 +333,47 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                   <th className="px-3 py-2 text-xs">Type/Variant</th>
                   <th className="px-3 py-2 text-xs">Status</th>
                   <th className="px-3 py-2 text-xs">Scheduled</th>
+                  <th className="px-3 py-2 text-xs">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--v2-border)]">
                 {notifications.map((n) => (
+                  (() => {
+                    const canRetry = n.status === 'FAILED' || n.status === 'DLQ';
+                    const canCancel = n.status === 'PENDING' || n.status === 'RETRYING';
+                    return (
                   <tr key={n.id} className="text-[var(--v2-text)]">
                     <td className="px-3 py-2 font-mono text-xs text-[var(--v2-accent)]">{n.id}</td>
                     <td className="px-3 py-2 text-xs">{n.type} / {n.variant_id || '-'}</td>
                     <td className="px-3 py-2 text-xs">{n.status}</td>
                     <td className="px-3 py-2 text-xs">{n.scheduled_at || n.created_at || '-'}</td>
+                    <td className="px-3 py-2 text-xs">
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          className="rounded border border-[var(--v2-border)] px-2 py-1 disabled:opacity-40"
+                          disabled={!canRetry}
+                          onClick={() => retryNotification(n.id)}
+                          title={canRetry ? 'FAILED/DLQ 상태에서 재시도' : 'FAILED/DLQ에서만 재시도 가능'}
+                        >
+                          Retry
+                        </button>
+                        <button
+                          className="rounded border border-[var(--v2-border)] px-2 py-1 disabled:opacity-40"
+                          disabled={!canCancel}
+                          onClick={() => cancelNotification(n.id)}
+                          title={canCancel ? 'PENDING/RETRYING 상태에서 취소' : 'PENDING/RETRYING에서만 취소 가능'}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
                   </tr>
+                    );
+                  })()
                 ))}
                 {notifications.length === 0 ? (
                   <tr>
-                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={4}>표시할 알림이 없습니다.</td>
+                    <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={5}>표시할 알림이 없습니다.</td>
                   </tr>
                 ) : null}
               </tbody>

@@ -78,20 +78,19 @@
 - [x] 요청 헤더 `x-admin-password` 누락 시 401 일관 처리
 
 ### 4.6 성능/쿼리
-- [ ] 사용자 리스트 API 페이지네이션/정렬/필터 인덱스
+- [x] 사용자 리스트 API 페이지네이션/정렬/필터 인덱스
 - [x] 대량 업데이트 SQL 배치 처리 (execute_values)
  - [x] Job 처리 타임아웃/락 타임아웃 설정 (관리자 import/관리자 job/worker 경로에 config 기반 lock/statement timeout 적용)
 
 ## 5. 프론트엔드 체크리스트
 ### 5.0 진행 현황 요약 (2025-12-25)
 - 현재까지 “실제 API 연동 완료” 영역: Dashboard KPI(최근 Job/Notify/Audit), Jobs/Audit, Notifications(생성+리스트), Imports(SHADOW 검증+오류 테이블+CSV 링크), Users(리스트 조회).
-- 현재까지 “UI만 있고 서버 연동 없음/미흡” 영역: Operations(상태/출석/입금 bulk 변경, impact preview 미구현).
+- 현재까지 “UI만 있고 서버 연동 없음/미흡” 영역: Notifications(예약 발송/재시도/상태 변경), Jobs(실패 아이템 CSV 다운로드).
 - FE 공통 UX: `withIdempotency` 기반 요청 헤더 주입 + 표준 에러 파싱 + 토스트(성공/실패)까지 동작.
 
 #### 다음 해야할 일 (우선순위)
-- P0(필수): Operations의 나머지 작업(상태/출석/입금 bulk 변경) 실제 실행 연동 + Audit/Jobs로 추적 가능해야 함.
-- P1: Users Grid의 벌크 선택(필터 전체/업로드 ID)을 Job/Operations 타겟으로 연결.
-- P1: Notifications 예약 발송(scheduled_at) 및 재시도/상태 변경 액션(백엔드 지원 범위 확인 후).
+- P0(필수): Notifications 예약 발송(scheduled_at) 및 재시도/상태 변경 액션(백엔드 지원 범위 확인 후).
+- P1: Jobs 실패 아이템 다운로드(CSV) UX + 서버 엔드포인트/다운로드 연결.
 
 ### 5.1 라우팅/구조
 - [x] `/admin/v2` 신규 라우트 추가
@@ -125,8 +124,8 @@
 ### 5.6 Operations UI
 - [x] Operations UI 스켈레톤 (대상/연장/상태/출석/입금/가드레일 입력)
 - [x] Extend-expiry API 연동 (IDs: `POST /api/vault/extend-expiry`, Filter/Segment: `POST /api/vault/admin/operations/extend-expiry`, shadow/apply)
-- [ ] 상태/출석/입금 변경 API 연동 (`POST /api/vault/admin/users/{user_id}/vault/status|attendance|deposit` 및/또는 Job 기반 bulk)
-- [ ] Impact 프리뷰 실제 계산 연동 (shadow 응답/preview 엔드포인트 기반)
+- [x] 상태/출석/입금 bulk 변경 API 연동 (`POST /api/vault/admin/operations/bulk-update`, IDs/Filter/Segment 지원)
+- [x] Impact 프리뷰 실제 계산 연동 (`POST /api/vault/admin/targets/preview`)
 - [x] Submit Operation 버튼 동작 + 결과 토스트 + 감사 로그 연결 (extend-expiry 범위)
 
 ### 5.7 Notifications UI
