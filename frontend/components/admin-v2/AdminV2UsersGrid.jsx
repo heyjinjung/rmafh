@@ -11,6 +11,8 @@ const columnDefs = [
   { key: 'diamond_status', label: '다이아 상태' },
   { key: 'platinum_attendance_days', label: '출석(일)' },
   { key: 'deposit_total', label: '누적 입금' },
+  { key: 'telegram_ok', label: '텔레그램' },
+  { key: 'review_ok', label: '리뷰' },
   { key: 'expires_at', label: '만료일' },
 ];
 
@@ -399,6 +401,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                             if (col.key === 'created_at' || col.key === 'expires_at') {
                               // ISO8601 → YYYY-MM-DD
                               display = val ? val.slice(0, 10) : '';
+                            } else if (col.key === 'telegram_ok' || col.key === 'review_ok') {
+                              // 체크마크 또는 공백
+                              display = val ? '✓' : '';
                             } else if (typeof val === 'number') {
                               display = val.toLocaleString();
                             } else {
