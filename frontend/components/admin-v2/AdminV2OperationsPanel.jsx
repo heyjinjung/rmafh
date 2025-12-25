@@ -4,6 +4,21 @@ import { pushToast } from './toastBus';
 
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
+const statusLabel = (s) => {
+  switch (s) {
+    case 'LOCKED':
+      return '잠금';
+    case 'UNLOCKED':
+      return '해제';
+    case 'CLAIMED':
+      return '수령';
+    case 'EXPIRED':
+      return '만료';
+    default:
+      return String(s || '');
+  }
+};
+
 function makeRequestId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
   return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
@@ -45,7 +60,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
 
     // page/uploaded → 실제로는 user_id 리스트 타겟
     setTargetScope('upload');
-    setTargetValue(`${linkedTarget.ids.length} user_id selected`);
+    setTargetValue(`선택된 user_id: ${linkedTarget.ids.length}개`);
   }, [linkedTarget]);
 
   const resolvedTarget = useMemo(() => {
@@ -108,7 +123,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
 
   const submitBulkUpdate = async () => {
     if (!adminPassword) {
-      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      pushToast({ ok: false, message: '관리자 비밀번호를 먼저 입력하세요.' });
       return;
     }
     if (!resolvedTarget) {
@@ -165,7 +180,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
 
   const submitExtendExpiry = async () => {
     if (!adminPassword) {
-      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      pushToast({ ok: false, message: '관리자 비밀번호를 먼저 입력하세요.' });
       return;
     }
 
@@ -203,9 +218,9 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
         const res = await apiFetch('/api/vault/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
         const data = res?.data;
         if (data?.shadow) {
-          pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+          pushToast({ ok: true, message: '만료일 연장 (Shadow) 미리보기', detail: `대상 수: ${data.candidates ?? '-'}`, requestId });
         } else {
-          pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+          pushToast({ ok: true, message: '만료일 연장 적용 완료', detail: `변경: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
         }
         return;
       }
@@ -226,9 +241,9 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
         const res = await apiFetch('/api/vault/admin/operations/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
         const data = res?.data;
         if (data?.shadow) {
-          pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+          pushToast({ ok: true, message: '만료일 연장 (Shadow) 미리보기', detail: `대상 수: ${data.candidates ?? '-'}`, requestId });
         } else {
-          pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+          pushToast({ ok: true, message: '만료일 연장 적용 완료', detail: `변경: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
         }
         return;
       }
@@ -249,9 +264,9 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
       const res = await apiFetch('/api/vault/admin/operations/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
       const data = res?.data;
       if (data?.shadow) {
-        pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+        pushToast({ ok: true, message: '만료일 연장 (Shadow) 미리보기', detail: `대상 수: ${data.candidates ?? '-'}`, requestId });
       } else {
-        pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+        pushToast({ ok: true, message: '만료일 연장 적용 완료', detail: `변경: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
       }
     } catch (err) {
       const info = extractErrorInfo(err);
@@ -265,16 +280,16 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
     <section id="operations" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Operations</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">Extend-expiry, status/attendance/deposit updates with guardrails.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">운영</p>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">만료일 연장 및 상태/출석/입금 변경을 안전장치와 함께 실행합니다.</p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Shadow recommended</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Shadow 모드 권장</span>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.1fr_1fr]">
         <div className="space-y-4">
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-2">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">Linked Target (from Users)</p>
+            <p className="text-sm font-semibold text-[var(--v2-text)]">연동 타겟 (Users에서)</p>
             {linkedTarget ? (
               <div className="text-xs text-[var(--v2-muted)] space-y-1">
                 <div>mode: <span className="font-mono">{linkedTarget.mode}</span></div>
@@ -293,12 +308,12 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">Target Scope</p>
+            <p className="text-sm font-semibold text-[var(--v2-text)]">타겟 범위</p>
             <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-text)]">
               {[
-                { key: 'segment', label: 'Saved Segment' },
-                { key: 'filter', label: 'Current Filter' },
-                { key: 'upload', label: 'Uploaded IDs' },
+                { key: 'segment', label: '저장 세그먼트' },
+                { key: 'filter', label: '현재 필터' },
+                { key: 'upload', label: '업로드 ID' },
               ].map((opt) => (
                 <button
                   key={opt.key}
@@ -318,15 +333,15 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
             <input
               value={targetValue}
               onChange={(e) => setTargetValue(e.target.value)}
-              placeholder={targetScope === 'upload' ? 'Paste uploaded ID list name' : 'Segment key or filter summary'}
+              placeholder={targetScope === 'upload' ? '업로드 ID 목록 이름(참고용)' : '세그먼트 키 또는 필터 요약(참고용)'}
               className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
             />
-            <p className="text-xs text-[var(--v2-muted)]">Segment/Filter scopes are handed to backend for targeting with idempotency + audit log.</p>
+            <p className="text-xs text-[var(--v2-muted)]">Segment/Filter 범위는 백엔드 타겟팅에 전달되며 멱등성과 감사 로그가 적용됩니다.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[var(--v2-text)]">Extend Expiry</p>
+              <p className="text-sm font-semibold text-[var(--v2-text)]">만료일 연장</p>
               <label className="inline-flex items-center gap-2 text-xs text-[var(--v2-muted)]">
                 <input
                   type="checkbox"
@@ -334,12 +349,12 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   checked={shadow}
                   onChange={(e) => setShadow(e.target.checked)}
                 />
-                Shadow mode
+                Shadow 모드
               </label>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Days to extend</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">연장 일수</label>
                 <input
                   type="number"
                   min="0"
@@ -349,7 +364,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 />
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Reason</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사유</label>
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
@@ -361,11 +376,11 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 </select>
               </div>
             </div>
-            <p className="text-xs text-[var(--v2-muted)]">Shadow: only preview + audit log. Apply: updates vault_status + audit.</p>
+            <p className="text-xs text-[var(--v2-muted)]">Shadow: 미리보기 + 감사로그만. Apply: 실제 반영 + 감사로그.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 space-y-3">
-            <p className="text-sm font-semibold text-[var(--v2-text)]">Status / Attendance / Deposit</p>
+            <p className="text-sm font-semibold text-[var(--v2-text)]">상태 / 출석 / 입금</p>
             <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Gold</label>
@@ -374,8 +389,12 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setGoldStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
-                  <option value="">NO CHANGE</option>
-                  {statusOptions.map((s) => <option key={s}>{s}</option>)}
+                  <option value="">변경 없음</option>
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel(s)}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -385,8 +404,12 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setPlatinumStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
-                  <option value="">NO CHANGE</option>
-                  {statusOptions.map((s) => <option key={s}>{s}</option>)}
+                  <option value="">변경 없음</option>
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel(s)}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -396,15 +419,19 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                   onChange={(e) => setDiamondStatus(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
                 >
-                  <option value="">NO CHANGE</option>
-                  {statusOptions.map((s) => <option key={s}>{s}</option>)}
+                  <option value="">변경 없음</option>
+                  {statusOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {statusLabel(s)}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Attendance Δ / cap</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">출석 Δ / 상한</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <input
                     type="number"
@@ -421,7 +448,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
                 </div>
               </div>
               <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Deposit Δ / floor</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 Δ / 하한</label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <input
                     type="number"
@@ -443,26 +470,26 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
 
         <div className="space-y-4">
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Impact Preview</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">영향도 미리보기</p>
             <div className="mt-3 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-              <span className="text-[var(--v2-muted)]">Target count (est.)</span>
+              <span className="text-[var(--v2-muted)]">대상 수(추정)</span>
               <span className="font-semibold text-[var(--v2-accent)]">
                 {preview.loading ? '...' : preview.candidates != null ? Number(preview.candidates).toLocaleString() : '-'}
               </span>
             </div>
             <div className="mt-2 flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2">
-              <span className="text-[var(--v2-muted)]">Sample user_ids</span>
+              <span className="text-[var(--v2-muted)]">샘플 user_ids</span>
               <span className="font-semibold text-[var(--v2-text)]">
                 {Array.isArray(preview.sample) && preview.sample.length ? `${preview.sample.slice(0, 10).join(', ')}` : '-'}
               </span>
             </div>
             {preview.error ? <p className="mt-2 text-xs text-[var(--v2-warning)]">{String(preview.error)}</p> : null}
-            <p className="mt-2 text-xs text-[var(--v2-muted)]">Backend will calculate exact candidates per target (segment/filter/user_ids).</p>
+            <p className="mt-2 text-xs text-[var(--v2-muted)]">백엔드가 타겟(세그먼트/필터/user_ids) 기준으로 정확한 대상을 계산합니다.</p>
           </div>
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)] space-y-3">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Safety</p>
-            <label className="text-xs text-[var(--v2-muted)]">Type apply to enable execution.</label>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">안전장치</p>
+            <label className="text-xs text-[var(--v2-muted)]">실행을 활성화하려면 apply 를 입력하세요.</label>
             <input
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
@@ -474,7 +501,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               onClick={submitExtendExpiry}
               className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_18px_rgba(183,247,90,0.35)] disabled:opacity-50"
             >
-              {submitting ? 'Submitting...' : 'Submit Extend Expiry (idempotent)'}
+              {submitting ? '처리 중...' : '만료일 연장 제출 (멱등)'}
             </button>
             <button
               type="button"
@@ -482,7 +509,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
               onClick={submitBulkUpdate}
               className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-4 py-3 text-sm font-semibold text-[var(--v2-text)] disabled:opacity-50"
             >
-              {submitting ? 'Submitting...' : 'Submit Bulk Update (idempotent)'}
+              {submitting ? '처리 중...' : '일괄 변경 제출 (멱등)'}
             </button>
             <p className="text-xs text-[var(--v2-muted)]">Extend Expiry는 audit에 기록되고, Bulk Update는 admin job + job items를 생성합니다.</p>
           </div>

@@ -23,7 +23,7 @@ export default function AdminV2CommonUxPanel() {
 
   const copyKey = () => {
     if (typeof navigator !== 'undefined') navigator.clipboard?.writeText(idemKey);
-    pushToast({ ok: true, message: 'Idempotency key copied', detail: detailLink });
+    pushToast({ ok: true, message: '멱등성 키를 복사했습니다', detail: detailLink });
   };
 
   const regenerate = () => {
@@ -41,22 +41,22 @@ export default function AdminV2CommonUxPanel() {
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="common-ux">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Common UX</p>
-          <p className="mt-1 text-sm text-[var(--v2-text)]">Idempotency widget, result toast, error standard.</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">공통 UX</p>
+          <p className="mt-1 text-sm text-[var(--v2-text)]">멱등성 위젯, 결과 토스트, 오류 표준</p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">UX kit</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">UX 킷</span>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Idempotency Key</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">멱등성 키</p>
               <p className="text-sm text-[var(--v2-text)]">자동 생성/복사/재생성 토글.</p>
             </div>
             <label className="flex items-center gap-2 text-xs text-[var(--v2-muted)]">
-              <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
-              auto-rotate 15s
+              <input aria-label="15초마다 자동 변경" type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+              15초마다 자동 변경
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--v2-text)]">
@@ -65,18 +65,18 @@ export default function AdminV2CommonUxPanel() {
               onChange={(e) => setIdemKey(e.target.value)}
               className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 font-mono md:w-[360px]"
             />
-            <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={copyKey}>Copy</button>
-            <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={regenerate}>Regenerate</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={copyKey}>복사</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-2" onClick={regenerate}>재생성</button>
           </div>
           <p className="text-xs text-[var(--v2-muted)]">서버 응답 헤더 `Idempotency-Status`가 toast 영역에 표기됩니다.</p>
         </div>
 
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-            <span>Result Toast + Detail Link</span>
+            <span>결과 토스트 + 상세 링크</span>
             <div className="flex gap-2">
-              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={simulateError}>Simulate Error</button>
-              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={clear}>Clear</button>
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={simulateError}>오류 시뮬레이션</button>
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={clear}>지우기</button>
             </div>
           </div>
           <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-sm text-[var(--v2-text)]">
@@ -95,12 +95,12 @@ export default function AdminV2CommonUxPanel() {
             )}
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-[var(--v2-muted)]">
-            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => pushToast({ ok: true, message: 'Apply 완료', detail: detailLink })}>Simulate Success</button>
+            <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => pushToast({ ok: true, message: 'Apply 완료', detail: detailLink })}>성공 시뮬레이션</button>
             <input
               value={detailLink}
               onChange={(e) => setDetailLink(e.target.value)}
               className="w-full rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-2 py-1 text-[var(--v2-text)] md:w-[240px]"
-              placeholder="job/job_id or audit/log link"
+              placeholder="job/job_id 또는 audit/log 링크"
             />
           </div>
         </div>
@@ -110,7 +110,7 @@ export default function AdminV2CommonUxPanel() {
         <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">오류 메시지 표준</p>
         <div className="mt-2 grid gap-3 md:grid-cols-[0.35fr_1fr]">
           <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] p-3 text-xs text-[var(--v2-text)]">
-            <p className="font-semibold text-[var(--v2-accent)]">Shape</p>
+            <p className="font-semibold text-[var(--v2-accent)]">형태</p>
             <pre className="mt-2 whitespace-pre-wrap text-[var(--v2-muted)]">{`{
   code: string,
   summary: string,

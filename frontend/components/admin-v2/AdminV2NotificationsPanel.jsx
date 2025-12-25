@@ -7,6 +7,66 @@ const variantOptions = ['EXPIRY', 'DEPOSIT', 'DAILY_IMPORT', 'MAINTENANCE'];
 const targetModes = ['EXTERNAL_USER_IDS', 'USER_IDS'];
 const statusFilters = ['ALL', 'PENDING', 'SENT', 'FAILED', 'DLQ', 'RETRYING', 'CANCELED'];
 
+const typeLabel = (t) => {
+  switch (t) {
+    case 'ALERT':
+      return '경고';
+    case 'REMINDER':
+      return '리마인더';
+    case 'BROADCAST':
+      return '공지';
+    default:
+      return String(t || '');
+  }
+};
+
+const variantLabel = (v) => {
+  switch (v) {
+    case 'EXPIRY':
+      return '만료';
+    case 'DEPOSIT':
+      return '입금';
+    case 'DAILY_IMPORT':
+      return '일일 가져오기';
+    case 'MAINTENANCE':
+      return '점검';
+    default:
+      return String(v || '');
+  }
+};
+
+const targetModeLabel = (m) => {
+  switch (m) {
+    case 'EXTERNAL_USER_IDS':
+      return '외부 사용자 ID';
+    case 'USER_IDS':
+      return 'user_id';
+    default:
+      return String(m || '');
+  }
+};
+
+const statusLabel = (s) => {
+  switch (s) {
+    case 'ALL':
+      return '전체';
+    case 'PENDING':
+      return '대기';
+    case 'SENT':
+      return '발송됨';
+    case 'FAILED':
+      return '실패';
+    case 'DLQ':
+      return 'DLQ';
+    case 'RETRYING':
+      return '재시도 중';
+    case 'CANCELED':
+      return '취소됨';
+    default:
+      return String(s || '');
+  }
+};
+
 const normalizeNotification = (n) => ({
   id: n.id,
   type: n.type,
@@ -159,43 +219,43 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="notifications">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Notifications</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">알림</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">
-            Compose and queue notifications with dedup hints and retry actions.
+            중복 방지 힌트와 재시도/취소 기능으로 알림을 생성하고 큐에 적재합니다.
           </p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Shadow/Apply ready</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Shadow/Apply 준비됨</span>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="grid gap-3 md:grid-cols-3">
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Type</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">유형</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               >
                 {typeOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{typeLabel(opt)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Variant</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">분류</label>
               <select
                 value={variant}
                 onChange={(e) => setVariant(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               >
                 {variantOptions.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{variantLabel(opt)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Schedule</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">예약 시간</label>
               <input
                 type="datetime-local"
                 value={scheduledAtLocal}
@@ -207,19 +267,19 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
 
           <div className="grid gap-3 md:grid-cols-3">
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Target</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">타겟 종류</label>
               <select
                 value={targetMode}
                 onChange={(e) => setTargetMode(e.target.value)}
                 className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
               >
                 {targetModes.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{targetModeLabel(opt)}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Targets</label>
+              <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">타겟 목록</label>
               <input
                 value={targetText}
                 onChange={(e) => setTargetText(e.target.value)}
@@ -236,7 +296,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
           </div>
 
           <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Title</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">제목</label>
             <input
               value={'(backend 미지원)'}
               onChange={() => {}}
@@ -245,7 +305,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Body</label>
+            <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">본문</label>
             <textarea
               value={'(backend 미지원)'}
               onChange={() => {}}
@@ -295,12 +355,12 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
         <div className="space-y-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Notification List</p>
-              <p className="text-sm text-[var(--v2-text)]">Filters + pagination + retry.</p>
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">알림 목록</p>
+              <p className="text-sm text-[var(--v2-text)]">필터/페이지/재시도</p>
             </div>
             <div className="flex gap-2 text-xs text-[var(--v2-muted)]">
-              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>Refresh</button>
-              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={downloadCsv}>Download CSV</button>
+              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={load}>새로고침</button>
+              <button className="rounded-full border border-[var(--v2-border)] px-3 py-1" onClick={downloadCsv}>CSV 다운로드</button>
             </div>
           </div>
 
@@ -308,7 +368,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="ID or variant"
+              placeholder="외부 사용자 ID 검색"
               className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
             />
             <select
@@ -317,7 +377,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
             >
               {statusFilters.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s}>{statusLabel(s)}</option>
               ))}
             </select>
           </div>
@@ -330,10 +390,10 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
               <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
                 <tr>
                   <th className="px-3 py-2 text-xs">ID</th>
-                  <th className="px-3 py-2 text-xs">Type/Variant</th>
-                  <th className="px-3 py-2 text-xs">Status</th>
-                  <th className="px-3 py-2 text-xs">Scheduled</th>
-                  <th className="px-3 py-2 text-xs">Actions</th>
+                  <th className="px-3 py-2 text-xs">유형/분류</th>
+                  <th className="px-3 py-2 text-xs">상태</th>
+                  <th className="px-3 py-2 text-xs">예약/생성</th>
+                  <th className="px-3 py-2 text-xs">작업</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--v2-border)]">
@@ -344,8 +404,8 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                     return (
                   <tr key={n.id} className="text-[var(--v2-text)]">
                     <td className="px-3 py-2 font-mono text-xs text-[var(--v2-accent)]">{n.id}</td>
-                    <td className="px-3 py-2 text-xs">{n.type} / {n.variant_id || '-'}</td>
-                    <td className="px-3 py-2 text-xs">{n.status}</td>
+                    <td className="px-3 py-2 text-xs">{typeLabel(n.type)} / {n.variant_id ? variantLabel(n.variant_id) : '-'}</td>
+                    <td className="px-3 py-2 text-xs">{statusLabel(n.status)}</td>
                     <td className="px-3 py-2 text-xs">{n.scheduled_at || n.created_at || '-'}</td>
                     <td className="px-3 py-2 text-xs">
                       <div className="flex flex-wrap gap-2">
@@ -355,7 +415,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                           onClick={() => retryNotification(n.id)}
                           title={canRetry ? 'FAILED/DLQ 상태에서 재시도' : 'FAILED/DLQ에서만 재시도 가능'}
                         >
-                          Retry
+                          재시도
                         </button>
                         <button
                           className="rounded border border-[var(--v2-border)] px-2 py-1 disabled:opacity-40"
@@ -363,7 +423,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
                           onClick={() => cancelNotification(n.id)}
                           title={canCancel ? 'PENDING/RETRYING 상태에서 취소' : 'PENDING/RETRYING에서만 취소 가능'}
                         >
-                          Cancel
+                          취소
                         </button>
                       </div>
                     </td>
@@ -382,9 +442,9 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
 
           <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
             <div className="space-x-2">
-              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>Prev</button>
-              <span>Page {page}</span>
-              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => p + 1)}>Next</button>
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => Math.max(1, p - 1))}>이전</button>
+              <span>페이지 {page}</span>
+              <button className="rounded border border-[var(--v2-border)] px-3 py-1" onClick={() => setPage((p) => p + 1)}>다음</button>
             </div>
             <div>Idempotent + 서버 API 연동 완료</div>
           </div>

@@ -119,22 +119,27 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     if (!csvText) errors.push('CSV 파일을 선택해주세요.');
     if (!mapping.external_user_id) errors.push('필수 매핑: external_user_id');
     if (mapping.external_user_id && rowsForApi.length === 0) errors.push('CSV에서 external_user_id를 하나도 찾지 못했어요.');
-    if (rowCount > 10000) errors.push('Rows > 10,000 will be split into batch jobs');
-    return { errors, warnings: rowCount > 0 && rowCount <= 10000 ? [] : errors.length ? [] : ['No warnings'] };
+    if (rowCount > 10000) errors.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
+    return { errors, warnings: rowCount > 0 && rowCount <= 10000 ? [] : errors.length ? [] : ['경고 없음'] };
   }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length]);
 
   const canProceed = () => {
     if (step === 1) return Boolean(fileName && csvText);
     if (step === 2) return Boolean(mapping.external_user_id);
     if (step === 3) return true;
-    if (step === 4) return mode === 'SHADOW' ? true : riskAck.trim().toLowerCase() === 'i understand';
+    if (step === 4) {
+      if (mode === 'SHADOW') return true;
+      const raw = String(riskAck || '').trim();
+      const lower = raw.toLowerCase();
+      return lower === 'i understand' || raw === '이해했습니다';
+    }
     return false;
   };
 
   const nextStep = () => setStep((s) => Math.min(4, s + 1));
   const prevStep = () => setStep((s) => Math.max(1, s - 1));
 
-  const uploadLabel = fileName ? `${fileName} (${rowCount.toLocaleString()} rows)` : 'CSV 파일 선택';
+  const uploadLabel = fileName ? `${fileName} (${rowCount.toLocaleString()}행)` : 'CSV 파일 선택';
 
   const runImport = async ({ runMode }) => {
     setSubmitState({ loading: true });
@@ -173,10 +178,10 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     <section id="imports" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Imports</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">가져오기</p>
           <p className="mt-1 text-sm text-[var(--v2-text)]">4-step flow: file → mapping → 검증 → 실행.</p>
         </div>
-        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">Step {step} / 4</span>
+        <span className="rounded-full border border-[var(--v2-border)] px-3 py-1 text-[10px] text-[var(--v2-muted)]">단계 {step} / 4</span>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
@@ -213,7 +218,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                     });
                   }}
                 />
-                <span className="text-[var(--v2-muted)]">Browse</span>
+                <span className="text-[var(--v2-muted)]">찾아보기</span>
               </label>
               <p className="mt-2 text-xs text-[var(--v2-muted)]">최대 10,000행 단위로 Job 분할 예정. 헤더가 포함된 UTF-8 CSV.</p>
             </div>
@@ -279,11 +284,11 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
               </div>
               <div className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm">
                 <div className="flex items-center justify-between text-[var(--v2-muted)]">
-                  <span>Errors</span>
+                  <span>오류</span>
                   <span>{validation.errors.length}</span>
                 </div>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-[var(--v2-warning)]">
-                  {validation.errors.length === 0 ? <li>No errors detected in sample.</li> : validation.errors.map((e) => <li key={e}>{e}</li>)}
+                  {validation.errors.length === 0 ? <li>샘플에서 오류가 감지되지 않았습니다.</li> : validation.errors.map((e) => <li key={e}>{e}</li>)}
                 </ul>
               </div>
 
@@ -317,10 +322,10 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                       <table className="min-w-full table-fixed text-left text-xs">
                         <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
                           <tr>
-                            <th className="px-3 py-2">row</th>
+                            <th className="px-3 py-2">행</th>
                             <th className="px-3 py-2">external_user_id</th>
-                            <th className="px-3 py-2">code</th>
-                            <th className="px-3 py-2">detail</th>
+                            <th className="px-3 py-2">코드</th>
+                            <th className="px-3 py-2">상세</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">
@@ -361,17 +366,17 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
               </div>
               <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]">
                 <div className="flex items-center justify-between text-[var(--v2-muted)]">
-                  <span>Impact Preview</span>
-                  <span>{rowCount.toLocaleString()} rows</span>
+                  <span>영향도 미리보기</span>
+                  <span>{rowCount.toLocaleString()}행</span>
                 </div>
-                <p className="mt-2 text-xs text-[var(--v2-muted)]">Split into batches of 10,000 rows. Dedup by external_user_id on server.</p>
+                <p className="mt-2 text-xs text-[var(--v2-muted)]">10,000행 단위로 배치로 분할합니다. 서버에서 external_user_id 기준으로 중복 제거합니다.</p>
               </div>
               <div className="space-y-2 text-sm text-[var(--v2-text)]">
-                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Risk Acknowledgement</label>
+                <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">위험 작업 확인</label>
                 <input
                   value={riskAck}
                   onChange={(e) => setRiskAck(e.target.value)}
-                  placeholder="type 'I understand'"
+                  placeholder="'I understand' 또는 '이해했습니다' 입력"
                   className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
                 />
                 <p className="text-xs text-[var(--v2-warning)]">위험 작업: Apply 모드에서는 되돌릴 수 없습니다.</p>
@@ -382,7 +387,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
         <div className="space-y-4">
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
-            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Step Guide</p>
+            <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">단계 안내</p>
             <ol className="mt-3 list-decimal space-y-2 pl-4 text-[var(--v2-muted)]">
               <li>CSV 업로드 (UTF-8, header 포함)</li>
               <li>컬럼 매핑 확인</li>
@@ -396,7 +401,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
             <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-              <span>Server Response</span>
+              <span>서버 응답</span>
               {submitState?.idempotencyKey ? <span className="font-mono">{submitState.idempotencyKey}</span> : null}
             </div>
             <div className="mt-2 space-y-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-xs">
@@ -421,7 +426,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
           <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 text-sm text-[var(--v2-text)]">
             <div className="flex items-center justify-between text-xs text-[var(--v2-muted)]">
-              <span>Error Report CSV</span>
+              <span>오류 리포트 CSV</span>
               <button
                 className="rounded border border-[var(--v2-border)] px-3 py-1 disabled:opacity-50"
                 onClick={openErrorReportCsv}
