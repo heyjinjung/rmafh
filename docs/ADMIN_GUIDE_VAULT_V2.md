@@ -1,6 +1,7 @@
 # ADMIN_GUIDE_VAULT_V2
 
 ## Changelog
+- 2025-12-25 v0.2: `/admin/v2` 진입 경로, 멱등성 위젯/토스트, Job/Audit 패널 사용 가이드 추가
 - 2025-12-20 v0.1: 골드 기본 UNLOCKED(데모) 및 telegram_ok 문구 정합화, 업로드 기반 진행률을 기본 플로우로 명시
 
 ## 목적
@@ -8,7 +9,8 @@
 - FE/BE/Worker/DB가 분리된 구조에서, “전역 동기화(특히 타이머/만료)”를 안전하게 확인/운영
 
 ## 접근 경로
-- 어드민 페이지: `/admin/` (Next.js 페이지)
+- 어드민 v1: `/admin/` (기존 최소 UI)
+- 어드민 v2: `/admin/v2` (Jobs/감사 로그/Notifications/Operations 통합)
 - 프록시 API: `/api/vault/*` (Next API Routes → FastAPI로 upstream 전달)
 
 ## 실행 순서(권장)
@@ -33,9 +35,15 @@
   - `external_user_id` 입력값을 쿼리스트링으로 전달: `?external_user_id=...`
   - 버튼들은 Next API Routes를 호출
 
-### 화면 구성(간단)
+### 화면 구성(v1 간단)
 - 상단에서 `external_user_id`를 입력하고 “작업 선택”에서 필요한 작업만 골라서 실행해요.
 - 선택한 작업만 화면에 보여서(나머지는 숨김) 복잡함을 줄였어요.
+
+### 화면 구성(v2 핵심)
+- 좌측 네비게이션: Dashboard / Users / Operations / Notifications / Jobs / Audit
+- 우측 패널: 선택한 행/Job/Audit에 대한 상세, 실패 아이템 다운로드, 재시도 버튼
+- 상단 바: 글로벌 검색(external_user_id, nickname, user_id) + 빠른 실행(Extend/Notify/Import)
+- 공통 UX: 멱등성 키 위젯(자동 생성/복사/재생성), 결과 토스트, 에러 표준 블록(status/body/request_id 표시)
 
 ## 어드민 사용법(쉬운 입력 폼)
 어드민은 “JSON을 직접 쓰는 방식”이 아니라, 체크박스/숫자/드롭다운/목록 입력으로 요청 내용을 만들어요.
@@ -78,6 +86,12 @@
 - **알림 종류(type)**: 드롭다운에서 선택
 - **대상 외부 아이디(목록)**: 쉼표/띄어쓰기로 입력, 비워두면 `external_user_id` 사용
 - **추가 옵션(variant_id)**: 필요할 때만 숫자로 입력(비워도 됨)
+
+### 3-1) 멱등성 키/토스트 사용법 (v2)
+- 모든 변경성 요청은 멱등성 키가 자동 생성되어 요청 헤더로 전송돼요.
+- “Idempotency” 위젯에서 키를 복사하거나 재생성할 수 있어요. 재생성 후에는 새 키로 다시 요청하세요.
+- 응답 헤더의 `Idempotency-Status` 값(`recorded`/`replayed`)을 토스트에 노출해 동일 요청 여부를 빠르게 확인해요.
+- 오류가 나면 에러 블록에 `status`/`body`/`request_id`를 함께 표시해 감사 로그 추적에 활용해요.
 
 ### 4) 추천 revive(referral-revive)
 - 이 요청은 **쿼리스트링 `external_user_id`가 필수**예요(위의 외부 아이디 입력을 꼭 채워주세요).

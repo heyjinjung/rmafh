@@ -1,5 +1,8 @@
 # 어드민 작업 감사 로그 운영 가이드
 
+## Changelog
+- 2025-12-25 v1.1: `job_id`/`idempotency_key` 필드, scope 로그, 조회 예시 업데이트
+
 ## 1. 개요
 
 어드민 감사 로그 시스템은 모든 관리자 작업을 추적하여 **누가, 언제, 무엇을** 수행했는지 기록합니다.
@@ -39,7 +42,10 @@ CREATE TABLE admin_audit_log (
   target_count INT NOT NULL DEFAULT 0,
   
   -- 요청 세부사항
-  request_id VARCHAR(64),  -- idempotency key
+  request_id VARCHAR(64),  -- idempotency key (header)
+  idempotency_key VARCHAR(64), -- 별도 멱등성 키 저장 (중복 안전)
+  idempotency_scope VARCHAR(32), -- FE/BE 구분용 scope
+  job_id BIGINT, -- 관련 admin_jobs.id
   request_body JSONB,  -- 요청 본문
   
   -- 결과
@@ -58,6 +64,8 @@ CREATE TABLE admin_audit_log (
 - `idx_audit_admin_user`: 어드민별 조회
 - `idx_audit_action`: 액션별 조회
 - `idx_audit_request_id`: request_id 조회
+- `idx_audit_idempotency_key`: 멱등성 키 재사용 추적
+- `idx_audit_job_id`: Job 단위 추적
 - `idx_audit_target_users`: 특정 사용자 영향 추적 (GIN 인덱스)
 
 ---
@@ -73,6 +81,8 @@ SELECT
   performed_at, 
   admin_user, 
   action, 
+  job_id,
+  idempotency_key,
   target_count,
   response_status
 FROM admin_audit_log
@@ -257,6 +267,8 @@ SELECT
   admin_user,
   request_body->>'scope' AS scope,
   request_body->>'extend_hours' AS hours,
+  idempotency_key,
+  job_id,
   target_count,
   response_summary->>'updated' AS updated_count
 FROM admin_audit_log

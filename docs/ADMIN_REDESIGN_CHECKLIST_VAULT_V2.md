@@ -74,7 +74,7 @@
 
 ### 4.6 성능/쿼리
 - [ ] 사용자 리스트 API 페이지네이션/정렬/필터 인덱스
-- [ ] 대량 업데이트 SQL 배치 처리 (execute_values)
+- [x] 대량 업데이트 SQL 배치 처리 (execute_values)
  - [x] Job 처리 타임아웃/락 타임아웃 설정 (관리자 import/관리자 job/worker 경로에 config 기반 lock/statement timeout 적용)
 
 ## 5. 프론트엔드 체크리스트
@@ -130,9 +130,9 @@
 
 ## 6. API 스펙/문서 업데이트
 - [x] `docs/API_SPEC_VAULT_V2.md`에 신규 Admin API 추가
-- [ ] `docs/ADMIN_GUIDE_VAULT_V2.md`에 `/admin/v2` 가이드 추가
-- [ ] `docs/ADMIN_AUDIT_OPERATIONS_GUIDE.md`에 job/idempotency 필드 추가
-- [ ] `docs/CSV_UPLOAD_COLUMN_GUIDE.md`에 업로드 검증 규칙 업데이트
+- [x] `docs/ADMIN_GUIDE_VAULT_V2.md`에 `/admin/v2` 가이드 추가
+- [x] `docs/ADMIN_AUDIT_OPERATIONS_GUIDE.md`에 job/idempotency 필드 추가
+- [x] `docs/CSV_UPLOAD_COLUMN_GUIDE.md`에 업로드 검증 규칙 업데이트
 
 ## 7. 테스트/QA 체크리스트
 ### 7.1 단위 테스트
@@ -151,10 +151,6 @@
 - [ ] CSV 업로드 → Job 완료 → 오류 다운로드
 - [ ] 알림 발송 → 리스트 조회 → 재시도
 - [ ] 감사 로그에서 request_id 추적
-
-### 7.4 성능/부하
-- [ ] 10k 행 CSV 처리 시간 측정
-- [ ] Users 리스트 100k 데이터 응답 시간
 - [ ] Job 처리 중 API 응답 타임아웃 발생 여부
 
 ## 8. 보안/운영 체크리스트

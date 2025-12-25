@@ -1681,29 +1681,28 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
             response.headers["Idempotency-Status"] = "recorded"
             return ExtendExpiryResponse(**response_body)
 
+        if not rows:
+            response_body = {"shadow": False, "updated": 0, "new_expires_at": None}
+            _idempotency_finish(
+                cur,
+                key=key,
+                scope=scope,
+                endpoint=endpoint,
+                response_status=200,
+                response_body=response_body,
+            )
+            conn.commit()
+            response.headers["Idempotency-Status"] = "recorded"
+            return ExtendExpiryResponse(**response_body)
+
+        update_values = []
+        log_values = []
         new_expires_at = None
-        updated = 0
         for user_id, expires_at in rows:
             new_expires = expires_at + timedelta(hours=body.extend_hours)
             new_expires_at = new_expires
-            cur.execute(
-                """
-                UPDATE vault_status
-                   SET expires_at=%s,
-                       expiry_extend_count=expiry_extend_count+1,
-                       last_extension_reason=%s,
-                       last_extension_at=%s
-                 WHERE user_id=%s
-                """,
-                (new_expires, body.reason, now, user_id),
-            )
-            cur.execute(
-                """
-                INSERT INTO vault_expiry_extension_log
-                    (user_id, prev_expires_at, new_expires_at, reason, request_id, shadow, metadata)
-                VALUES (%s, %s, %s, %s, %s, false, %s)
-                ON CONFLICT (request_id) DO NOTHING
-                """,
+            update_values.append((user_id, new_expires, body.reason, now))
+            log_values.append(
                 (
                     user_id,
                     expires_at,
@@ -1717,9 +1716,37 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
                             "extend_hours": body.extend_hours,
                         }
                     ),
-                ),
+                )
             )
-            updated += 1
+
+        execute_values(
+            cur,
+            """
+            UPDATE vault_status AS vs
+               SET expires_at=data.new_expires_at,
+                   expiry_extend_count=vs.expiry_extend_count+1,
+                   last_extension_reason=data.reason,
+                   last_extension_at=data.now
+              FROM (VALUES %s) AS data(user_id, new_expires_at, reason, now)
+             WHERE vs.user_id = data.user_id
+            """,
+            update_values,
+            template="(%s,%s,%s,%s)",
+        )
+
+        execute_values(
+            cur,
+            """
+            INSERT INTO vault_expiry_extension_log
+                (user_id, prev_expires_at, new_expires_at, reason, request_id, shadow, metadata)
+            VALUES %s
+            ON CONFLICT (request_id) DO NOTHING
+            """,
+            log_values,
+            template="(%s,%s,%s,%s,%s,false,%s)",
+        )
+
+        updated = len(update_values)
         
         # 감사 로그 기록
         admin_user = request.client.host if request.client else "unknown"
@@ -2255,6 +2282,86 @@ async def retry_admin_job(job_id: str, request: Request, _auth: str = Depends(ve
         created_at=row[8].isoformat() if row[8] else None,
         updated_at=row[9].isoformat() if row[9] else None,
     )
+
+
+@app.get("/api/vault/admin/audit-log", response_model=AdminAuditLogListResponse)
+async def list_admin_audit_log(
+    action: str | None = None,
+    endpoint: str | None = None,
+    request_id: str | None = None,
+    job_id: str | None = None,
+    idempotency_key: str | None = None,
+    response_status: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    order: str = "desc",
+    _auth: str = Depends(verify_admin_password),
+):
+    page = 1 if page < 1 else page
+    page_size = 1 if page_size < 1 else page_size
+    page_size = 200 if page_size > 200 else page_size
+    offset = (page - 1) * page_size
+    order_sql = "DESC" if order.lower() != "asc" else "ASC"
+
+    conditions: list[str] = []
+    params: list = []
+    if action:
+        conditions.append("action=%s")
+        params.append(action)
+    if endpoint:
+        conditions.append("endpoint=%s")
+        params.append(endpoint)
+    if request_id:
+        conditions.append("request_id=%s")
+        params.append(request_id)
+    if job_id:
+        conditions.append("job_id=%s")
+        params.append(job_id)
+    if idempotency_key:
+        conditions.append("idempotency_key=%s")
+        params.append(idempotency_key)
+    if response_status:
+        conditions.append("response_status=%s")
+        params.append(response_status)
+
+    where_sql = ""
+    if conditions:
+        where_sql = " WHERE " + " AND ".join(conditions)
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT COUNT(*) FROM admin_audit_log {where_sql}", tuple(params))
+        total = int(cur.fetchone()[0])
+        cur.execute(
+            f"""
+            SELECT id, admin_user, action, endpoint, target_count, request_id, response_status, error_message, job_id, idempotency_key, created_at
+              FROM admin_audit_log
+              {where_sql}
+          ORDER BY created_at {order_sql}
+             LIMIT %s OFFSET %s
+            """,
+            tuple(params + [page_size, offset]),
+        )
+        rows = cur.fetchall() or []
+
+    items = [
+        {
+            "id": row[0],
+            "admin_user": row[1],
+            "action": row[2],
+            "endpoint": row[3],
+            "target_count": row[4],
+            "request_id": row[5],
+            "response_status": row[6],
+            "error_message": row[7],
+            "job_id": row[8],
+            "idempotency_key": row[9],
+            "created_at": row[10].isoformat() if row[10] else None,
+        }
+        for row in rows
+    ]
+    has_more = (offset + len(items)) < total
+    return AdminAuditLogListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
 
 
 @app.get("/api/vault/admin/users")
