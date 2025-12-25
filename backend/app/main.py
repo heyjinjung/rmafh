@@ -2257,13 +2257,71 @@ async def retry_admin_job(job_id: str, request: Request, _auth: str = Depends(ve
 
 
 @app.get("/api/vault/admin/users")
-async def get_all_users(query: str | None = None, _auth: str = Depends(verify_admin_password)):
-    """전체 회원 리스트와 각 회원의 금고 상태 조회"""
+async def get_all_users(
+    query: str | None = None,
+    status: str | None = None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    _auth: str = Depends(verify_admin_password),
+):
+    """회원 리스트 조회 (서버 페이징/정렬/필터).
+
+    - query: external_user_id 또는 nickname 부분 일치
+    - status: gold_status 기준 필터 (LOCKED/UNLOCKED/CLAIMED/EXPIRED)
+    - sort_by: created_at/expires_at/deposit_total/external_user_id/nickname
+    - sort_dir: asc|desc
+    - page/page_size: 최대 200
+    """
+
+    if page < 1:
+        page = 1
+    page_size = max(1, min(page_size, 200))
+
+    sort_by = (sort_by or "created_at").lower()
+    sort_dir = (sort_dir or "desc").lower()
+    sort_map = {
+        "created_at": "ui.created_at",
+        "expires_at": "vs.expires_at",
+        "deposit_total": "uas.deposit_total",
+        "external_user_id": "ui.external_user_id",
+        "nickname": "uas.nickname",
+    }
+    order_col = sort_map.get(sort_by, "ui.created_at")
+    order_dir = "ASC" if sort_dir == "asc" else "DESC"
+
     with db.get_conn() as conn:
         cur = conn.cursor()
-        sql = [
+        _apply_job_timeouts(cur)
+
+        base_sql = [
             """
-            SELECT 
+            FROM user_identity ui
+            LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
+            INNER JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
+            """
+        ]
+        where = []
+        params = []
+        if query:
+            where.append("(ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s)")
+            like = f"%{query}%"
+            params.extend([like, like])
+        if status:
+            where.append("COALESCE(vs.gold_status, 'LOCKED') = %s")
+            params.append(status)
+        if where:
+            base_sql.append("WHERE " + " AND ".join(where))
+
+        # total count
+        cur.execute("SELECT COUNT(*) " + "\n".join(base_sql), params)
+        total = cur.fetchone()[0]
+
+        offset = (page - 1) * page_size
+        cur.execute(
+            """
+            SELECT
                 ui.user_id,
                 ui.external_user_id,
                 ui.created_at,
@@ -2279,41 +2337,31 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
                 uas.nickname,
                 uas.telegram_ok,
                 uas.joined_date
-            FROM user_identity ui
-            LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
-            INNER JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
             """
-        ]
-        params = []
-        if query:
-            sql.append("WHERE ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s")
-            like = f"%{query}%"
-            params.extend([like, like])
-
-        sql.append("ORDER BY ui.user_id DESC LIMIT 1000")
-        cur.execute("\n".join(sql), params)
+            + "\n".join(base_sql)
+            + f"\nORDER BY {order_col} {order_dir} NULLS LAST LIMIT %s OFFSET %s",
+            params + [page_size, offset],
+        )
         rows = cur.fetchall()
-        
+
         from datetime import date
         today = date.today()
-        
+
         users = []
         for row in rows:
-            # CSV에서 업로드된 가입일 기준으로 최대 출석 가능일 계산
-            joined_date = row[14]  # uas.joined_date
+            joined_date = row[14]
             max_attendance_days = 0
             if joined_date:
                 days_since_join = (today - joined_date).days
                 max_attendance_days = max(0, days_since_join)
-            
-            # 실제 출석일수는 최대 출석 가능일을 초과할 수 없음
-            actual_attendance = row[7] or 0  # vs.platinum_attendance_days
+
+            actual_attendance = row[7] or 0
             capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
 
             deposit_total = int(row[11] or 0)
             platinum_deposit_done = bool(row[8])
             diamond_deposit_current = int(row[9] or 0) or deposit_total
-            
+
             users.append({
                 "user_id": row[0],
                 "external_user_id": row[1],
@@ -2332,8 +2380,8 @@ async def get_all_users(query: str | None = None, _auth: str = Depends(verify_ad
                 "nickname": row[12] or "",
                 "telegram_ok": row[13] or False,
             })
-        
-        return {"users": users, "total": len(users)}
+
+        return {"users": users, "total": total, "page": page, "page_size": page_size}
 
 
 @app.post("/api/vault/admin/users", response_model=AdminUserResponse)

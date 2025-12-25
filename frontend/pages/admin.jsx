@@ -20,6 +20,7 @@ const ICON_TELEGRAM = 'https://www.figma.com/api/mcp/asset/01bcbc61-1f54-4542-8f
 export default function AdminPage() {
   const router = useRouter();
   const basePath = router.basePath || '';
+  const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED === 'true';
   const toAppPath = (path) => {
     if (typeof path !== 'string') return path;
     if (!path.startsWith('/')) return path;
@@ -329,6 +330,17 @@ export default function AdminPage() {
       <Head>
         <title>CC Casino - 관리자 도구</title>
       </Head>
+
+      {adminV2Enabled ? (
+        <div className="bg-emerald-900/40 border-b border-emerald-700/60 text-white">
+          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-2 text-sm">
+            <span className="text-white/80">Admin v2 프리뷰 사용 가능</span>
+            <Link href="/admin/v2" className="rounded-md border border-emerald-500/50 px-3 py-1 text-emerald-100 hover:bg-emerald-800/50">
+              v2 열기
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       {toast ? (
         <div className="fixed top-6 right-6 z-50 max-w-sm w-full drop-shadow-xl">
