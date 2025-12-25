@@ -289,7 +289,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
         <li>Users에서 변경할 대상을 선택하세요.</li>
         <li>아래에서 변경할 내용을 입력하세요.</li>
         <li>미리보기로 대상과 변경 내용을 확인하세요.</li>
-        <li>문제가 없으면 '적용하기' 버튼을 눌러주세요.</li>
+        <li>문제가 없으면 &apos;적용하기&apos; 버튼을 눌러주세요.</li>
       </ol>
       <div className="space-y-4">
         {/* 대상 안내 */}
@@ -305,7 +305,7 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
         <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4">
           <b>만료일 연장</b>
           <div className="mt-2 flex gap-3">
-            <input type="number" min="1" max="3" value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value) || 1)} className="rounded border px-2 py-1" />
+            <input type="number" min="1" max="3" aria-label="연장 일수" value={expiryDays} onChange={e => setExpiryDays(Number(e.target.value) || 1)} className="rounded border px-2 py-1" />
             <select value={reason} onChange={e => setReason(e.target.value)} className="rounded border px-2 py-1">
               <option value="PROMO">프로모션</option>
               <option value="OPS">운영</option>
@@ -353,15 +353,15 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
             <div>
               <label className="text-xs text-[var(--v2-muted)]">출석 Δ / 상한</label>
               <div className="mt-1 grid grid-cols-2 gap-2">
-                <input type="number" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
-                <input type="number" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" aria-label="출석 Δ" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" aria-label="출석 상한" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
               </div>
             </div>
             <div>
               <label className="text-xs text-[var(--v2-muted)]">입금 Δ / 하한</label>
               <div className="mt-1 grid grid-cols-2 gap-2">
-                <input type="number" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
-                <input type="number" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" aria-label="입금 Δ" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
+                <input type="number" aria-label="입금 하한" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded border px-2 py-1" />
               </div>
             </div>
           </div>
