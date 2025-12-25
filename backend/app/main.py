@@ -30,6 +30,7 @@ from app.schemas import (
     AdminUserUpdateRequest,
     AdminUserResponse,
     AdminNotificationsListResponse,
+    AdminAuditLogListResponse,
     AdminJobCreateRequest,
     AdminJobResponse,
     AdminJobsListResponse,

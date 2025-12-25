@@ -68,6 +68,28 @@ class AdminNotificationsListResponse(BaseModel):
     items: List[AdminNotificationItem]
 
 
+class AdminAuditLogItem(BaseModel):
+    id: int
+    admin_user: str
+    action: str
+    endpoint: Optional[str] = None
+    target_count: Optional[int] = None
+    request_id: Optional[str] = None
+    response_status: Optional[str] = None
+    error_message: Optional[str] = None
+    job_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class AdminAuditLogListResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+    items: List[AdminAuditLogItem]
+
+
 class CompensationEnqueueRequest(BaseModel):
     user_id: Optional[int] = None
     external_user_id: Optional[str] = None

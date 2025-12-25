@@ -7,3 +7,5 @@ export { default as AdminV2UsersGrid } from './AdminV2UsersGrid';
 export { default as AdminV2SegmentsPanel } from './AdminV2SegmentsPanel';
 export { default as AdminV2ImportsFlow } from './AdminV2ImportsFlow';
 export { default as AdminV2OperationsPanel } from './AdminV2OperationsPanel';
+export { default as AdminV2NotificationsPanel } from './AdminV2NotificationsPanel';
+export { default as AdminV2CommonUxPanel } from './AdminV2CommonUxPanel';

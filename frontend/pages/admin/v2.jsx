@@ -11,6 +11,8 @@ import {
   AdminV2SegmentsPanel,
   AdminV2ImportsFlow,
   AdminV2OperationsPanel,
+  AdminV2NotificationsPanel,
+  AdminV2CommonUxPanel,
 } from '../../components/admin-v2';
 import { withIdempotency } from '../../lib/apiClient';
 
@@ -85,6 +87,10 @@ export default function AdminV2Page() {
           <AdminV2QuickActions />
 
           <AdminV2UsersGrid adminPassword={adminPassword} basePath={basePath} />
+          <AdminV2SegmentsPanel />
+          <AdminV2OperationsPanel />
+          <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
+          <AdminV2ImportsFlow />
 
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
             <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
@@ -138,6 +144,8 @@ export default function AdminV2Page() {
             </div>
             <AdminV2JobsPanel />
           </div>
+
+          <AdminV2CommonUxPanel />
         </section>
       </AdminV2Layout>
     </>
