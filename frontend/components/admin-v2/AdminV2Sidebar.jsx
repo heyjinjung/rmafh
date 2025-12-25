@@ -4,7 +4,6 @@ const navItems = [
   { key: 'dashboard', label: '대시보드', href: '#top' },
   { key: 'users', label: '사용자', href: '#users' },
   { key: 'imports', label: '가져오기', href: '#imports' },
-  { key: 'operations', label: '운영', href: '#operations' },
   { key: 'notifications', label: '알림', href: '#notifications' },
 ];
 
