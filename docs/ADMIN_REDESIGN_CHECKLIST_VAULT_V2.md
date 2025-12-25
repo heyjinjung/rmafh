@@ -2,12 +2,13 @@
 
 ## 1. 메타
 - 문서명: Vault v2 어드민 리디자인 개발 체크리스트
-- 문서 버전: v1.1.0
+- 문서 버전: v1.2.0
 - 작성일: 2025-12-25
 - 작성자: Codex
 - 적용 범위: `/admin/v2`, 백엔드 Admin API, 멱등성/Job/감사 로그
 
 ## Changelog
+- 2025-12-25 v1.2.0: Segments 백엔드 영속화(/api/vault/admin/segments) + segment_id 타겟팅 + Operations Extend-expiry 실제 Submit 연동 반영.
 - 2025-12-25 v1.1.0: Users 벌크 타겟(필터/업로드/선택 IDs) → Operations 타겟 연결 및 행 클릭 우측 상세 패널 구현 반영.
 - 2025-12-25 v1.0.9: 프론트엔드 체크리스트(섹션 5) 진행 현황/남은 작업을 실제 구현 기준으로 보강하고 체크박스 정합성 수정.
 - 2025-12-25 v1.0.8: Admin v2 실제 구현 기준으로 문서의 Admin API 경로/파라미터/필드 정오표 반영 (audit-log, page/page_size/order, imports error_report_csv).
@@ -84,12 +85,11 @@
 ## 5. 프론트엔드 체크리스트
 ### 5.0 진행 현황 요약 (2025-12-25)
 - 현재까지 “실제 API 연동 완료” 영역: Dashboard KPI(최근 Job/Notify/Audit), Jobs/Audit, Notifications(생성+리스트), Imports(SHADOW 검증+오류 테이블+CSV 링크), Users(리스트 조회).
-- 현재까지 “UI만 있고 서버 연동 없음/미흡” 영역: Segments(로컬 저장만), Operations(폼/가드레일 UI만, 실행/impact preview 미구현), Users 상세/벌크 스코프 연동.
+- 현재까지 “UI만 있고 서버 연동 없음/미흡” 영역: Operations(상태/출석/입금 bulk 변경, impact preview 미구현).
 - FE 공통 UX: `withIdempotency` 기반 요청 헤더 주입 + 표준 에러 파싱 + 토스트(성공/실패)까지 동작.
 
 #### 다음 해야할 일 (우선순위)
-- P0(필수): Operations 실제 실행 연동(extend-expiry + users vault update) + Audit/Jobs로 추적 가능해야 함.
-- P0(필수): Segments를 “로컬 드래프트”에서 “백엔드 저장/ID 기반 타겟팅”으로 전환(또는 백엔드 미지원이면 UI/문구를 명확히).
+- P0(필수): Operations의 나머지 작업(상태/출석/입금 bulk 변경) 실제 실행 연동 + Audit/Jobs로 추적 가능해야 함.
 - P1: Users Grid의 벌크 선택(필터 전체/업로드 ID)을 Job/Operations 타겟으로 연결.
 - P1: Notifications 예약 발송(scheduled_at) 및 재시도/상태 변경 액션(백엔드 지원 범위 확인 후).
 
@@ -111,10 +111,10 @@
 - [x] 행 클릭 → 우측 Drawer(우측 상세 패널) 표시 (백엔드에 `GET /api/vault/admin/users/{user_id}` 없음 → 현재는 리스트 응답 필드만 노출)
 
 ### 5.4 세그먼트/필터
-- [x] 세그먼트 생성/저장/삭제 (localStorage)
+- [x] 세그먼트 생성/저장/삭제 (백엔드 영속화)
 - [x] 필터 조건 UI: 상태, 만료, 입금 범위, 출석 범위, 텔레그램/리뷰
-- [ ] 세그먼트 백엔드 저장/삭제/조회 API 연동 (현재 백엔드 엔드포인트 없음)
-- [ ] 세그먼트 → Operations 작업 생성/타겟팅 연동 (segment_id 기반 Job/Operations 연결)
+- [x] 세그먼트 백엔드 저장/삭제/조회 API 연동 (`GET|POST|DELETE /api/vault/admin/segments`)
+- [x] 세그먼트 → Operations 타겟팅 연동 (segment_id 기반 `POST /api/vault/admin/operations/extend-expiry`)
 
 ### 5.5 Imports UI
 - [x] 4단계 업로드 흐름 구현 (파일 → 매핑 → 검증 → 실행)
@@ -124,10 +124,10 @@
 
 ### 5.6 Operations UI
 - [x] Operations UI 스켈레톤 (대상/연장/상태/출석/입금/가드레일 입력)
-- [ ] Extend-expiry API 연동 (`POST /api/vault/extend-expiry`, shadow/apply)
+- [x] Extend-expiry API 연동 (IDs: `POST /api/vault/extend-expiry`, Filter/Segment: `POST /api/vault/admin/operations/extend-expiry`, shadow/apply)
 - [ ] 상태/출석/입금 변경 API 연동 (`POST /api/vault/admin/users/{user_id}/vault/status|attendance|deposit` 및/또는 Job 기반 bulk)
 - [ ] Impact 프리뷰 실제 계산 연동 (shadow 응답/preview 엔드포인트 기반)
-- [ ] Submit Operation 버튼 동작 + 결과 토스트 + 감사 로그/Job 추적 연결
+- [x] Submit Operation 버튼 동작 + 결과 토스트 + 감사 로그 연결 (extend-expiry 범위)
 
 ### 5.7 Notifications UI
 - [x] 알림 생성 폼 (type/variant/대상) + `POST /api/vault/notify`

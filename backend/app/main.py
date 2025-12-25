@@ -55,6 +55,10 @@ from app.schemas import (
     AdminSegmentItem,
     AdminSegmentsListResponse,
     AdminExtendExpiryRequest,
+    AdminTargetPreviewRequest,
+    AdminTargetPreviewResponse,
+    AdminBulkUpdateRequest,
+    AdminBulkUpdateResponse,
 )
 
 app = FastAPI(title="Vault v2.0 API", version="0.2.0")
@@ -1514,6 +1518,13 @@ def _ensure_schema():
     with db.get_conn() as conn:
         cur = conn.cursor()
 
+        # Extensions (best-effort for local/dev). pg_trgm enables fast ILIKE '%q%' search.
+        try:
+            cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")
+        except Exception:
+            # Ignore if the DB user lacks permission; system still works without it.
+            conn.rollback()
+
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS user_identity (
@@ -1522,6 +1533,13 @@ def _ensure_schema():
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             """
+        )
+
+        # Users list performance indexes (query/status/sort_by).
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_identity_created_at ON user_identity (created_at DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_identity_external_user_id_btree ON user_identity (external_user_id)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_identity_external_user_id_trgm ON user_identity USING GIN (external_user_id gin_trgm_ops)"
         )
 
         cur.execute(
@@ -1549,6 +1567,14 @@ def _ensure_schema():
         )
 
         cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vault_status_coalesced_gold_status ON vault_status ((COALESCE(gold_status, 'LOCKED')))"
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_vault_status_expires_at ON vault_status (expires_at DESC)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vault_status_gold_status_expires_at ON vault_status (gold_status, expires_at DESC)"
+        )
+
+        cur.execute(
             """
             CREATE TABLE IF NOT EXISTS user_admin_snapshot (
                 user_id INTEGER PRIMARY KEY,
@@ -1561,6 +1587,12 @@ def _ensure_schema():
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
             """
+        )
+
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_admin_snapshot_deposit_total ON user_admin_snapshot (deposit_total DESC)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_user_admin_snapshot_nickname_btree ON user_admin_snapshot (nickname)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_user_admin_snapshot_nickname_trgm ON user_admin_snapshot USING GIN (nickname gin_trgm_ops)"
         )
 
         cur.execute("ALTER TABLE user_admin_snapshot ADD COLUMN IF NOT EXISTS nickname TEXT")
@@ -2912,6 +2944,395 @@ async def admin_extend_expiry(body: AdminExtendExpiryRequest, request: Request, 
         conn.commit()
         response.headers["Idempotency-Status"] = "recorded"
         return ExtendExpiryResponse(**response_body)
+
+
+@app.post("/api/vault/admin/targets/preview", response_model=AdminTargetPreviewResponse)
+async def admin_targets_preview(body: AdminTargetPreviewRequest, _auth: str = Depends(verify_admin_password)):
+    """Resolve IDs/filter/segment targets and return exact candidate count + sample user IDs.
+
+    Intended for UI impact preview.
+    """
+
+    target_mode = (body.target.mode or "").lower()
+    target_dict: dict = {"mode": target_mode}
+    user_ids = _dedupe_int_list(list(body.target.user_ids) if body.target.user_ids else None, max_items=10000)
+
+    if target_mode == "user_ids":
+        if not user_ids:
+            raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
+    elif target_mode == "filter":
+        target_dict["filter"] = body.target.filter.model_dump() if body.target.filter else {}
+    elif target_mode == "segment":
+        seg_id = (body.target.segment_id or "").strip()
+        if not seg_id:
+            raise HTTPException(status_code=400, detail="SEGMENT_ID_REQUIRED")
+        target_dict["segment_id"] = seg_id
+    else:
+        raise HTTPException(status_code=400, detail="INVALID_TARGET_MODE")
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+
+        if target_mode == "user_ids":
+            cur.execute(
+                """
+                SELECT COUNT(*)
+                  FROM vault_status
+                 WHERE user_id = ANY(%s)
+                   AND (gold_status!='CLAIMED' OR platinum_status!='CLAIMED' OR diamond_status!='CLAIMED')
+                """,
+                (user_ids,),
+            )
+            total = int(cur.fetchone()[0] or 0)
+
+            cur.execute(
+                """
+                SELECT user_id
+                  FROM vault_status
+                 WHERE user_id = ANY(%s)
+                   AND (gold_status!='CLAIMED' OR platinum_status!='CLAIMED' OR diamond_status!='CLAIMED')
+                 ORDER BY user_id
+                 LIMIT 10
+                """,
+                (user_ids,),
+            )
+            sample_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+            return AdminTargetPreviewResponse(candidates=total, sample_user_ids=sample_ids)
+
+        if target_mode == "segment":
+            cur.execute("SELECT filters FROM admin_segments WHERE segment_id=%s", (target_dict["segment_id"],))
+            seg_row = cur.fetchone()
+            if not seg_row:
+                raise HTTPException(status_code=404, detail="SEGMENT_NOT_FOUND")
+            target_dict["segment_filters"] = seg_row[0] or {}
+
+        where_sql, params = _build_user_target_sql(target_dict)
+
+        cur.execute(
+            """
+            SELECT COUNT(*)
+              FROM vault_status vs
+              JOIN user_identity ui ON ui.user_id = vs.user_id
+              JOIN user_admin_snapshot uas ON uas.user_id = vs.user_id
+             WHERE """
+            + where_sql,
+            tuple(params),
+        )
+        total = int(cur.fetchone()[0] or 0)
+
+        cur.execute(
+            """
+            SELECT vs.user_id
+              FROM vault_status vs
+              JOIN user_identity ui ON ui.user_id = vs.user_id
+              JOIN user_admin_snapshot uas ON uas.user_id = vs.user_id
+             WHERE """
+            + where_sql
+            + "\n ORDER BY vs.user_id LIMIT 10",
+            tuple(params),
+        )
+        sample_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+        return AdminTargetPreviewResponse(candidates=total, sample_user_ids=sample_ids)
+
+
+@app.post("/api/vault/admin/operations/bulk-update", response_model=AdminBulkUpdateResponse, status_code=202)
+async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
+    """Bulk apply status/attendance/deposit updates for IDs/filter/segment targets.
+
+    This runs synchronously (no worker) but records results into admin_jobs/admin_job_items.
+    """
+
+    request_id = _validate_request_id(getattr(body, "request_id", None))
+
+    has_status = body.status is not None and any(
+        getattr(body.status, k) is not None for k in ("gold_status", "platinum_status", "diamond_status")
+    )
+    has_attendance = body.attendance is not None and (body.attendance.delta_days is not None or body.attendance.set_days is not None)
+    has_deposit = body.deposit is not None and (body.deposit.platinum_deposit_done is not None or body.deposit.diamond_deposit_current is not None)
+    if not (has_status or has_attendance or has_deposit):
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    key = _validate_idempotency_key(request_id)
+    scope = _idempotency_scope(request)
+    endpoint = "/api/vault/admin/operations/bulk-update"
+    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+
+    target_mode = (body.target.mode or "").lower()
+    target_dict: dict = {"mode": target_mode}
+    user_ids = _dedupe_int_list(list(body.target.user_ids) if body.target.user_ids else None, max_items=10000)
+
+    if target_mode == "user_ids":
+        if not user_ids:
+            raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
+    elif target_mode == "filter":
+        target_dict["filter"] = body.target.filter.model_dump() if body.target.filter else {}
+    elif target_mode == "segment":
+        seg_id = (body.target.segment_id or "").strip()
+        if not seg_id:
+            raise HTTPException(status_code=400, detail="SEGMENT_ID_REQUIRED")
+        target_dict["segment_id"] = seg_id
+    else:
+        raise HTTPException(status_code=400, detail="INVALID_TARGET_MODE")
+
+    def _apply_updates_for_user(cur, user_id: int, now: datetime):
+        cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
+        snap_row = cur.fetchone()
+        review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        row = _get_or_create_vault_row(cur, user_id, now)
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current = row
+        current = {
+            "gold_status": gold_status,
+            "platinum_status": platinum_status,
+            "diamond_status": diamond_status,
+        }
+
+        new_attendance_days = int(attendance_days or 0)
+        new_platinum_deposit_done = bool(platinum_deposit_done)
+        new_diamond_deposit_current = int(diamond_deposit_current or 0)
+        new_platinum_status = platinum_status
+        new_diamond_status = diamond_status
+
+        if has_attendance:
+            if body.attendance.set_days is not None:
+                new_attendance_days = _clamp_attendance_days(int(body.attendance.set_days))
+            else:
+                new_attendance_days = _clamp_attendance_days(int(attendance_days or 0) + int(body.attendance.delta_days or 0))
+
+        if has_deposit:
+            if body.deposit.platinum_deposit_done is not None:
+                new_platinum_deposit_done = bool(body.deposit.platinum_deposit_done)
+            if body.deposit.diamond_deposit_current is not None:
+                new_diamond_deposit_current = int(body.deposit.diamond_deposit_current)
+
+        # Recompute unlock statuses from attendance/deposit where applicable.
+        if has_attendance or has_deposit:
+            if new_platinum_status not in {"CLAIMED", "EXPIRED"}:
+                if new_attendance_days >= 3 and new_platinum_deposit_done and review_ok:
+                    new_platinum_status = "UNLOCKED"
+            if new_diamond_status not in {"CLAIMED", "EXPIRED"}:
+                if new_diamond_deposit_current >= 500000:
+                    new_diamond_status = "UNLOCKED"
+
+        # Apply explicit status overrides last.
+        explicit_updates: dict[str, str] = {}
+        if has_status:
+            if body.status.gold_status is not None:
+                explicit_updates["gold_status"] = _validate_status(body.status.gold_status, "gold_status")
+            if body.status.platinum_status is not None:
+                explicit_updates["platinum_status"] = _validate_status(body.status.platinum_status, "platinum_status")
+            if body.status.diamond_status is not None:
+                explicit_updates["diamond_status"] = _validate_status(body.status.diamond_status, "diamond_status")
+
+        # CLAIMED은 되돌리지 않음 (per single-user behavior)
+        for col, new_val in explicit_updates.items():
+            if current.get(col) == "CLAIMED" and new_val != "CLAIMED":
+                raise HTTPException(status_code=409, detail="CANNOT_MODIFY_CLAIMED")
+
+        new_gold_status = explicit_updates.get("gold_status", gold_status)
+        new_platinum_status = explicit_updates.get("platinum_status", new_platinum_status)
+        new_diamond_status = explicit_updates.get("diamond_status", new_diamond_status)
+
+        # Update vault_status row.
+        set_cols: list[str] = [
+            "gold_status=%s",
+            "platinum_status=%s",
+            "diamond_status=%s",
+        ]
+        params: list[Any] = [new_gold_status, new_platinum_status, new_diamond_status]
+
+        if has_attendance:
+            set_cols.extend(["platinum_attendance_days=%s", "last_attended_at=%s"])
+            params.extend([new_attendance_days, now])
+        if has_deposit:
+            set_cols.extend(["platinum_deposit_done=%s", "diamond_deposit_current=%s"])
+            params.extend([new_platinum_deposit_done, new_diamond_deposit_current])
+
+        set_cols.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"""
+            UPDATE vault_status
+               SET {', '.join(set_cols)}
+             WHERE user_id=%s
+            """,
+            params,
+        )
+
+        return {
+            "expires_at": expires_at.isoformat() if expires_at else None,
+            "gold_status": new_gold_status,
+            "platinum_status": new_platinum_status,
+            "diamond_status": new_diamond_status,
+        }
+
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+        now = _now()
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminBulkUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        resolved_user_ids: list[int] = []
+        resolved_meta: dict[str, Any] = {"mode": target_mode}
+        if target_mode == "user_ids":
+            resolved_user_ids = user_ids
+            resolved_meta["user_ids_count"] = len(user_ids)
+        else:
+            if target_mode == "segment":
+                cur.execute("SELECT name, filters FROM admin_segments WHERE segment_id=%s", (target_dict["segment_id"],))
+                seg_row = cur.fetchone()
+                if not seg_row:
+                    raise HTTPException(status_code=404, detail="SEGMENT_NOT_FOUND")
+                target_dict["segment_filters"] = seg_row[1] or {}
+                resolved_meta["segment_name"] = seg_row[0]
+
+            where_sql, params = _build_user_target_sql(target_dict)
+            cur.execute(
+                """
+                SELECT vs.user_id
+                  FROM vault_status vs
+                  JOIN user_identity ui ON ui.user_id = vs.user_id
+                  JOIN user_admin_snapshot uas ON uas.user_id = vs.user_id
+                 WHERE """
+                + where_sql,
+                tuple(params),
+            )
+            resolved_user_ids = [int(r[0]) for r in (cur.fetchall() or [])]
+            resolved_meta["candidates"] = len(resolved_user_ids)
+
+        resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
+        target_count = len(resolved_user_ids)
+
+        job_id = _generate_job_id()
+        payload: Dict[str, Any] = {
+            "type": "BULK_UPDATE",
+            "target": body.target.model_dump(exclude_none=True) if hasattr(body.target, "model_dump") else body.target.dict(exclude_none=True),
+            "resolved": resolved_meta,
+            "status": body.status.model_dump(exclude_none=True) if body.status and hasattr(body.status, "model_dump") else (body.status.dict(exclude_none=True) if body.status else None),
+            "attendance": body.attendance.model_dump(exclude_none=True) if body.attendance and hasattr(body.attendance, "model_dump") else (body.attendance.dict(exclude_none=True) if body.attendance else None),
+            "deposit": body.deposit.model_dump(exclude_none=True) if body.deposit and hasattr(body.deposit, "model_dump") else (body.deposit.dict(exclude_none=True) if body.deposit else None),
+        }
+
+        cur.execute(
+            """
+            INSERT INTO admin_jobs
+                (job_id, type, status, request_id, target_count, processed, failed, payload, created_at, updated_at)
+            VALUES (%s, %s, 'RUNNING', %s, %s, 0, 0, %s, NOW(), NOW())
+            """,
+            (job_id, "BULK_UPDATE", key, target_count, Json(payload)),
+        )
+
+        if resolved_user_ids:
+            execute_values(
+                cur,
+                """
+                INSERT INTO admin_job_items (job_id, user_id, status)
+                VALUES %s
+                """,
+                [(job_id, uid, "PENDING") for uid in resolved_user_ids],
+                template="(%s,%s,%s)",
+            )
+
+        processed = 0
+        failed = 0
+        for uid in resolved_user_ids:
+            processed += 1
+            try:
+                _apply_updates_for_user(cur, uid, now)
+                cur.execute(
+                    """
+                    UPDATE admin_job_items
+                       SET status='DONE',
+                           error_message=NULL
+                     WHERE job_id=%s AND user_id=%s
+                    """,
+                    (job_id, uid),
+                )
+            except HTTPException as e:
+                failed += 1
+                msg = str(getattr(e, "detail", None) or "ERROR")
+                cur.execute(
+                    """
+                    UPDATE admin_job_items
+                       SET status='FAILED',
+                           error_message=%s
+                     WHERE job_id=%s AND user_id=%s
+                    """,
+                    (msg[:500], job_id, uid),
+                )
+            except Exception as e:
+                failed += 1
+                msg = str(e) or "ERROR"
+                cur.execute(
+                    """
+                    UPDATE admin_job_items
+                       SET status='FAILED',
+                           error_message=%s
+                     WHERE job_id=%s AND user_id=%s
+                    """,
+                    (msg[:500], job_id, uid),
+                )
+
+        final_status = "DONE" if failed == 0 else "FAILED"
+        cur.execute(
+            """
+            UPDATE admin_jobs
+               SET status=%s,
+                   processed=%s,
+                   failed=%s,
+                   updated_at=NOW()
+             WHERE job_id=%s
+            """,
+            (final_status, processed, failed, job_id),
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_BULK_UPDATE",
+            endpoint=endpoint,
+            target_user_ids=resolved_user_ids[:1000],
+            request_id=request_id,
+            request_body=payload,
+            response_status="SUCCESS" if failed == 0 else "PARTIAL_FAILURE",
+            response_summary={"job_id": job_id, "target_count": target_count, "processed": processed, "failed": failed},
+            job_id=job_id,
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "job_id": job_id,
+            "status": final_status,
+            "request_id": key,
+            "target_count": target_count,
+            "processed": processed,
+            "failed": failed,
+        }
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=202,
+            response_body=response_body,
+        )
+        conn.commit()
+
+    response.headers["Idempotency-Status"] = "recorded"
+    return AdminBulkUpdateResponse(**response_body)
 
 
 @app.post("/api/vault/admin/users", response_model=AdminUserResponse)

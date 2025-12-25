@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
+import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
+import { pushToast } from './toastBus';
 
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 
-export default function AdminV2OperationsPanel({ usersTarget }) {
+function makeRequestId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
+}
+
+export default function AdminV2OperationsPanel({ adminPassword, basePath, usersTarget, segmentTarget }) {
   const [targetScope, setTargetScope] = useState('segment');
   const [targetValue, setTargetValue] = useState('');
   const [expiryDays, setExpiryDays] = useState(3);
-  const [reason, setReason] = useState('PROMO_EXTENSION');
+  const [reason, setReason] = useState('PROMO');
   const [shadow, setShadow] = useState(true);
   const [goldStatus, setGoldStatus] = useState('UNLOCKED');
   const [platinumStatus, setPlatinumStatus] = useState('LOCKED');
@@ -14,6 +21,8 @@ export default function AdminV2OperationsPanel({ usersTarget }) {
   const [attendance, setAttendance] = useState({ delta: 0, cap: 3 });
   const [deposit, setDeposit] = useState({ delta: 0, floor: 0 });
   const [confirmText, setConfirmText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
   const linkedTarget = useMemo(() => {
     if (!usersTarget || typeof usersTarget !== 'object') return null;
@@ -45,6 +54,104 @@ export default function AdminV2OperationsPanel({ usersTarget }) {
   }, [shadow, targetScope]);
 
   const canExecute = confirmText.trim().toLowerCase() === 'apply';
+
+  const submitExtendExpiry = async () => {
+    if (!adminPassword) {
+      pushToast({ ok: false, message: 'Admin Password를 먼저 입력하세요.' });
+      return;
+    }
+
+    const extendHours = Math.trunc(Number(expiryDays) * 24);
+    if (!Number.isFinite(extendHours) || extendHours < 1 || extendHours > 72) {
+      pushToast({ ok: false, message: '연장 시간은 1~72시간(최대 3일) 범위여야 합니다.' });
+      return;
+    }
+    if (!['OPS', 'PROMO', 'ADMIN'].includes(String(reason).toUpperCase())) {
+      pushToast({ ok: false, message: 'Reason은 OPS/PROMO/ADMIN 중 하나여야 합니다.' });
+      return;
+    }
+
+    const requestId = makeRequestId();
+
+    try {
+      setSubmitting(true);
+
+      if (targetScope === 'upload') {
+        const ids = linkedTarget?.ids || [];
+        if (!ids.length) {
+          pushToast({ ok: false, message: 'Users에서 대상 user_ids를 먼저 선택하세요.' });
+          return;
+        }
+
+        const payload = {
+          request_id: requestId,
+          scope: 'USER_IDS',
+          user_ids: ids.map((v) => Number(v)).filter((n) => Number.isFinite(n)),
+          extend_hours: extendHours,
+          reason: String(reason).toUpperCase(),
+          shadow,
+        };
+
+        const res = await apiFetch('/api/vault/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
+        const data = res?.data;
+        if (data?.shadow) {
+          pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+        } else {
+          pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+        }
+        return;
+      }
+
+      if (targetScope === 'filter') {
+        const filter = linkedTarget?.filter || null;
+        if (!filter) {
+          pushToast({ ok: false, message: 'Users에서 필터 스코프를 먼저 선택하세요.' });
+          return;
+        }
+        const payload = {
+          request_id: requestId,
+          target: { mode: 'filter', filter: { query: filter.query || null, status: filter.status || null } },
+          extend_hours: extendHours,
+          reason: String(reason).toUpperCase(),
+          shadow,
+        };
+        const res = await apiFetch('/api/vault/admin/operations/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
+        const data = res?.data;
+        if (data?.shadow) {
+          pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+        } else {
+          pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+        }
+        return;
+      }
+
+      // segment
+      const segId = segmentTarget?.segment_id;
+      if (!segId) {
+        pushToast({ ok: false, message: 'Segments에서 세그먼트를 Apply 해주세요.' });
+        return;
+      }
+      const payload = {
+        request_id: requestId,
+        target: { mode: 'segment', segment_id: segId },
+        extend_hours: extendHours,
+        reason: String(reason).toUpperCase(),
+        shadow,
+      };
+      const res = await apiFetch('/api/vault/admin/operations/extend-expiry', { method: 'POST', body: payload, idempotencyKey: requestId });
+      const data = res?.data;
+      if (data?.shadow) {
+        pushToast({ ok: true, message: 'Extend Expiry (Shadow) 프리뷰', detail: `candidates: ${data.candidates ?? '-'}`, requestId });
+      } else {
+        pushToast({ ok: true, message: 'Extend Expiry 적용 완료', detail: `updated: ${data.updated ?? '-'} / new_expires_at: ${data.new_expires_at ?? '-'}`, requestId });
+      }
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '요청 실패', detail: info.requestId || info.detail, requestId: info.requestId, idempotencyKey: info.idempotencyKey });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <section id="operations" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
@@ -135,11 +242,15 @@ export default function AdminV2OperationsPanel({ usersTarget }) {
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">Reason</label>
-                <input
+                <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                />
+                >
+                  {['OPS', 'PROMO', 'ADMIN'].map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <p className="text-xs text-[var(--v2-muted)]">Shadow: only preview + audit log. Apply: updates vault_status + audit.</p>
@@ -244,9 +355,10 @@ export default function AdminV2OperationsPanel({ usersTarget }) {
             <button
               type="button"
               disabled={!canExecute}
+              onClick={submitExtendExpiry}
               className="w-full rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black shadow-[0_0_18px_rgba(183,247,90,0.35)] disabled:opacity-50"
             >
-              Submit Operation (idempotent)
+              {submitting ? 'Submitting...' : 'Submit Operation (idempotent)'}
             </button>
             <p className="text-xs text-[var(--v2-warning)]">Audit + job creation to be wired. All operations must log idempotency key and scope.</p>
           </div>

@@ -86,6 +86,15 @@ class AdminExtendExpiryRequest(BaseModel):
     shadow: bool = False
 
 
+class AdminTargetPreviewRequest(BaseModel):
+    target: AdminExtendExpiryTarget
+
+
+class AdminTargetPreviewResponse(BaseModel):
+    candidates: int
+    sample_user_ids: Optional[List[int]] = None
+
+
 class NotifyRequest(BaseModel):
     type: str
     user_ids: Optional[List[int]] = None
@@ -189,6 +198,33 @@ class AdminDepositUpdateResponse(BaseModel):
     platinum_status: str
     diamond_status: str
     expires_at: Optional[str]
+
+
+class AdminBulkAttendanceUpdate(BaseModel):
+    delta: Optional[int] = 0
+    cap: Optional[int] = None
+
+
+class AdminBulkDepositUpdate(BaseModel):
+    delta: Optional[int] = 0
+    floor: Optional[int] = None
+
+
+class AdminBulkUpdateRequest(BaseModel):
+    request_id: str
+    target: AdminExtendExpiryTarget
+    status: Optional[AdminStatusUpdateRequest] = None
+    attendance: Optional[AdminBulkAttendanceUpdate] = None
+    deposit: Optional[AdminBulkDepositUpdate] = None
+
+
+class AdminBulkUpdateResponse(BaseModel):
+    job_id: str
+    status: str
+    request_id: str
+    target_count: int
+    processed: int
+    failed: int
 
 
 class AdminUserCreateRequest(BaseModel):
