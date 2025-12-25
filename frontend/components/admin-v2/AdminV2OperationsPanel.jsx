@@ -378,16 +378,30 @@ export default function AdminV2OperationsPanel({ adminPassword, basePath, usersT
           <div className="grid gap-3 md:grid-cols-2 mt-2">
             <div>
               <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">출석 Δ / 상한</label>
+              <p className="mt-1 text-xs text-[var(--v2-muted)]">변화량 / 최대값</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <input type="number" aria-label="출석 Δ" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
-                <input type="number" aria-label="출석 상한" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                <div>
+                  <input type="number" placeholder="변화량" aria-label="출석 Δ" value={attendance.delta} onChange={e => setAttendance((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                  <span className="mt-1 block text-xs text-[var(--v2-muted)]">예: +5</span>
+                </div>
+                <div>
+                  <input type="number" placeholder="상한" aria-label="출석 상한" value={attendance.cap} onChange={e => setAttendance((prev) => ({ ...prev, cap: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                  <span className="mt-1 block text-xs text-[var(--v2-muted)]">예: 100</span>
+                </div>
               </div>
             </div>
             <div>
               <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">입금 Δ / 하한</label>
+              <p className="mt-1 text-xs text-[var(--v2-muted)]">변화량 / 최소값</p>
               <div className="mt-2 grid grid-cols-2 gap-2">
-                <input type="number" aria-label="입금 Δ" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
-                <input type="number" aria-label="입금 하한" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                <div>
+                  <input type="number" placeholder="변화량" aria-label="입금 Δ" value={deposit.delta} onChange={e => setDeposit((prev) => ({ ...prev, delta: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                  <span className="mt-1 block text-xs text-[var(--v2-muted)]">예: +10000</span>
+                </div>
+                <div>
+                  <input type="number" placeholder="하한" aria-label="입금 하한" value={deposit.floor} onChange={e => setDeposit((prev) => ({ ...prev, floor: Number(e.target.value) || 0 }))} className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]" />
+                  <span className="mt-1 block text-xs text-[var(--v2-muted)]">예: 0</span>
+                </div>
               </div>
             </div>
           </div>
