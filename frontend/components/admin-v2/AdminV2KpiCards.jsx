@@ -11,22 +11,19 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
   const [cards, setCards] = useState(fallbackCards);
   const [badges, setBadges] = useState({ jobs: {}, notifications: {} });
-  const [auditMini, setAuditMini] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
 
     const load = async () => {
       try {
-        const [jobsResp, notiResp, auditResp] = await Promise.all([
+        const [jobsResp, notiResp] = await Promise.all([
           apiFetch('/api/vault/admin/jobs?page=1&page_size=20&order=desc').catch(() => null),
           apiFetch('/api/vault/admin/notifications?page=1&page_size=20&order=desc').catch(() => null),
-          apiFetch('/api/vault/admin/audit-log?page=1&page_size=5&order=desc').catch(() => null),
         ]);
 
         const jobs = jobsResp?.data?.items || [];
         const notifications = notiResp?.data?.items || [];
-        const audits = auditResp?.data?.items || [];
 
         const countBy = (items, key) => {
           const out = {};
@@ -50,13 +47,11 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
             jobs: countBy(jobs, 'status'),
             notifications: countBy(notifications, 'status'),
           });
-          setAuditMini(audits);
         }
       } catch (err) {
         if (!cancelled) {
           setCards(fallbackCards);
           setBadges({ jobs: {}, notifications: {} });
-          setAuditMini([]);
         }
       }
     };
@@ -106,40 +101,6 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
             ) : null}
           </div>
         ))}
-      </div>
-
-      <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
-        <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">최근 감사 로그(5)</p>
-          <span className="text-xs text-[var(--v2-muted)]">/api/vault/admin/audit-log</span>
-        </div>
-        <div className="mt-3 overflow-hidden rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)]">
-          <table className="min-w-full table-fixed text-left text-xs">
-            <thead className="border-b border-[var(--v2-border)] text-[var(--v2-muted)]">
-              <tr>
-                <th className="px-3 py-2">시간</th>
-                <th className="px-3 py-2">액션</th>
-                <th className="px-3 py-2">엔드포인트</th>
-                <th className="px-3 py-2">상태</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--v2-border)] text-[var(--v2-text)]">
-              {(auditMini || []).map((row) => (
-                <tr key={row.id}>
-                  <td className="px-3 py-2">{row.created_at || '-'}</td>
-                  <td className="px-3 py-2">{row.action || '-'}</td>
-                  <td className="px-3 py-2">{row.endpoint || '-'}</td>
-                  <td className="px-3 py-2">{row.response_status || '-'}</td>
-                </tr>
-              ))}
-              {!auditMini?.length ? (
-                <tr>
-                  <td className="px-3 py-2 text-[var(--v2-muted)]" colSpan={4}>표시할 감사 로그가 없습니다.</td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );

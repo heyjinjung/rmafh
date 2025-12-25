@@ -1,12 +1,11 @@
 import Link from 'next/link';
 
 const navItems = [
-  { key: 'dashboard', label: '대시보드', href: '/admin/v2' },
+  { key: 'dashboard', label: '대시보드', href: '/admin/v2#top' },
   { key: 'users', label: '사용자', href: '/admin/v2#users' },
   { key: 'imports', label: '가져오기', href: '/admin/v2#imports' },
   { key: 'operations', label: '운영', href: '/admin/v2#operations' },
   { key: 'notifications', label: '알림', href: '/admin/v2#notifications' },
-  { key: 'audit', label: '감사/작업', href: '/admin/v2#audit' },
 ];
 
 export default function AdminV2Sidebar({ active }) {

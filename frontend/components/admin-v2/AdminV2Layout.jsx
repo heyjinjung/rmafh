@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import AdminV2Sidebar from './AdminV2Sidebar';
 import AdminV2TopBar from './AdminV2TopBar';
 import AdminV2ContextPanel from './AdminV2ContextPanel';
@@ -15,6 +16,29 @@ const themeVars = {
 };
 
 export default function AdminV2Layout({ active = 'dashboard', children }) {
+  const [showBackToTop, setShowBackToTop] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (typeof window === 'undefined') return;
+      setShowBackToTop(window.scrollY > 240);
+    };
+
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    if (typeof window === 'undefined') return;
+    const el = document.getElementById('top');
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen text-[var(--v2-text)]" style={themeVars}>
       <div
@@ -37,10 +61,24 @@ export default function AdminV2Layout({ active = 'dashboard', children }) {
           <AdminV2Sidebar active={active} />
           <div className="flex min-h-screen flex-1 flex-col">
             <AdminV2TopBar />
-            <main className="flex-1 px-6 py-6 lg:px-10">{children}</main>
+            <main className="flex-1 px-6 py-6 lg:px-10">
+              <div id="top" />
+              {children}
+            </main>
           </div>
           <AdminV2ContextPanel />
         </div>
+
+        {showBackToTop ? (
+          <button
+            type="button"
+            onClick={scrollToTop}
+            aria-label="맨 위로 이동"
+            className="fixed bottom-6 right-6 z-50 rounded-full border border-[var(--v2-border)] bg-[var(--v2-surface)]/90 px-4 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 xl:right-[344px]"
+          >
+            ↑ 맨 위로
+          </button>
+        ) : null}
       </div>
     </div>
   );
