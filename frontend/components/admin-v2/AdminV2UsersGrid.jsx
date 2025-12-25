@@ -49,6 +49,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [expiryReason, setExpiryReason] = useState('OPS');
   const [depositSaving, setDepositSaving] = useState(false);
   const [platinumDepositDone, setPlatinumDepositDone] = useState(false);
+  const [diamondDepositCurrent, setDiamondDepositCurrent] = useState(0);
   const [form, setForm] = useState({
     external_user_id: '',
     nickname: '',
@@ -123,6 +124,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setExpiryExtendDays(1);
     setExpiryReason('OPS');
     setPlatinumDepositDone(Boolean(row?.platinum_deposit_done) || Number(row?.deposit_total || 0) >= 150000);
+    setDiamondDepositCurrent(Number(row?.diamond_deposit_current || row?.deposit_total || 0));
   };
 
   const openCreate = () => {
@@ -230,14 +232,20 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       const response = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'PATCH', body: payload });
       console.log('Update response:', response);
       pushToast({ ok: true, message: '저장 완료' });
-      const depositReached = Number(form.deposit_total || 0) >= 150000;
-      if (depositReached && !platinumDepositDone) {
+      const depositAmount = Number(form.deposit_total || 0);
+      const platinumReached = depositAmount >= 150000;
+      const diamondReached = depositAmount >= 500000;
+      if ((platinumReached && !platinumDepositDone) || (diamondReached && diamondDepositCurrent < 500000)) {
         try {
           await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/deposit`, {
             method: 'POST',
-            body: { platinum_deposit_done: true, diamond_deposit_current: Number(form.deposit_total || 0) },
+            body: {
+              platinum_deposit_done: platinumReached ? true : undefined,
+              diamond_deposit_current: diamondReached ? depositAmount : undefined,
+            },
           });
-          setPlatinumDepositDone(true);
+          if (platinumReached) setPlatinumDepositDone(true);
+          if (diamondReached) setDiamondDepositCurrent(depositAmount);
         } catch (e) {
           console.error('Auto deposit unlock failed', e);
         }
@@ -308,31 +316,35 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     }
   };
 
-  const submitDepositFlag = async (nextValue, { silent } = {}) => {
+  const submitDepositUpdate = async (updates = {}, { silent } = {}) => {
     if (!ensureAuth()) return;
     if (!selectedRow?.user_id) return;
 
     const requestId = makeRequestId();
-    const body = {
-      platinum_deposit_done: Boolean(nextValue),
-      diamond_deposit_current: Number(form.deposit_total || 0),
-    };
+    const body = {};
+    if (updates.platinum_deposit_done !== undefined) body.platinum_deposit_done = Boolean(updates.platinum_deposit_done);
+    if (updates.diamond_deposit_current !== undefined) body.diamond_deposit_current = Number(updates.diamond_deposit_current);
+
+    if (!Object.keys(body).length) return;
 
     try {
       setDepositSaving(true);
       const res = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/deposit`, { method: 'POST', body, idempotencyKey: requestId });
       const data = res?.data || {};
-      const nextDone = Boolean(data.platinum_deposit_done ?? nextValue);
-      setPlatinumDepositDone(nextDone);
+      setPlatinumDepositDone(Boolean(data.platinum_deposit_done ?? platinumDepositDone));
+      setDiamondDepositCurrent(Number(data.diamond_deposit_current ?? diamondDepositCurrent));
       setSelectedRow((prev) => (prev ? {
         ...prev,
-        platinum_deposit_done: nextDone,
-        diamond_deposit_current: data.diamond_deposit_current ?? prev.diamond_deposit_current,
+        platinum_deposit_done: Boolean(data.platinum_deposit_done ?? prev.platinum_deposit_done),
+        diamond_deposit_current: Number(data.diamond_deposit_current ?? prev.diamond_deposit_current),
         platinum_status: data.platinum_status ?? prev.platinum_status,
         diamond_status: data.diamond_status ?? prev.diamond_status,
       } : prev));
       if (!silent) {
-        pushToast({ ok: true, message: nextDone ? '플레티넘 입금 확인 완료' : '플레티넘 입금 해제됨', detail: data.platinum_status });
+        const msgs = [];
+        if (updates.platinum_deposit_done !== undefined) msgs.push(updates.platinum_deposit_done ? '플레티넘 해금' : '플레티넘 해제');
+        if (updates.diamond_deposit_current !== undefined) msgs.push(updates.diamond_deposit_current >= 500000 ? '다이아 해금' : '다이아 해제');
+        pushToast({ ok: true, message: msgs.join(' + ') || '입금 상태 업데이트', detail: `PT: ${data.platinum_status} / DM: ${data.diamond_status}` });
       }
       fetchUsers();
     } catch (err) {
@@ -793,7 +805,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
-                      onClick={() => submitDepositFlag(true)}
+                      onClick={() => submitDepositUpdate({ platinum_deposit_done: true })}
                       disabled={depositSaving || saving}
                       className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
                     >
@@ -801,7 +813,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </button>
                     <button
                       type="button"
-                      onClick={() => submitDepositFlag(false)}
+                      onClick={() => submitDepositUpdate({ platinum_deposit_done: false })}
                       disabled={depositSaving || saving}
                       className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
                     >
@@ -811,7 +823,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       type="button"
                       onClick={() => {
                         setForm((prev) => ({ ...prev, deposit_total: '150000' }));
-                        submitDepositFlag(true);
+                        submitDepositUpdate({ platinum_deposit_done: true });
                       }}
                       disabled={depositSaving || saving}
                       className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
@@ -820,6 +832,43 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </button>
                   </div>
                   <p className="text-xs text-[var(--v2-muted)]">누적 입금이 150,000원 이상이면 자동 확인됩니다. 부족한 경우 버튼으로 바로 해금할 수 있습니다.</p>
+                </div>
+
+                <div className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">다이아 입금 (50만)</div>
+                    <div className="text-xs text-[var(--v2-muted)]">자동/수동 해금</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : 500000 })}
+                      disabled={depositSaving || saving || diamondDepositCurrent >= 500000}
+                      className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
+                    >
+                      다이아 해금
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => submitDepositUpdate({ diamond_deposit_current: 0 })}
+                      disabled={depositSaving || saving || diamondDepositCurrent < 500000}
+                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
+                    >
+                      해금 해제
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm((prev) => ({ ...prev, deposit_total: '500000' }));
+                        submitDepositUpdate({ diamond_deposit_current: 500000 });
+                      }}
+                      disabled={depositSaving || saving}
+                      className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
+                    >
+                      500,000 + 해금
+                    </button>
+                  </div>
+                  <p className="text-xs text-[var(--v2-muted)]">누적 입금이 500,000원 이상이면 자동 해금됩니다. 부족한 경우 버튼으로 바로 해금할 수 있습니다.</p>
                 </div>
 
                 <div className="flex gap-2">
