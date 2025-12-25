@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, date, timedelta, timezone
 from typing import Any, Dict, List
 import logging
 import hashlib
@@ -80,7 +80,7 @@ def _parse_int_optional(value: Any) -> int | None:
     return int(value)
 
 
-def _parse_date_optional(value: Any) -> datetime.date | None:
+def _parse_date_optional(value: Any) -> date | None:
     if value is None:
         return None
     if isinstance(value, str):
