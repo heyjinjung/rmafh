@@ -673,342 +673,338 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             </table>
           </div>
 
-          <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0">
-            <div className="flex items-center justify-between">
-              <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">상세</p>
+          <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0 flex flex-col h-full overflow-hidden">
+            <div className="flex items-center justify-between shrink-0 mb-4">
+              <p className="font-ibm text-lg font-bold text-[var(--v2-text)]">
+                사용자 상세
+              </p>
               <button
                 type="button"
-                className="rounded border border-[var(--v2-border)] px-2 py-1 text-xs text-[var(--v2-muted)] hover:border-[var(--v2-accent)]/40"
+                className="rounded border border-[var(--v2-border)] px-3 py-1 text-xs text-[var(--v2-muted)] hover:border-[var(--v2-accent)]/40 hover:text-[var(--v2-text)] transition-colors"
                 onClick={() => setDrawerOpen((v) => !v)}
                 disabled={!selectedRow}
               >
-                {drawerOpen ? '숨기기' : '보기'}
+                {drawerOpen ? '닫기' : '열기'}
               </button>
             </div>
 
-            {!selectedRow ? (
-              panelMode === 'create' ? (
-                <div className="mt-3 space-y-3 text-sm text-[var(--v2-text)]">
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID (필수)</div>
-                    <input
-                      value={form.external_user_id}
-                      onChange={(e) => setForm((prev) => ({ ...prev, external_user_id: e.target.value }))}
-                      placeholder="예: 12345"
-                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                    />
-                  </div>
+            <div className="flex-1 overflow-y-auto pr-1 space-y-6">
+              {!selectedRow ? (
+                panelMode === 'create' ? (
+                  <div className="space-y-4 text-sm text-[var(--v2-text)]">
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-4 space-y-4">
+                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">기본 정보</h3>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">외부 사용자 ID (필수)</div>
+                        <input
+                          value={form.external_user_id}
+                          onChange={(e) => setForm((prev) => ({ ...prev, external_user_id: e.target.value }))}
+                          placeholder="예: 12345"
+                          className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-3 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)] focus:outline-none focus:border-[var(--v2-accent)]"
+                        />
+                      </div>
 
-                  <div>
-                    <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
-                    <input
-                      value={form.nickname}
-                      onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
-                      placeholder="(선택)"
-                      className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                    />
-                  </div>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">닉네임</div>
+                        <input
+                          value={form.nickname}
+                          onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                          placeholder="(선택)"
+                          className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-3 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)] focus:outline-none focus:border-[var(--v2-accent)]"
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
-                      <input
-                        value={form.joined_date}
-                        onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
-                        placeholder="2025-12-25"
-                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-[var(--v2-muted)] mb-1">가입일</div>
+                          <input
+                            value={form.joined_date}
+                            onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                            placeholder="2025-12-25"
+                            className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-3 text-sm text-[var(--v2-text)] focus:outline-none focus:border-[var(--v2-accent)]"
+                          />
+                        </div>
+                        <div>
+                          <div className="text-xs text-[var(--v2-muted)] mb-1">누적 입금</div>
+                          <input
+                            inputMode="numeric"
+                            value={form.deposit_total}
+                            onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                            className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-3 text-sm text-[var(--v2-text)] focus:outline-none focus:border-[var(--v2-accent)]"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
-                      <input
-                        inputMode="numeric"
-                        value={form.deposit_total}
-                        onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
-                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                      />
+
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-4 space-y-4">
+                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">인증 및 승인</h3>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">텔레그램 인증</span>
+                        <input
+                          type="checkbox"
+                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                          checked={Boolean(form.telegram_ok)}
+                          onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm">리뷰 승인</span>
+                        <input
+                          type="checkbox"
+                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                          checked={Boolean(form.review_ok)}
+                          onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-3 text-sm font-bold text-black hover:brightness-110 disabled:opacity-50"
+                        onClick={submitCreate}
+                        disabled={saving}
+                      >
+                        생성하기
+                      </button>
+                      <button
+                        type="button"
+                        className="flex-1 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-3 text-sm text-[var(--v2-text)] hover:bg-[var(--v2-surface-3)] disabled:opacity-50"
+                        onClick={() => {
+                          setDrawerOpen(false);
+                          setPanelMode('none');
+                        }}
+                        disabled={saving}
+                      >
+                        취소
+                      </button>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(form.telegram_ok)}
-                        onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
-                      />
-                      <span>텔레그램 인증</span>
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(form.review_ok)}
-                        onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
-                      />
-                      <span>리뷰 승인</span>
-                    </label>
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center text-[var(--v2-muted)] opacity-50">
+                    <svg className="h-12 w-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                    </svg>
+                    <p className="text-sm">사용자를 선택하세요</p>
                   </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                      onClick={submitCreate}
-                      disabled={saving}
-                    >
-                      생성
-                    </button>
-                    <button
-                      type="button"
-                      className="flex-1 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 disabled:opacity-50"
-                      onClick={() => {
-                        setDrawerOpen(false);
-                        setPanelMode('none');
-                      }}
-                      disabled={saving}
-                    >
-                      취소
-                    </button>
-                  </div>
+                )
+              ) : !drawerOpen ? (
+                <div className="flex h-full flex-col items-center justify-center text-[var(--v2-muted)] opacity-50">
+                  <p className="text-sm">패널이 닫혀있습니다</p>
                 </div>
               ) : (
-                <p className="mt-3 text-sm text-[var(--v2-muted)]">행을 클릭하면 우측 패널에서 편집할 수 있습니다.</p>
-              )
-            ) : !drawerOpen ? (
-              <p className="mt-3 text-sm text-[var(--v2-muted)]">상세 패널이 숨김 상태입니다.</p>
-            ) : (
-              <div className="mt-3 space-y-4 text-sm text-[var(--v2-text)]">
-                <div className="grid gap-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 md:grid-cols-[1fr_1fr]">
-                  <div className="space-y-2">
-                    <div className="text-xs text-[var(--v2-muted)]">외부 사용자 ID</div>
-                    <div className="font-mono text-[var(--v2-accent)]">{selectedRow.external_user_id}</div>
-                    <div className="text-xs text-[var(--v2-muted)]">사용자 ID</div>
-                    <div className="font-mono">{String(selectedRow.user_id || '')}</div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-6 text-sm text-[var(--v2-text)]">
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 space-y-4 shadow-sm">
+                    <div className="flex items-start justify-between">
                       <div>
-                        <div className="text-xs text-[var(--v2-muted)]">생성일</div>
-                        <div>{selectedRow.created_at ? selectedRow.created_at.slice(0, 10) : '-'}</div>
+                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] mb-1">외부 ID</div>
+                        <div className="font-mono text-xl text-[var(--v2-accent)] font-semibold tracking-tight">{selectedRow.external_user_id}</div>
                       </div>
-                      <div>
-                        <div className="text-xs text-[var(--v2-muted)]">만료일</div>
-                        <div>{selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}</div>
+                      <div className="text-right">
+                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] mb-1">DB ID</div>
+                        <div className="font-mono text-[var(--v2-muted)] text-xs">#{selectedRow.user_id}</div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="flex items-center gap-2 text-sm">
+
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">닉네임</div>
+                        <input
+                          value={form.nickname}
+                          onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
+                          className="w-full bg-transparent border-b border-[var(--v2-border)] py-1 text-sm focus:outline-none focus:border-[var(--v2-accent)] transition-colors placeholder:text-[var(--v2-muted)]/50"
+                          placeholder="미설정"
+                        />
+                      </div>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">가입일</div>
+                        <input
+                          value={form.joined_date}
+                          onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
+                          className="w-full bg-transparent border-b border-[var(--v2-border)] py-1 text-sm focus:outline-none focus:border-[var(--v2-accent)] transition-colors"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[var(--v2-border)] pb-3 mb-2">
+                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">상태 및 권한</h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">누적 입금액</div>
+                        <div className="relative">
+                          <input
+                            inputMode="numeric"
+                            value={form.deposit_total}
+                            onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                            className="w-full rounded bg-[var(--v2-surface-2)] border border-[var(--v2-border)] py-2 pl-3 pr-8 text-sm font-mono focus:outline-none focus:border-[var(--v2-accent)]"
+                          />
+                          <span className="absolute right-3 top-2 text-xs text-[var(--v2-muted)]">원</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">만료일</div>
+                        <div className="py-2 text-sm font-mono text-[var(--v2-text)]">
+                          {selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                      <label className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition cursor-pointer">
+                        <span className="text-sm">텔레그램 인증</span>
                         <input
                           type="checkbox"
                           checked={Boolean(form.telegram_ok)}
                           onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
                         />
-                        <span>텔레그램 인증</span>
                       </label>
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition cursor-pointer">
+                        <span className="text-sm">리뷰 승인</span>
                         <input
                           type="checkbox"
                           checked={Boolean(form.review_ok)}
                           onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
                         />
-                        <span>리뷰 승인</span>
                       </label>
                     </div>
                   </div>
-                </div>
 
-                <div className="grid gap-3 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <div className="text-xs text-[var(--v2-muted)]">닉네임</div>
-                    <input
-                      value={form.nickname}
-                      onChange={(e) => setForm((prev) => ({ ...prev, nickname: e.target.value }))}
-                      className="w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <div className="text-xs text-[var(--v2-muted)]">가입일 (YYYY-MM-DD)</div>
-                      <input
-                        value={form.joined_date}
-                        onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
-                        placeholder={selectedRow.joined_date || '2025-12-25'}
-                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)]"
-                      />
+                  <div className="gap-4 flex flex-col">
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트 미션</div>
+                        <div className={`text-[10px] px-2 py-0.5 rounded border ${goldStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
+                            goldStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          }`}>
+                          {statusLabel(goldStatus)}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 relative">
+                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                        {[
+                          { label: '입장', done: goldMission1, key: 'gold_mission_1_done' },
+                          { label: '인증', done: goldMission2, key: 'gold_mission_2_done' },
+                          { label: '기타', done: goldMission3, key: 'gold_mission_3_done' }
+                        ].map((m, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                            onClick={() => submitGoldMissions({ [m.key]: !m.done })}
+                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
+                              }`}>
+                              {m.done ? '✓' : idx + 1}
+                            </div>
+                            <span className="text-[10px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <div className="text-xs text-[var(--v2-muted)]">누적 입금</div>
-                      <input
-                        inputMode="numeric"
-                        value={form.deposit_total}
-                        onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
-                        className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                      />
-                    </div>
-                  </div>
-                </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">골드 볼트 (미션)</div>
-                      <div className="text-[10px] text-[var(--v2-accent)] border border-[var(--v2-accent)] px-1 rounded">{statusLabel(goldStatus)}</div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-3">
+                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">만료일 연장</div>
+                      <div className="flex gap-2">
                         <input
-                          type="checkbox"
-                          checked={goldMission1}
-                          onChange={(e) => submitGoldMissions({ gold_mission_1_done: e.target.checked })}
-                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
-                          className="accent-[var(--v2-accent)]"
+                          type="number"
+                          min="1" max="3"
+                          value={expiryExtendDays}
+                          onChange={(e) => setExpiryExtendDays(Number(e.target.value))}
+                          className="w-16 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] text-center py-2 text-sm focus:border-[var(--v2-accent)] focus:outline-none"
                         />
-                        <span>1. 입장 (CC/매니저)</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
-                        <input
-                          type="checkbox"
-                          checked={goldMission2}
-                          onChange={(e) => submitGoldMissions({ gold_mission_2_done: e.target.checked })}
-                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
-                          className="accent-[var(--v2-accent)]"
-                        />
-                        <span>2. 본인인증 (간편)</span>
-                      </label>
-                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
-                        <input
-                          type="checkbox"
-                          checked={goldMission3}
-                          onChange={(e) => submitGoldMissions({ gold_mission_3_done: e.target.checked })}
-                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
-                          className="accent-[var(--v2-accent)]"
-                        />
-                        <span>3. 기타 (예비)</span>
-                      </label>
+                        <select
+                          value={expiryReason}
+                          onChange={(e) => setExpiryReason(e.target.value)}
+                          className="flex-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 text-sm focus:border-[var(--v2-accent)] focus:outline-none"
+                        >
+                          <option value="OPS">운영</option>
+                          <option value="PROMO">프로모션</option>
+                          <option value="ADMIN">관리자</option>
+                        </select>
+                        <button
+                          onClick={submitExtendExpiry}
+                          disabled={extending || saving}
+                          className="rounded bg-[var(--v2-surface-3)] px-3 py-2 text-sm font-medium hover:bg-[var(--v2-accent)] hover:text-black transition-colors disabled:opacity-50"
+                        >
+                          연장
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-4">
+                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">고액권 관리</div>
+
+                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)]">
+                        <div className="text-sm">
+                          <span className="text-[var(--v2-muted)] mr-2">플레티넘</span>
+                          <span className={platinumDepositDone ? 'text-[var(--v2-accent)]' : ''}>
+                            {platinumDepositDone ? '해금됨' : '잠김'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => submitDepositUpdate({ platinum_deposit_done: !platinumDepositDone })}
+                          className={`px-3 py-1 text-xs rounded border transition-colors ${platinumDepositDone
+                              ? 'border-[var(--v2-border)] hover:border-red-400 hover:text-red-400'
+                              : 'border-[var(--v2-accent)] text-[var(--v2-accent)] hover:bg-[var(--v2-accent)] hover:text-black'
+                            }`}
+                        >
+                          {platinumDepositDone ? '해제' : '해금'}
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)]">
+                        <div className="text-sm">
+                          <span className="text-[var(--v2-muted)] mr-2">다이아</span>
+                          <span className={diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 'text-blue-400' : ''}>
+                            {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '해금됨' : '잠김'}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const target = diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 0 : DIAMOND_UNLOCK.depositTotal;
+                            submitDepositUpdate({ diamond_deposit_current: target });
+                          }}
+                          className={`px-3 py-1 text-xs rounded border transition-colors ${diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal
+                              ? 'border-[var(--v2-border)] hover:border-red-400 hover:text-red-400'
+                              : 'border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black'
+                            }`}
+                        >
+                          {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '해제' : '해금'}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">만료일 연장</div>
-                      <div className="text-xs text-[var(--v2-muted)]">최대 +3일</div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="3"
-                        value={expiryExtendDays}
-                        onChange={(e) => setExpiryExtendDays(Number(e.target.value) || 1)}
-                        className="w-20 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                      />
-                      <select
-                        value={expiryReason}
-                        onChange={(e) => setExpiryReason(e.target.value)}
-                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)]"
-                      >
-                        <option value="OPS">운영</option>
-                        <option value="PROMO">프로모션</option>
-                        <option value="ADMIN">관리자</option>
-                      </select>
-                      <button
-                        type="button"
-                        onClick={submitExtendExpiry}
-                        disabled={extending || saving}
-                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                      >
-                        연장
-                      </button>
-                    </div>
-                    <p className="text-xs text-[var(--v2-muted)]">선택한 사용자에게만 적용됩니다. (1~72시간, 최대 3일)</p>
+                  <div className="sticky bottom-0 pt-4 pb-2 bg-[var(--v2-surface-2)] border-t border-[var(--v2-border)] flex gap-3">
+                    <button
+                      type="button"
+                      onClick={submitDelete}
+                      disabled={saving}
+                      className="flex-1 rounded-lg border border-red-900/30 bg-red-900/10 py-3 text-sm font-medium text-red-500 hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                    >
+                      삭제
+                    </button>
+                    <button
+                      type="button"
+                      onClick={submitUpdate}
+                      disabled={saving}
+                      className="flex-[2] rounded-lg bg-[var(--v2-accent)] py-3 text-sm font-bold text-black hover:brightness-110 shadow-[0_0_15px_rgba(183,247,90,0.2)] transition-all disabled:opacity-50"
+                    >
+                      {saving ? '저장 중...' : '변경사항 저장'}
+                    </button>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">플레티넘 입금 ({(PLATINUM_UNLOCK.depositTotal / 10000).toLocaleString()}만)</div>
-                      <div className="text-[10px] text-[var(--v2-muted)]">자동/수동 해금</div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => submitDepositUpdate({ platinum_deposit_done: true })}
-                        disabled={depositSaving || saving}
-                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                      >
-                        플레티넘 해금
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => submitDepositUpdate({ platinum_deposit_done: false })}
-                        disabled={depositSaving || saving}
-                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
-                      >
-                        해금 해제
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm((prev) => ({ ...prev, deposit_total: String(PLATINUM_UNLOCK.depositTotal) }));
-                          submitDepositUpdate({ platinum_deposit_done: true });
-                        }}
-                        disabled={depositSaving || saving}
-                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
-                      >
-                        {PLATINUM_UNLOCK.depositTotal.toLocaleString()} + 해금
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : DIAMOND_UNLOCK.depositTotal })}
-                        disabled={depositSaving || saving || diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal}
-                        className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                      >
-                        다이아 해금
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => submitDepositUpdate({ diamond_deposit_current: 0 })}
-                        disabled={depositSaving || saving || diamondDepositCurrent < DIAMOND_UNLOCK.depositTotal}
-                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
-                      >
-                        해금 해제
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm((prev) => ({ ...prev, deposit_total: String(DIAMOND_UNLOCK.depositTotal) }));
-                          submitDepositUpdate({ diamond_deposit_current: DIAMOND_UNLOCK.depositTotal });
-                        }}
-                        disabled={depositSaving || saving}
-                        className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
-                      >
-                        {DIAMOND_UNLOCK.depositTotal.toLocaleString()} + 해금
-                      </button>
-                    </div>
-                  </div>
                 </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="flex-1 rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
-                    onClick={submitUpdate}
-                    disabled={saving}
-                  >
-                    저장
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
-                    onClick={submitDelete}
-                    disabled={saving}
-                  >
-                    삭제
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
+            </div>
           </aside>
         </div>
       </div>

@@ -115,6 +115,38 @@ ADD COLUMN IF NOT EXISTS gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE;
 COMMENT ON COLUMN vault_status.gold_mission_3_done IS '골드 미션 3 완료 여부';
 
 -- =============================================================================
+-- 3.1 플래티넘 미션 O/X 필드 추가
+-- =============================================================================
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS platinum_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.platinum_mission_1_done IS '플래티넘 미션 1 완료 (누적 입금 20만원)';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS platinum_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.platinum_mission_2_done IS '플래티넘 미션 2 완료 (입금 3회)';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS platinum_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.platinum_mission_3_done IS '플래티넘 미션 3 완료 (출석 3일)';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS platinum_mission_4_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.platinum_mission_4_done IS '플래티넘 미션 4 완료 (리뷰)';
+
+-- =============================================================================
+-- 3.2 다이아 미션 O/X 필드 추가
+-- =============================================================================
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS diamond_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.diamond_mission_1_done IS '다이아 미션 1 완료 (누적 200만원)';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS diamond_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE;
+COMMENT ON COLUMN vault_status.diamond_mission_2_done IS '다이아 미션 2 완료 (출석 2회)';
+
+-- =============================================================================
 -- 4. 인덱스 추가
 -- =============================================================================
 
