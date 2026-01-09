@@ -209,6 +209,21 @@
 완료 기준:
 - [x] `frontend: lint` 통과
 
+### 10.6 Implementation Log (공유용)
+- **DB**: `docs/DB_MIGRATION_V3.sql` (컬럼 추가: `gold_mission_1_done`, `gold_mission_2_done`, `gold_mission_3_done`)
+- **Backend**:
+  - `backend/app/routers/admin_vault.py`: `admin_update_gold_missions` 구현 (미션 토글 + `gold_status` 자동 계산)
+  - `backend/app/schemas.py`: `AdminGoldMissionsUpdateRequest` 추가
+- **Frontend**:
+  - `frontend/components/admin-v2/AdminV2UsersGrid.jsx`: 토글 UI 구현, 상태별(CLAIMED) 비활성화 처리
+  - `frontend/pages/api/vault/admin/users/[userId]/vault/gold-missions.js`: Next.js Proxy 추가
+
+### 10.7 Troubleshooting
+- **Status**: ✅ **완료 (Completed)**
+- **Issue Track**:
+  - 초기 `test_admin_gold_missions_v3` 작성 시 `ImportError` 발생 → `app.services.common` 경로 수정으로 해결.
+  - 현재 특이사항 없음.
+
 ---
 
 ## 9. Phase 5: DB 마이그레이션
@@ -234,37 +249,51 @@
 설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.6
 
 ### 10.1 DB
-- [ ] `vault_status`에 컬럼 추가
-  - [ ] `gold_mission_1_done` BOOLEAN NOT NULL DEFAULT FALSE
-  - [ ] `gold_mission_2_done` BOOLEAN NOT NULL DEFAULT FALSE
-  - [ ] `gold_mission_3_done` BOOLEAN NOT NULL DEFAULT FALSE
+- [x] `vault_status`에 컬럼 추가
+  - [x] `gold_mission_1_done` BOOLEAN NOT NULL DEFAULT FALSE
+  - [x] `gold_mission_2_done` BOOLEAN NOT NULL DEFAULT FALSE
+  - [x] `gold_mission_3_done` BOOLEAN NOT NULL DEFAULT FALSE
 
 ### 10.2 백엔드 API
-- [ ] 엔드포인트 신설: `POST /api/vault/admin/users/{user_id}/vault/gold-missions`
-- [ ] 멱등키 지원: `x-idempotency-key` 필수(현 패턴과 동일)
-- [ ] 감사로그 액션 분리: `ADMIN_GOLD_MISSIONS_UPDATE`
-- [ ] 상태 자동 계산 규칙 구현
-  - [ ] `gold_status`가 `CLAIMED/EXPIRED`면 자동 변경하지 않는다
-  - [ ] 그 외는 (m1&m2&m3)면 UNLOCKED, 아니면 LOCKED
+- [x] 엔드포인트 신설: `POST /api/vault/admin/users/{user_id}/vault/gold-missions`
+- [x] 멱등키 지원: `x-idempotency-key` 필수(현 패턴과 동일)
+- [x] 감사로그 액션 분리: `ADMIN_GOLD_MISSIONS_UPDATE`
+- [x] 상태 자동 계산 규칙 구현
+  - [x] `gold_status`가 `CLAIMED/EXPIRED`면 자동 변경하지 않는다
+  - [x] 그 외는 (m1&m2&m3)면 UNLOCKED, 아니면 LOCKED
 
 ### 10.3 프론트(Admin v2)
-- [ ] 유저 상세 패널에 “골드 미션(O/X)” 섹션 추가
-- [ ] 토글 변경 → 즉시 저장(권장) 또는 명시적 Save(팀 합의)
-- [ ] 실패 시 토글 롤백 + 에러 토스트
+- [x] 유저 상세 패널에 “골드 미션(O/X)” 섹션 추가
+- [x] 토글 변경 → 즉시 저장(권장) 또는 명시적 Save(팀 합의)
+- [x] 실패 시 토글 롤백 + 에러 토스트
 
 ### 10.4 Next API Proxy
-- [ ] 프록시 추가: `/pages/api/vault/admin/users/[userId]/vault/gold-missions.js`
-- [ ] `x-admin-password`/`x-idempotency-key` 전달
+- [x] 프록시 추가: `/pages/api/vault/admin/users/[userId]/vault/gold-missions.js`
+- [x] `x-admin-password`/`x-idempotency-key` 전달
 
 ### 10.5 테스트
-- [ ] `test_admin_gold_missions_v3.py` 추가
-- [ ] 조합 테스트: m1/m2/m3 변경에 따른 LOCKED↔UNLOCKED
-- [ ] CLAIMED 보호 규칙이 깨지지 않는다
-- [ ] 멱등 재시도 시 동일 결과(가능하면)
+- [x] `test_admin_gold_missions_v3.py` 추가
+- [x] 조합 테스트: m1/m2/m3 변경에 따른 LOCKED↔UNLOCKED
+- [x] CLAIMED 보호 규칙이 깨지지 않는다
+- [x] 멱등 재시도 시 동일 결과(가능하면)
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
-- [ ] `frontend: lint` 통과
+- [] `frontend: lint` 통과
+
+### 10.6 Implementation Log (공유용)
+- **DB**: `docs/DB_MIGRATION_V3.sql` (컬럼 추가: `gold_mission_1_done`, `gold_mission_2_done`, `gold_mission_3_done`)
+- **Backend**:
+  - `backend/app/routers/admin_vault.py`: `admin_update_gold_missions` 구현 (미션 토글 + `gold_status` 자동 계산)
+  - `backend/app/schemas.py`: `AdminGoldMissionsUpdateRequest` 추가
+- **Frontend**:
+  - `frontend/components/admin-v2/AdminV2UsersGrid.jsx`: 토글 UI 구현, 상태별(CLAIMED) 비활성화 처리
+  - `frontend/pages/api/vault/admin/users/[userId]/vault/gold-missions.js`: Next.js Proxy 추가
+
+### 10.7 Troubleshooting
+- **Status**: ✅ **완료 (Completed)**
+- **Issue Track**:
+  - 초기 `test_admin_gold_missions_v3` 작성 시 `ImportError` 발생 → `app.services.common` 경로 수정으로 해결.
+  - 현재 특이사항 없음.
 
 ---
 
@@ -272,23 +301,37 @@
 설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.2, 2.3
 
 ### 11.1 플래티넘 조건 변경
-- [ ] 누적 입금액 조건이 “200,000원” 기준으로 동작한다
-- [ ] 누적 입금 횟수 조건이 “3회” 기준으로 동작한다
-- [ ] 플래티넘 해금은 “골드 금고 해제(선행조건)”를 만족해야만 가능하다
-  - [ ] 선행조건 정의를 명확히 했다(예: `gold_status`가 `UNLOCKED` 또는 `CLAIMED`)
-- [ ] 기존 플래티넘 로직(출석/리뷰 등)과 충돌하지 않도록 정리했다(중복 규칙 제거 또는 우선순위 확정)
+- [x] 누적 입금액 조건이 “200,000원” 기준으로 동작한다
+- [x] 누적 입금 횟수 조건이 “3회” 기준으로 동작한다
+- [x] 플래티넘 해금은 “골드 금고 해제(선행조건)”를 만족해야만 가능하다
+  - [x] 선행조건 정의를 명확히 했다(예: `gold_status`가 `UNLOCKED` 또는 `CLAIMED`)
+- [x] 기존 플래티넘 로직(출석/리뷰 등)과 충돌하지 않도록 정리했다(중복 규칙 제거 또는 우선순위 확정)
 
 ### 11.2 다이아 조건/만료 변경
-- [ ] 다이아 누적 충전 조건이 “2,000,000원” 기준으로 동작한다
-- [ ] CC카지노 출석부 기준 출석 “2회” 조건이 동작한다
-  - [ ] 출석 기준 필드가 서버에서 단일 소스로 관리된다(예: `diamond_attendance_days` 또는 별도 필드)
-- [ ] 다이아 해금은 “플래티넘 금고 해제(선행조건)”를 만족해야만 가능하다
-  - [ ] 선행조건 정의를 명확히 했다(예: `platinum_status`가 `UNLOCKED` 또는 `CLAIMED`)
-- [ ] 다이아 만료가 5일(120시간)로 동작한다
-  - [ ] `diamond_expires_at`(또는 동등한 필드) 기준으로 만료/표시/연산이 일관되다
+- [x] 다이아 누적 충전 조건이 “2,000,000원” 기준으로 동작한다
+- [x] CC카지노 출석부 기준 출석 “2회” 조건이 동작한다
+  - [x] 출석 기준 필드가 서버에서 단일 소스로 관리된다(예: `diamond_attendance_days` 또는 별도 필드)
+- [x] 다이아 해금은 “플래티넘 금고 해제(선행조건)”를 만족해야만 가능하다
+  - [x] 선행조건 정의를 명확히 했다(예: `platinum_status`가 `UNLOCKED` 또는 `CLAIMED`)
+- [x] 다이아 만료가 5일(120시간)로 동작한다
+  - [x] `diamond_expires_at`(또는 동등한 필드) 기준으로 만료/표시/연산이 일관되다
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과
+
+### 11.3 Implementation Log (공유용)
+- **Backend**:
+  - `backend/app/services/vault_service.py`: `compute_platinum_status`, `compute_diamond_status` 업데이트 (누적 입금/횟수, 출석, 선행조건 반영)
+  - `backend/app/main.py`: `user_daily_import` 로직에 `diamond_attendance_days`, `gold_mission_1_done` 업데이트 반영
+  - `backend/app/schemas.py`: `AdminDepositUpdateRequest` 등 V3 필드 반영 (`platinum_deposit_total` 등)
+- **Tests**:
+  - `backend/tests/test_daily_import_v3.py`: 시나리오 테스트 작성 (CSV Import -> 조건 충족 -> 해금)
+
+### 11.4 Troubleshooting
+- **Status**: ✅ **완료 (Resolved)**
+- **Issue**: `test_daily_import_v3.py`에서 `KeyError: 'gold_status'` 발생.
+- **Cause**: `admin_users.py` SQL 쿼리에 `diamond_attendance_days` 컬럼이 추가되면서, 이후 컬럼들의 인덱스가 밀림. 이로 인해 `row[...]` 매핑이 어긋나 엉뚱한 값(날짜 필드에 불리언 등)을 참조하여 500 에러 발생.
+- **Resolution**: `admin_users.py`의 `row` 인덱스 접근 번호를 SQL `SELECT` 순서에 맞게 수정하여 해결.
 
 ---
 
@@ -318,17 +361,26 @@
 설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.5
 
 ### 13.1 CSV 입력/스키마
-- [ ] CSV 칼럼 `cc_attendance_count`를 파싱한다(정수, 0~2+)
-- [ ] 누락/빈값 처리 정책이 명확하다(기본값 0 등)
-- [ ] 잘못된 값(문자/음수 등) 처리 정책이 명확하다(에러/클램프 중 택1)
+- [x] CSV 칼럼 `cc_attendance_count`를 파싱한다(정수, 0~2+)
+- [x] 누락/빈값 처리 정책이 명확하다(기본값 0 등)
+- [x] 잘못된 값(문자/음수 등) 처리 정책이 명확하다(에러/클램프 중 택1)
 
 ### 13.2 admin import 파이프라인 반영
-- [ ] 반영 위치가 계획서대로다(user-daily-import / admin imports)
-- [ ] DB에 값이 저장된다(연동 대상 필드가 명확하다)
-- [ ] 다이아 출석 조건 계산이 이 값과 일관되게 연결된다
+- [x] 반영 위치가 계획서대로다(user-daily-import / admin imports)
+- [x] DB에 값이 저장된다(연동 대상 필드가 명확하다)
+- [x] 다이아 출석 조건 계산이 이 값과 일관되게 연결된다
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과
+
+### 13.3 Implementation Log (공유용)
+- **Backend**:
+  - `backend/app/main.py`: `DailyUserImportRequest`, `DailyUserImportRow` 스키마에 `cc_attendance_count` 추가 및 파싱 로직 구현
+  - SQL Update 쿼리: `diamond_attendance_days` 컬럼 매핑 추가
+
+### 13.4 Troubleshooting
+- **Status**: ✅ **완료 (Resolved)**
+- **Resolution**: Section 11.4의 `admin_users.py` 인덱스 수정으로 해결됨.
 
 ---
 

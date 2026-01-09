@@ -310,9 +310,9 @@ backend/app/repositories/
 | 1 | SOT 파일 생성 (Backend) | `constants/vault_config.py` | 🟢 | 🔴 P0 |
 | 2 | SOT 파일 생성 (Frontend) | `lib/vaultConfig.js` | 🟢 | 🔴 P0 |
 | 3 | SOT 문서화 | `docs/VAULT_SOT.md` | 🟢 | 🟡 P1 |
-| 4 | Backend 상수 참조 변경 | `main.py`, `routers/*.py`, `services/*.py` | ⏳ | 🔴 P0 |
+| 4 | Backend 상수 참조 변경 | `main.py`, `routers/*.py`, `services/*.py` | 🟢 | 🔴 P0 |
 | 5 | Frontend 상수 참조 변경 | `index.jsx` 등 vault 관련 | ⏳ | 🔴 P0 |
-| 6 | 테스트 실행 및 검증 | - | ⏳ | 🔴 P0 |
+| 6 | 테스트 실행 및 검증 | - | 🟢 | 🔴 P0 |
 
 ### Sprint 1.5: 권한/라우팅 분리(유저 vs 어드민) (0.5-1일)
 | # | 작업 | 범위 | 상태 | 우선순위 |
@@ -324,10 +324,10 @@ backend/app/repositories/
 ### Sprint 1.6: 어드민 골드 미션 O/X (0.5-1일)
 | # | 작업 | 범위 | 상태 | 우선순위 |
 |---|------|------|------|----------|
-| 1 | 골드 미션 3개 저장 필드 확정(SOT 포함) | BE/Docs | ⏳ | 🔴 P0 |
-| 2 | 어드민에서 미션 O/X 토글 UI 제공 | FE(Admin v2) | ⏳ | 🔴 P0 |
-| 3 | 미션 변경 API 추가/수정(멱등/감사로그 포함) | BE | ⏳ | 🔴 P0 |
-| 4 | 골드 상태 계산/표시(자동) | FE/BE | ⏳ | 🟡 P1 |
+| 1 | 골드 미션 3개 저장 필드 확정(SOT 포함) | BE/Docs | 🟢 | 🔴 P0 |
+| 2 | 어드민에서 미션 O/X 토글 UI 제공 | FE(Admin v2) | 🟢 | 🔴 P0 |
+| 3 | 미션 변경 API 추가/수정(멱등/감사로그 포함) | BE | 🟢 | 🔴 P0 |
+| 4 | 골드 상태 계산/표시(자동) | FE/BE | 🟢 | 🟡 P1 |
 
 ### Sprint 2: 유틸리티 분리 (0.5일) — ✅ 완료
 | # | 작업 | 대상 함수 | 상태 |
