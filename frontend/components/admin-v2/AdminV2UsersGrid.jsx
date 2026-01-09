@@ -985,9 +985,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   </div>
 
                   <div className="gap-4 flex flex-col">
+                    {/* 골드 볼트 미션 */}
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트 미션</div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                          <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트</div>
+                        </div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${goldStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
                           goldStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
                             'border-[var(--v2-muted)] text-[var(--v2-muted)]'
@@ -995,33 +999,34 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                           {statusLabel(goldStatus)}
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2 relative">
-                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                      <div className="space-y-2">
                         {[
-                          { label: '입장', done: goldMission1, key: 'gold_mission_1_done' },
-                          { label: '인증', done: goldMission2, key: 'gold_mission_2_done' },
-                          { label: '기타', done: goldMission3, key: 'gold_mission_3_done' }
+                          { label: 'CC카지노 공식채널 입장', done: goldMission1, key: 'gold_mission_1_done' },
+                          { label: '담당실장 공식채널 입장', done: goldMission2, key: 'gold_mission_2_done' },
+                          { label: '간편 본인확인', done: goldMission3, key: 'gold_mission_3_done' }
                         ].map((m, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
-                            onClick={() => submitGoldMissions({ [m.key]: !m.done })}
-                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
-                          >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
-                              }`}>
-                              {m.done ? '✓' : idx + 1}
+                          <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
+                            <div className="flex items-center gap-3">
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-sm">{m.label}</span>
                             </div>
-                            <span className="text-[10px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
-                          </button>
+                            <Switch
+                              checked={m.done}
+                              onChange={() => submitGoldMissions({ [m.key]: !m.done })}
+                              disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
 
+                    {/* 플래티넘 볼트 미션 */}
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">플래티넘 볼트 미션</div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-slate-400"></div>
+                          <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">플래티넘 볼트</div>
+                        </div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${platinumStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
                           platinumStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
                             'border-[var(--v2-muted)] text-[var(--v2-muted)]'
@@ -1029,32 +1034,33 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                           {statusLabel(platinumStatus)}
                         </div>
                       </div>
-                      <div className="flex items-center justify-between gap-2 relative">
-                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                      <div className="space-y-2">
                         {[
-                          { label: '입금20만', done: platinumMission1, key: 'platinum_mission_1_done' },
-                          { label: '입금3회', done: platinumMission2, key: 'platinum_mission_2_done' },
+                          { label: '누적 입금 20만원 달성', done: platinumMission1, key: 'platinum_mission_1_done' },
+                          { label: '누적 입금 3회 달성', done: platinumMission2, key: 'platinum_mission_2_done' },
                         ].map((m, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={saving || platinumStatus === 'CLAIMED' || platinumStatus === 'EXPIRED'}
-                            onClick={() => submitPlatinumMissions({ [m.key]: !m.done })}
-                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
-                          >
-                            <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
-                              }`}>
-                              {m.done ? '✓' : idx + 1}
+                          <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
+                            <div className="flex items-center gap-3">
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-sm">{m.label}</span>
                             </div>
-                            <span className="text-[9px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
-                          </button>
+                            <Switch
+                              checked={m.done}
+                              onChange={() => submitPlatinumMissions({ [m.key]: !m.done })}
+                              disabled={saving || platinumStatus === 'CLAIMED' || platinumStatus === 'EXPIRED'}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
 
+                    {/* 다이아 볼트 미션 */}
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
                       <div className="flex items-center justify-between mb-4">
-                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트 미션</div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
+                          <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트</div>
+                        </div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${diamondStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
                           diamondStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
                             'border-[var(--v2-muted)] text-[var(--v2-muted)]'
@@ -1062,25 +1068,22 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                           {statusLabel(diamondStatus)}
                         </div>
                       </div>
-                      <div className="flex items-center justify-center gap-8 relative">
-                        <div className="absolute top-1/2 left-1/4 w-1/2 h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                      <div className="space-y-2">
                         {[
-                          { label: '충전200만', done: diamondMission1, key: 'diamond_mission_1_done' },
-                          { label: 'CC출석2회', done: diamondMission2, key: 'diamond_mission_2_done' }
+                          { label: '누적 충전 200만원 달성', done: diamondMission1, key: 'diamond_mission_1_done' },
+                          { label: 'CC카지노 2회 출석', done: diamondMission2, key: 'diamond_mission_2_done' }
                         ].map((m, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={saving || diamondStatus === 'CLAIMED' || diamondStatus === 'EXPIRED'}
-                            onClick={() => submitDiamondMissions({ [m.key]: !m.done })}
-                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
-                          >
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
-                              }`}>
-                              {m.done ? '✓' : idx + 1}
+                          <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
+                            <div className="flex items-center gap-3">
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-sm">{m.label}</span>
                             </div>
-                            <span className="text-[10px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
-                          </button>
+                            <Switch
+                              checked={m.done}
+                              onChange={() => submitDiamondMissions({ [m.key]: !m.done })}
+                              disabled={saving || diamondStatus === 'CLAIMED' || diamondStatus === 'EXPIRED'}
+                            />
+                          </div>
                         ))}
                       </div>
                     </div>
