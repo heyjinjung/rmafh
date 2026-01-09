@@ -367,9 +367,9 @@ test_sot_consistency.py	14개	✅ 12 passed, 2 skipped
 - [x] 동작이 명확하다(뒤로: 이전 화면, 홈: 대시보드/메인)
 
 ### 12.3 사이드바 문구 3종(고정)
-- [ ] "현재 변경사항 - 금고조건 변경 후 진행예정입니다." 문구가 고정으로 유지된다
-- [ ] "이벤트 종료일 - 다이아 금고 기준으로 연동" 문구가 v3 다이아 마감(5일) 기준으로 표기된다
-- [ ] "최소 34만원 이사지원 혜택" 문구가 반영된다
+- [x] "현재 변경사항 - 금고조건 변경 후 진행예정입니다." 문구가 고정으로 유지된다
+- [x] "이벤트 종료일 - 다이아 금고 기준으로 연동" 문구가 v3 다이아 마감(5일) 기준으로 표기된다
+- [x] "최소 34만원 이사지원 혜택" 문구가 반영된다
 
 완료 기준:
 - [x] `frontend: lint` 통과
@@ -380,7 +380,10 @@ test_sot_consistency.py	14개	✅ 12 passed, 2 skipped
   - `frontend/pages/admin.jsx` L56-60: 유저 로그인 + 어드민 미인증 시 `/`로 리다이렉트
   - `frontend/pages/admin/v2.jsx` L33-36: 동일한 가드 로직 구현
   - `frontend/pages/guide.jsx` L97-108: Header 컴포넌트에 뒤로가기/홈 버튼 구현
-- **§12.3 사이드바 문구**: 추후 구현 예정
+- **§12.3 사이드바 문구 구현 완료 (2026-01-10)**:
+  - `frontend/pages/index.jsx` L123-137: 사이드바 안내 문구 섹션 추가
+  - SOT 연동: `VAULT_EXPIRY_HOURS.DIAMOND` (120시간/5일) import 사용
+  - 스타일: `styles.sidebarNotice`, `styles.noticeItem`, `styles.noticeLabel`, `styles.noticeText` 추가
 
 ---
 
