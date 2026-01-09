@@ -120,7 +120,15 @@ def _reset_db_state(db_url):
 
     The test suite uses a real Postgres and a session-scoped client, so
     without cleanup, re-running tests can be affected by previous data.
+    
+    IMPORTANT: This only runs when APP_ENV=test to prevent accidental deletion
+    of production/development data.
     """
+    # Skip DB reset if not in test environment to protect real data
+    if os.getenv("APP_ENV") != "test":
+        yield
+        return
+        
     try:
         conn = psycopg2.connect(db_url, connect_timeout=3)
     except OperationalError:  # pragma: no cover
