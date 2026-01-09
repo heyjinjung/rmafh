@@ -96,10 +96,11 @@ async def admin_update_gold_missions(
             raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
 
         (
-            expires_at, gold_status, _platinum_status, _diamond_status,
-            _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
-            gold_mission_1_done, gold_mission_2_done, gold_mission_3_done, _diamond_attendance_days,
-            _plat_m1, _plat_m2, _plat_m3, _plat_m4, _dia_m1, _dia_m2,
+            expires_at, gold_status, platinum_status, diamond_status,
+            attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total,
+            gold_mission_1_done, gold_mission_2_done, gold_mission_3_done, diamond_attendance_days,
+            plat_m1, plat_m2,
+            dia_m1, dia_m2,
         ) = row
 
         new_m1 = updates.get("gold_mission_1_done", bool(gold_mission_1_done))
@@ -220,7 +221,7 @@ async def admin_update_platinum_missions(
             _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
             _gold_m1, _gold_m2, _gold_m3, _diamond_attendance_days,
             plat_m1, plat_m2,
-            _dia_m1, _dia_m2,
+            dia_m1, dia_m2,
         ) = row
 
         new_m1 = updates.get("platinum_mission_1_done", bool(plat_m1))
@@ -329,7 +330,7 @@ async def admin_update_diamond_missions(
             expires_at, _gold_status, _platinum_status, diamond_status,
             _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
             _gold_m1, _gold_m2, _gold_m3, _diamond_attendance_days,
-            _plat_m1, _plat_m2, _plat_m3, _plat_m4,
+            _plat_m1, _plat_m2,
             dia_m1, dia_m2,
         ) = row
 

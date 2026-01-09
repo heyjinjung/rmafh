@@ -567,7 +567,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
                        ELSE vs.diamond_status
                    END,
                    expires_at = CASE
-                       WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
+                       WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '5 days'
                        ELSE vs.expires_at
                    END,
                    updated_at = NOW()
@@ -746,7 +746,7 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
                        ELSE vs.diamond_status
                    END,
                expires_at = CASE
-                   WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '7 days'
+                   WHEN v.last_deposit_at IS NOT NULL THEN v.last_deposit_at::timestamptz + INTERVAL '5 days'
                    ELSE vs.expires_at
                END,
                updated_at = NOW()

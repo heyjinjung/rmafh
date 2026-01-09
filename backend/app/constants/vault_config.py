@@ -47,12 +47,12 @@ VAULT_REWARDS: dict[str, int] = {
 # =============================================================================
 
 VAULT_EXPIRY_HOURS: dict[str, int] = {
-    "GOLD": 72,            # 3일
-    "PLATINUM": 72,        # 3일
-    "DIAMOND": 120,        # 5일 (변경: 기존 72시간)
+    "GOLD": 120,            # 5일
+    "PLATINUM": 120,        # 5일
+    "DIAMOND": 120,        # 5일
 }
 
-DEFAULT_EXPIRY_HOURS: int = 72  # 기본값
+DEFAULT_EXPIRY_HOURS: int = 120  # 기본값 (5일)
 
 
 # =============================================================================

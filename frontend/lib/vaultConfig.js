@@ -25,12 +25,12 @@ export const VAULT_REWARDS = {
 // =============================================================================
 
 export const VAULT_EXPIRY_HOURS = {
-  GOLD: 72,            // 3일
-  PLATINUM: 72,        // 3일
-  DIAMOND: 120,        // 5일 (변경: 기존 72시간)
+  GOLD: 120,            // 5일 (변경: 기존 72시간)
+  PLATINUM: 120,        // 5일 (변경: 기존 72시간)
+  DIAMOND: 120,        // 5일 (기존 120시간 유지)
 };
 
-export const DEFAULT_EXPIRY_HOURS = 72;
+export const DEFAULT_EXPIRY_HOURS = 120; // 5일 (변경: 기존 72시간)
 
 // =============================================================================
 // 3. 해금 조건 목표값 (Unlock Thresholds)
