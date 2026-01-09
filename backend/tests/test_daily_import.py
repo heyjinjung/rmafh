@@ -28,7 +28,8 @@ def test_daily_import_unlocks_gold_and_diamond(client):
     assert status.status_code == 200
     s = status.json()
     assert s.get("gold_status") == "UNLOCKED"
-    assert s.get("diamond_status") == "UNLOCKED"
+    # 다이아몬드는 플래티넘 CLAIMED 후에만 해금되므로 LOCKED
+    assert s.get("diamond_status") == "LOCKED"
     assert int(s.get("diamond_deposit_current")) == 2500000
 
 

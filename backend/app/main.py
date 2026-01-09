@@ -561,7 +561,9 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
                    END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') 
+                            AND vs.platinum_status = 'CLAIMED'
+                            AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                    expires_at = CASE
@@ -738,7 +740,9 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
                                  END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') 
+                            AND vs.platinum_status = 'CLAIMED'
+                            AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                expires_at = CASE

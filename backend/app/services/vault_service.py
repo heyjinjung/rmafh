@@ -126,12 +126,12 @@ def compute_diamond_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If deposit_total >= DIAMOND_UNLOCK threshold, status is UNLOCKED
+    - If platinum_status is CLAIMED and deposit_total >= DIAMOND_UNLOCK threshold, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if deposit_total >= DIAMOND_UNLOCK["deposit_total"]:
+    if platinum_status == "CLAIMED" and deposit_total >= DIAMOND_UNLOCK["deposit_total"]:
         return "UNLOCKED"
     return current_status
 

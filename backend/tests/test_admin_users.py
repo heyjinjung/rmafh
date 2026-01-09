@@ -158,4 +158,5 @@ def test_admin_user_bulk_updates_apply(client):
         data = status.json()
         assert data["gold_status"] == "UNLOCKED"
         assert data["platinum_status"] == "UNLOCKED"
-        assert data["diamond_status"] == "UNLOCKED"
+        # 다이아몬드는 플래티넘 CLAIMED 후에만 해금되므로 아직 LOCKED
+        assert data["diamond_status"] == "LOCKED"

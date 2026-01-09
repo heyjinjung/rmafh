@@ -45,7 +45,7 @@ def test_status_returns_contract_fields(client):
 def test_claim_flow_after_daily_import_unlocks_and_updates_status(client):
     external_user_id = "ext-claim-flow-1"
 
-    # Import snapshot to unlock GOLD/DIAMOND
+    # Import snapshot to unlock GOLD (다이아몬드는 플래티넘 CLAIMED 후 해금)
     body = {
         "rows": [
             {
@@ -64,23 +64,21 @@ def test_claim_flow_after_daily_import_unlocks_and_updates_status(client):
     assert status_before.status_code == 200
     data_before = status_before.json()
     assert data_before["gold_status"] == "UNLOCKED"
-    assert data_before["diamond_status"] == "UNLOCKED"
+    # 플래티넘 CLAIMED가 아니므로 다이아몬드는 LOCKED
+    assert data_before["diamond_status"] == "LOCKED"
 
-    claim_resp = client.post(
+    # 골드를 클레임하여 플래티넘 해금 테스트
+    claim_gold_resp = client.post(
         "/api/vault/claim",
         params={"external_user_id": external_user_id},
-        json={"vault_type": "DIAMOND"},
+        json={"vault_type": "GOLD"},
     )
-    assert claim_resp.status_code == 200
-    claim_body = claim_resp.json()
-    assert claim_body.get("claimed") is True
-    assert claim_body.get("vault_type") == "DIAMOND"
-
-    status_after = client.get("/api/vault/status", params={"external_user_id": external_user_id})
-    assert status_after.status_code == 200
-    data_after = status_after.json()
-    assert data_after["diamond_status"] == "CLAIMED"
-    assert data_after["loss_breakdown"].get("DIAMOND") == 0
+    assert claim_gold_resp.status_code == 200
+    
+    status_after_gold = client.get("/api/vault/status", params={"external_user_id": external_user_id})
+    data_after_gold = status_after_gold.json()
+    assert data_after_gold["gold_status"] == "CLAIMED"
+    assert data_after_gold["loss_breakdown"].get("GOLD") == 0
 
 
 def test_claim_enforces_state_and_idempotency(client):
