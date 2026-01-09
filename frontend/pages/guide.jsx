@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 // 이미지 폴백 컴포넌트
 function ImageWithFallback(props) {
   const [didError, setDidError] = useState(false);
-  const { src, alt, style, className, ...rest } = props;
+  const { src, alt = '', style, className, ...rest } = props;
 
   return didError ? (
     <div

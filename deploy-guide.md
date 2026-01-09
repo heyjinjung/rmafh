@@ -3,15 +3,15 @@
 ## 서버 정보
 - IP: 149.28.135.147
 - Username: root
-- Password: 2wP?+!Etm8#Qv4Mn
 - 배포 경로: /opt/rmarh
+
+> 보안: 서버 비밀번호/키는 **레포 및 문서에 남기지 말고** 별도 보안 채널에서 관리하세요.
 
 ## 1단계: 서버 접속 및 확인
 
 PowerShell에서 실행:
 ```powershell
 ssh root@149.28.135.147
-# 비밀번호 입력: 2wP?+!Etm8#Qv4Mn
 ```
 
 서버 접속 후:
@@ -57,17 +57,20 @@ cd /opt/rmarh
 cat > .env << 'EOF'
 # Database
 POSTGRES_USER=vault
-POSTGRES_PASSWORD=vaultpass
+POSTGRES_PASSWORD=CHANGE_ME_STRONG_PASSWORD
 POSTGRES_DB=vault
 
 # Application
-ADMIN_PASSWORD=your_admin_password_here
+ADMIN_PASSWORD=CHANGE_ME_STRONG_ADMIN_PASSWORD
 IDEMPOTENCY_TTL_HOURS=24
 
 # Ports (기존 프로젝트와 충돌 방지)
 WEB_PORT=3002
 API_PORT=18000
 DB_PORT=5432
+
+# (Optional) If you prefer overriding everything with a single URL
+# DATABASE_URL=postgresql://vault:CHANGE_ME_STRONG_PASSWORD@db:5432/vault
 EOF
 ```
 
