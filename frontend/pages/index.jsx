@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
+import { VAULT_REWARDS } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
@@ -374,7 +375,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       {
         id: 'gold-vault',
         tier: 'gold',
-        rewardAmount: 10000,
+        rewardAmount: VAULT_REWARDS.GOLD,
         status: mapApiStatusToUi(api.gold_status),
         missions: [
           {
@@ -396,7 +397,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       {
         id: 'platinum-vault',
         tier: 'platinum',
-        rewardAmount: 30000,
+        rewardAmount: VAULT_REWARDS.PLATINUM,
         status: mapApiStatusToUi(api.platinum_status),
         expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
         missions: [
@@ -410,7 +411,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       {
         id: 'diamond-vault',
         tier: 'diamond',
-        rewardAmount: 70000,
+        rewardAmount: VAULT_REWARDS.DIAMOND,
         status: mapApiStatusToUi(api.diamond_status),
         progress: Number.isFinite(diamondProgress) ? diamondProgress : 0,
         missions: [

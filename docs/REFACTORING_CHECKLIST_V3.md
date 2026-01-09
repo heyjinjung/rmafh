@@ -94,15 +94,16 @@
 
 현재 확인 결과(중요):
 - SOT 파일 3종은 존재/생성 완료
-- 단, 백엔드/프론트 코드에는 하드코딩된 “조건/보상/만료 시간” 숫자가 아직 남아있음 → Sprint 1의 #4/#5 작업이 필요
+- ✅ Backend 코드에서 하드코딩된 상수가 SOT로 치환 완료 (Sprint 1 #4)
+- ⏳ Frontend 코드 치환은 Sprint 1 #5에서 진행 예정
 
 체크리스트:
-- [ ] v3 규칙 변경이 생기면 **SOT → 문서 → 코드** 순으로 반영한다
-- [ ] SOT 값이 바뀌면 관련 테스트(조건/만료/보상)가 깨지지 않는지 확인했다
-- [ ] “조건/보상/만료 시간” 관련 숫자가 다른 파일에 중복되어 있지 않다
+- [x] v3 규칙 변경이 생기면 **SOT → 문서 → 코드** 순으로 반영한다
+- [x] SOT 값이 바뀌면 관련 테스트(조건/만료/보상)가 깨지지 않는지 확인했다
+- [x] "조건/보상/만료 시간" 관련 숫자가 다른 파일에 중복되어 있지 않다 (Backend)
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과 (23 passed)
 
 ---
 
@@ -111,12 +112,13 @@
 - [x] (1) SOT 파일 생성 (Backend): `backend/app/constants/vault_config.py`
 - [x] (2) SOT 파일 생성 (Frontend): `frontend/lib/vaultConfig.js`
 - [x] (3) SOT 문서화: `docs/VAULT_SOT.md`
-- [ ] (4) Backend 상수 참조 변경: `backend/app/main.py` 등에서 SOT로 치환
+- [x] (4) Backend 상수 참조 변경: `backend/app/main.py`, `routers/*.py`, `services/*.py`에서 SOT로 치환
 - [ ] (5) Frontend 상수 참조 변경: `frontend/pages/index.jsx`에서 SOT로 치환
 - [ ] (6) 테스트 실행 및 검증: (4)(5) 완료 후 재실행
 
 메모(완료 기준 해석):
-- (6)은 “현재 기준으로 테스트/린트가 통과”하더라도, (4)(5)를 적용한 뒤 다시 통과해야 Sprint 1 완료로 간주
+- (6)은 "현재 기준으로 테스트/린트가 통과"하더라도, (4)(5)를 적용한 뒤 다시 통과해야 Sprint 1 완료로 간주
+- (4) 완료: 2026-01-09 - pytest 23 passed
 
 ---
 
