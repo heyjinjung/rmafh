@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { VAULT_REWARDS } from '../lib/vaultConfig';
+import { VAULT_REWARDS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
@@ -38,10 +38,10 @@ export default function Home() {
     // URL 쿼리 파라미터 확인
     const params = new URLSearchParams(window.location.search);
     const extUserId = params.get('external_user_id');
-    
+
     // 또는 localStorage에서 로그인 정보 확인
     const storedUser = localStorage.getItem('user');
-    
+
     if (extUserId) {
       setExternalUserId(extUserId);
     } else if (storedUser) {
@@ -247,13 +247,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     try {
       // URL 쿼리 파라미터 또는 localStorage에서 external_user_id 가져오기
       const params = new URLSearchParams(window.location.search);
-      const extUserId = params.get('external_user_id') || 
+      const extUserId = params.get('external_user_id') ||
         (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
-      
-      const endpoint = extUserId 
+
+      const endpoint = extUserId
         ? `${basePath}/api/vault/status/?external_user_id=${encodeURIComponent(extUserId)}`
         : `${basePath}/api/vault/status/`;
-      
+
       const data = await apiFetch(endpoint);
       // 골드→플래티넘 해금 직후 토스트 노출 로직
       const prev = prevStatusRef.current;
@@ -367,8 +367,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     const api = status || {};
     const attendanceDays = Number(api.platinum_attendance_days || 0);
     const reviewDone = Boolean(api.platinum_review_done);
-    const diamondDeposit = Number(api.diamond_deposit_current || 0);
-    const diamondTarget = 500000;
+    const diamondDeposit = Number(api.diamond_deposit_total || api.diamond_deposit_current || 0);
+    const diamondTarget = DIAMOND_UNLOCK.depositTotal;  // SOT: 2,000,000
     const diamondProgress = Math.max(0, Math.min(100, Math.floor((diamondDeposit / diamondTarget) * 100)));
 
     return [
@@ -381,16 +381,16 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           {
             id: 'g1',
             label: 'CC카지노 공식채널 입장',
-            isDone: Boolean(api.telegram_ok),
+            isDone: Boolean(api.gold_mission_1_done ?? api.telegram_ok),  // CSV auto
             hint: '각종 이벤트 및 보너스 드랍 진행',
           },
           {
             id: 'g2',
             label: '담당실장 공식채널 입장',
-            isDone: Boolean(api.telegram_ok),
+            isDone: Boolean(api.gold_mission_2_done),  // Admin toggle
             hint: '본사혜택 외 추가 이벤트 진행',
           },
-          { id: 'g3', label: '간편 본인확인 -담당실장에게 본인 확인', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
+          { id: 'g3', label: '간편 본인확인 -담당실장에게 본인 확인', isDone: Boolean(api.gold_mission_3_done) },  // Admin toggle
           { id: 'g4', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },
         ],
       },
@@ -437,14 +437,14 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
       try {
         // URL 쿼리 파라미터 또는 localStorage에서 external_user_id 가져오기
         const params = new URLSearchParams(window.location.search);
-        const extUserId = params.get('external_user_id') || 
+        const extUserId = params.get('external_user_id') ||
           (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
-        
+
         const vaultType = tier.toUpperCase();
-        const endpoint = extUserId 
+        const endpoint = extUserId
           ? `${basePath}/api/vault/claim/?external_user_id=${encodeURIComponent(extUserId)}`
           : `${basePath}/api/vault/claim/`;
-        
+
         const res = await apiFetch(endpoint, {
           method: 'POST',
           body: JSON.stringify({ vault_type: vaultType }),
@@ -549,7 +549,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         : tier === 'platinum'
           ? '0 0 8px rgba(7, 175, 77, 0.5)'
           : '0 0 8px rgba(10, 167, 135, 0.5)'
-      })`,
+        })`,
     };
 
     switch (tier) {
@@ -766,9 +766,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           return (
             <motion.div
               key={vault.id}
-              className={`relative overflow-hidden rounded-2xl ${
-                isSelected ? `border-2 ${colorScheme.border}` : 'border border-gray-800'
-              } bg-black/80 transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.5)]`}
+              className={`relative overflow-hidden rounded-2xl ${isSelected ? `border-2 ${colorScheme.border}` : 'border border-gray-800'
+                } bg-black/80 transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.5)]`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 * index, duration: 0.5 }}
@@ -816,13 +815,12 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                   </motion.div>
 
                   <motion.div
-                    className={`px-3 py-1 rounded-full flex items-center justify-center ${
-                      isLocked
+                    className={`px-3 py-1 rounded-full flex items-center justify-center ${isLocked
                         ? 'bg-gradient-to-r from-[#F97935] to-[#FF5500] border border-[#FF5500]/50'
                         : isAvailable
                           ? 'bg-gradient-to-r from-[#07AF4D] to-[#06C355] border border-[#06C355]/50'
                           : 'bg-gradient-to-r from-[#5D5D5D] to-[#7D7D7D] border border-[#7D7D7D]/50'
-                    }`}
+                      }`}
                     initial={{ opacity: 0, scale: 0 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 + 0.2 * index, duration: 0.2, type: 'spring' }}
@@ -894,9 +892,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                       transition={{ delay: 0.3 + 0.1 * missionIndex, duration: 0.3 }}
                     >
                       <div
-                        className={`flex-shrink-0 w-5 h-5 rounded-full ${
-                          mission.isDone ? `${colorScheme.buttonBg} border border-white/20` : 'bg-gray-800 border border-gray-600'
-                        } flex items-center justify-center mr-3 mt-0.5`}
+                        className={`flex-shrink-0 w-5 h-5 rounded-full ${mission.isDone ? `${colorScheme.buttonBg} border border-white/20` : 'bg-gray-800 border border-gray-600'
+                          } flex items-center justify-center mr-3 mt-0.5`}
                       >
                         {mission.isDone && (
                           <motion.svg
@@ -929,9 +926,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                 <motion.button
                   whileHover={buttonEnabled ? { scale: 1.02 * animationIntensity } : {}}
                   whileTap={buttonEnabled ? { scale: 0.98 * animationIntensity } : {}}
-                  className={`w-full py-3.5 rounded-xl font-bold text-white transition-all duration-200 ${
-                    buttonEnabled ? `${colorScheme.buttonBg} ${colorScheme.buttonHover} shadow-lg` : `${colorScheme.buttonDisabled} border border-gray-800`
-                  } relative overflow-hidden group`}
+                  className={`w-full py-3.5 rounded-xl font-bold text-white transition-all duration-200 ${buttonEnabled ? `${colorScheme.buttonBg} ${colorScheme.buttonHover} shadow-lg` : `${colorScheme.buttonDisabled} border border-gray-800`
+                    } relative overflow-hidden group`}
                   disabled={!buttonEnabled}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -983,11 +979,10 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
           <motion.button
             whileHover={getCompletedVaults() === 3 ? { scale: 1.02 * animationIntensity } : {}}
             whileTap={getCompletedVaults() === 3 ? { scale: 0.98 * animationIntensity } : {}}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg relative overflow-hidden mt-6 ${
-              getCompletedVaults() === 3
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg relative overflow-hidden mt-6 ${getCompletedVaults() === 3
                 ? 'bg-gradient-to-r from-[#07AF4D] to-[#0AA787] shadow-lg shadow-[#07AF4D]/20 border border-[#07AF4D]/50'
                 : 'bg-gray-800/80 border border-gray-700 backdrop-blur-sm'
-            }`}
+              }`}
             disabled={getCompletedVaults() < 3}
           >
             <span className="relative z-10 flex items-center justify-center">

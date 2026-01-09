@@ -23,6 +23,10 @@ export default async function handler(req, res) {
     if (req.headers['x-admin-password']) {
       headers['x-admin-password'] = req.headers['x-admin-password'];
     }
+    // Idempotency key forwarding
+    if (req.headers['x-idempotency-key']) {
+      headers['x-idempotency-key'] = req.headers['x-idempotency-key'];
+    }
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);

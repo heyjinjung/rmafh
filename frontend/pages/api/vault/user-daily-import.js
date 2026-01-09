@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', ['POST', 'OPTIONS']);
     return res.status(200).end();
   }
-  
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST', 'OPTIONS']);
     return res.status(405).json({ error: { code: 'METHOD_NOT_ALLOWED', message: 'Method Not Allowed' } });
@@ -37,23 +37,27 @@ export default async function handler(req, res) {
       'content-type': 'application/json',
       accept: 'application/json',
     };
-    
+
     // 어드민 인증 헤더 전달
     if (req.headers['x-admin-password']) {
       headers['x-admin-password'] = req.headers['x-admin-password'];
     }
-    
+    // 멱등키 전달
+    if (req.headers['x-idempotency-key']) {
+      headers['x-idempotency-key'] = req.headers['x-idempotency-key'];
+    }
+
     // 타임아웃 설정 (30초)
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30000);
-    
+
     const upstream = await fetch(`${base}/api/vault/user-daily-import${buildQuery(req)}`, {
       method: 'POST',
       headers,
       body: JSON.stringify(req.body || {}),
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeout);
 
     const contentType = upstream.headers.get('content-type') || '';
