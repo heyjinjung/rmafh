@@ -37,16 +37,18 @@ cd /opt/rmarh
 
 ## 3단계: 프로젝트 파일 업로드
 
-로컬 PowerShell에서 실행:
-```powershell
-# SCP로 전체 프로젝트 업로드
-scp -r C:\Users\JAVIS\rmarh\* root@149.28.135.147:/opt/rmarh/
-```
+권장: **Git으로 배포** (로컬에서 변경 → commit/push → 서버에서 pull).
 
-또는 Git 사용 (서버에서):
+서버에서 최초 1회:
 ```bash
 cd /opt/rmarh
-git clone [YOUR_GIT_REPO_URL] .
+git clone https://github.com/heyjinjung/rmafh.git .
+```
+
+서버에서 이후 업데이트(재배포) 시:
+```bash
+cd /opt/rmarh
+git pull
 ```
 
 ## 4단계: 환경 변수 설정
@@ -54,6 +56,15 @@ git clone [YOUR_GIT_REPO_URL] .
 서버에서 .env 파일 생성:
 ```bash
 cd /opt/rmarh
+cp .env.example .env
+# .env 파일에서 아래 값은 반드시 변경하세요:
+# - POSTGRES_PASSWORD
+# - ADMIN_PASSWORD
+
+# (처음 배포/변경 후)
+# docker compose up -d --build
+
+# 또는 아래처럼 직접 생성해도 됩니다:
 cat > .env << 'EOF'
 # Database
 POSTGRES_USER=vault
