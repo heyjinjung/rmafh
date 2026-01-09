@@ -305,6 +305,7 @@ class DailyUserImportRow(BaseModel):
     last_deposit_at: Optional[str] = Field(None, alias="입금일")
     telegram_ok: bool = Field(False, alias="텔레그램")
     review_ok: bool = Field(False, alias="리뷰")
+    cc_attendance_count: int = Field(0, alias="출석횟수")  # CC카지노 출석 횟수
 
     class Config:
         populate_by_name = True  # 한글/영문 둘 다 허용
