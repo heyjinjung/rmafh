@@ -2,11 +2,11 @@
 
 ## 1. 메타
 - 문서 타입: 리팩토링 계획서
-- 버전: v3.0.1
+- 버전: v3.0.2
 - 작성일: 2026-01-09
-- 최종 수정: 2026-01-09
+- 최종 수정: 2026-01-10
 - 전략: **(A) 구조 리팩토링 + 기능 변경 동시 진행** / **(B) 속도 우선 Fast Track**
-- 테스트: **23개 기존 테스트 유지 + 신규 테스트 추가**
+- 테스트: **51개 테스트 통과 (2 skipped)**
 - 목적: 금고 조건/보상 변경 + 아키텍처 개선 (SOLID 준수)
 
 ---
@@ -32,12 +32,28 @@
 | **3** | 서비스 레이어 | ✅ 완료 | `services/*.py` |
 | **4** | 프론트엔드 리팩토링 | ✅ 완료 | Sprint 1.5 + SOT 치환 완료 |
 | **5** | DB 마이그레이션 | ✅ 완료 | 골드 미션 컬럼 3개 + v3 컬럼 추가 |
+| **P0** | 골드 미션 O/X | ✅ 완료 | BE API + FE 토글 UI + Proxy |
+| **P0** | 플래티넘/다이아 조건 | ✅ 완료 | 해금 조건 로직 + 테스트 |
+| **P0** | CSV cc_attendance_count | ✅ 완료 | 스키마 + 파싱 + DB 저장 |
+| **P0** | 신규 테스트 | ✅ 완료 | 51 passed, 2 skipped |
 
 ### 생성된 SOT 파일 목록
 - ✅ `backend/app/constants/vault_config.py` (218줄)
 - ✅ `frontend/lib/vaultConfig.js` (346줄)
 - ✅ `docs/VAULT_SOT.md` (224줄)
 - ✅ `docs/DB_MIGRATION_V3.sql` (158줄)
+
+### 추가된 테스트 파일 (2026-01-10)
+- ✅ `backend/tests/test_vault_unlock_v3.py` - 12개 테스트 (해금 조건)
+- ✅ `backend/tests/test_sot_consistency.py` - 14개 테스트 (SOT 정합성)
+- ✅ `backend/tests/test_daily_import_v3.py` - CSV Import 시나리오
+
+### 해금 조건 정책 (SOT 준수)
+| 티어 | 해금 조건 |
+|------|-----------|
+| **골드** | `telegram_ok = True` |
+| **플래티넘** | `gold_status = 'CLAIMED'` + `deposit_total ≥ 200K` + `deposit_count ≥ 3` + `attendance ≥ 3` + `review_ok` |
+| **다이아몬드** | `platinum_status = 'CLAIMED'` + `deposit_total ≥ 2M` |
 
 ---
 

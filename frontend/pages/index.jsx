@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { VAULT_REWARDS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
+import { VAULT_REWARDS, VAULT_EXPIRY_HOURS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
