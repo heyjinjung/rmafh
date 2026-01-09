@@ -71,7 +71,26 @@ SET diamond_expires_at = created_at + INTERVAL '5 days'
 WHERE diamond_expires_at IS NULL;
 
 -- =============================================================================
--- 3. 인덱스 추가
+-- 3. 골드 미션 O/X 필드 추가
+-- =============================================================================
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS gold_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE;
+
+COMMENT ON COLUMN vault_status.gold_mission_1_done IS '골드 미션 1 완료 여부';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS gold_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE;
+
+COMMENT ON COLUMN vault_status.gold_mission_2_done IS '골드 미션 2 완료 여부';
+
+ALTER TABLE vault_status 
+ADD COLUMN IF NOT EXISTS gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE;
+
+COMMENT ON COLUMN vault_status.gold_mission_3_done IS '골드 미션 3 완료 여부';
+
+-- =============================================================================
+-- 4. 인덱스 추가
 -- =============================================================================
 
 -- 3.1 플래티넘 조건 검색용 인덱스
@@ -90,7 +109,7 @@ ON vault_status (diamond_expires_at)
 WHERE diamond_status NOT IN ('CLAIMED', 'EXPIRED');
 
 -- =============================================================================
--- 4. 뷰 생성 (분석용)
+-- 5. 뷰 생성 (분석용)
 -- =============================================================================
 
 CREATE OR REPLACE VIEW vault_progress_v3 AS
@@ -120,7 +139,7 @@ FROM vault_status;
 COMMENT ON VIEW vault_progress_v3 IS 'Vault v3.0 진행률 분석용 뷰';
 
 -- =============================================================================
--- 5. 마이그레이션 로그
+-- 6. 마이그레이션 로그
 -- =============================================================================
 
 INSERT INTO admin_audit_log (
@@ -137,7 +156,7 @@ INSERT INTO admin_audit_log (
     'DB_SCHEMA',
     0,
     'SUCCESS',
-    '{"version": "3.0", "changes": ["platinum_deposit_total", "platinum_deposit_count", "diamond_attendance_days", "diamond_expires_at"]}',
+    '{"version": "3.0", "changes": ["platinum_deposit_total", "platinum_deposit_count", "diamond_attendance_days", "diamond_expires_at", "gold_mission_1_done", "gold_mission_2_done", "gold_mission_3_done"]}',
     '{"migration_date": "2026-01-09", "description": "Vault v3.0 schema migration"}'
 );
 

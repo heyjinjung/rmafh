@@ -3,13 +3,15 @@
 ## 1. 메타
 - 문서명: Vault v3 리팩토링 실행 체크리스트
 - 문서 타입: 실행 가이드/체크리스트
-- 문서 버전: v1.0.0
+- 문서 버전: v1.0.2
 - 작성일: 2026-01-09
 - 작성자: GitHub Copilot (GPT-5.2)
 - 대상: Lead Architect/운영자/개발자
 - 범위: `docs/REFACTORING_PLAN_V3.md`의 Phase 0~5 + v3 신규 기능(특히 골드 미션 O/X)
 
 ## Changelog
+- 2026-01-09 v1.0.2: v3 핵심 기능/UX/CSV/테스트 항목까지 완전 커버 보강
+- 2026-01-09 v1.0.1: 속도 우선(Fast Track) 실행 가이드 추가
 - 2026-01-09 v1.0.0: 최초 작성 (Phase 게이트 + P0 검증 기준 포함)
 
 ---
@@ -32,6 +34,10 @@
   - (1) 문서 업데이트 (최소: 계획서/스펙/컬럼 가이드)
   - (2) 테스트 추가/갱신
   - (3) 롤백 플랜 1줄이라도 작성
+- 속도 우선(Fast Track) 모드 적용 시:
+  - 라우터/서비스 분리는 후순위로 미루고 `backend/app/main.py`에 직접 반영 가능
+  - DB+BE 변경은 1개 PR로 묶을 수 있음 (FE는 별도 스프린트)
+  - 필수 검증: `pytest` 신규 1개 + 스모크 시나리오 1개
 
 ---
 
@@ -60,6 +66,10 @@
 - `frontend/lib/vaultConfig.js`
 - `docs/VAULT_SOT.md`
 
+현재 상태(계획서 기준):
+- SOT 3종은 생성 완료 상태(Phase 0 ✅)
+- 관련 파일: `docs/DB_MIGRATION_V3.sql`(Phase 5 대상)
+
 체크리스트:
 - [ ] v3 규칙 변경이 생기면 **SOT → 문서 → 코드** 순으로 반영한다
 - [ ] SOT 값이 바뀌면 관련 테스트(조건/만료/보상)가 깨지지 않는지 확인했다
@@ -73,13 +83,28 @@
 ## 5. Phase 1: 유틸리티 분리(난이도: 낮음)
 목표: `backend/app/main.py`의 **순수 함수/검증/변환 로직**을 `utils/`로 분리
 
+주의(속도 우선 Fast Track): Phase 1은 후순위로 미뤄도 된다.
+
 체크리스트:
-- [ ] 분리 대상은 “DB 접근 없는 함수”부터 시작했다
-- [ ] 함수 시그니처는 유지하거나, 최소 변경으로 래핑했다
-- [ ] 분리 후에도 import 순환이 발생하지 않는다
+- [x] 분리 대상은 “DB 접근 없는 함수”부터 시작했다
+- [x] 함수 시그니처는 유지하거나, 최소 변경으로 래핑했다
+- [x] 분리 후에도 import 순환이 발생하지 않는다
+
+분리 대상(계획서 권장, 우선순위):
+- [x] `backend/app/utils/__init__.py` 생성
+- [x] `backend/app/utils/parsers.py`로 파서 분리
+  - [x] `_parse_int_optional`
+  - [x] `_parse_date_optional`
+- [x] `backend/app/utils/auth.py`로 인증 분리
+  - [x] `verify_admin_password`
+- [x] `backend/app/utils/audit.py`로 감사로깅 분리
+  - [x] `_log_admin_action`
+- [x] `backend/app/utils/sql_builders.py`로 SQL/타임아웃 분리
+  - [x] `_build_user_target_sql`
+  - [x] `_apply_job_timeouts`
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과 (23 passed)
 
 ---
 
@@ -87,12 +112,20 @@
 목표: `backend/app/main.py` 엔드포인트를 도메인별 파일로 분리(기능 동일)
 
 체크리스트:
-- [ ] 엔드포인트 경로/메서드/응답은 변경하지 않았다(리팩토링만)
-- [ ] 의존성 주입(예: admin password 검증)을 공통으로 유지했다
-- [ ] 라우터 분리 후에도 OpenAPI/서버 부팅이 정상이다
+- [x] 엔드포인트 경로/메서드/응답은 변경하지 않았다(리팩토링만)
+- [x] 의존성 주입(예: admin password 검증)을 공통으로 유지했다
+- [x] 라우터 분리 후에도 OpenAPI/서버 부팅이 정상이다
+
+분리된 라우터 파일:
+- [x] `backend/app/routers/__init__.py` 생성
+- [x] `backend/app/routers/dependencies.py` - 공통 의존성
+- [x] `backend/app/routers/health.py` - /health 엔드포인트
+- [x] `backend/app/routers/vault.py` - /api/vault/login, /status, /claim, /attendance
+- [x] `backend/app/routers/admin_users.py` - /api/vault/admin/users CRUD
+- [x] `backend/app/routers/admin_vault.py` - gold-missions, status, attendance, deposit
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과 (23 passed)
 
 ---
 
@@ -100,12 +133,18 @@
 목표: “규칙/계산/가드레일”을 서비스 함수로 모아 SRP를 개선
 
 체크리스트:
-- [ ] 핵심 규칙(금고 조건/상태 전이/만료 정책)은 서비스 레이어로 이동했다
-- [ ] 서비스 함수는 입력/출력 계약이 명확하다(요청 스키마/응답 스키마와 대응)
-- [ ] 서비스가 DB 접근을 완전히 추상화하지 못하더라도(현 구조상) 책임이 분리되었다
+- [x] 핵심 규칙(금고 조건/상태 전이/만료 정책)은 서비스 레이어로 이동했다
+- [x] 서비스 함수는 입력/출력 계약이 명확하다(요청 스키마/응답 스키마와 대응)
+- [x] 서비스가 DB 접근을 완전히 추상화하지 못하더라도(현 구조상) 책임이 분리되었다
+
+분리된 서비스 파일:
+- [x] `backend/app/services/__init__.py` 생성
+- [x] `backend/app/services/common.py` - 공통 유틸(idempotency, parsing, validation)
+- [x] `backend/app/services/user_identity_service.py` - 유저 ID 해석/생성/벌크
+- [x] `backend/app/services/vault_service.py` - 금고 상태 계산/조건/가드레일
 
 완료 기준:
-- [ ] `backend: pytest (docker)` 통과
+- [x] `backend: pytest (docker)` 통과 (23 passed)
 
 ---
 
@@ -115,6 +154,15 @@
 체크리스트:
 - [ ] v3 변경은 `frontend/components/admin-v2/` 및 관련 API proxy에 “최소 변경”으로 반영했다
 - [ ] 프론트에서 규칙을 재구현하지 않았다(가능하면 서버 계산 결과를 표시)
+- [ ] (Sprint 1.5) 유저 로그인에서 어드민 UI/메뉴가 아예 보이지 않는다
+- [ ] (Sprint 1.5) 직접 URL 접근으로도 어드민 페이지가 열리지 않는다(가드/리다이렉트/403 중 팀 기준으로 1개로 통일)
+- [ ] (Sprint 1.5) 관리자 페이지는 유저 영역과 분리된 구성/레이아웃/네비를 사용한다(최소: 노출/접근 차단)
+- [ ] (Sprint 1) 금고 관련 “상수/보상/만료 시간”은 `frontend/lib/vaultConfig.js`(SOT) 기준으로만 표시한다
+- [ ] 사이드바 고정 문구 3종을 요구사항대로 반영했다(문구/다이아 마감(5일) 연동 포함)
+- [ ] 금고 가이드 화면 상단에 “뒤로가기 / 홈 버튼”이 존재하고 동작이 명확하다
+- [ ] 스코프 아웃(지갑/인벤토리)은 UI/메뉴/라우팅 어디에도 추가하지 않았다
+- [ ] Next API Proxy(`frontend/pages/api/**`)는 기존 프록시 패턴을 그대로 따르고, 필요한 헤더만 전달한다
+- [ ] 어드민 관련 요청은 멱등키(`x-idempotency-key`)가 필요한 경우 항상 포함한다(해당 기능에서)
 
 완료 기준:
 - [ ] `frontend: lint` 통과
@@ -126,8 +174,14 @@
 
 체크리스트:
 - [ ] Expand → Migrate → Contract 순서로 배포 가능하도록 설계했다
+- [ ] (Expand) 새 컬럼/테이블은 서비스 중단 없이 추가 가능하도록 설계했다(기본값/NULL 허용 여부 포함)
+- [ ] (Migrate) 운영 데이터 이행/백필이 필요하면 별도 단계로 분리했다(대량 업데이트로 인한 락/부하 주의)
+- [ ] (Contract) 안정화 후 NOT NULL/제약/인덱스 강화를 적용한다(필요시 후순위)
 - [ ] 컬럼 추가는 DEFAULT/NOT NULL 정책을 안전하게 잡았다
 - [ ] 인덱스/제약은 운영 부하를 고려했다(필요시 후순위)
+- [ ] 마이그레이션 적용 전후로 백업/롤백 경로가 준비되어 있다(최소: 실패 시 되돌릴 1줄 플랜)
+- [ ] 로컬/도커 환경에서 `docs/DB_MIGRATION_V3.sql` 적용 후, 핵심 API 스모크를 수행했다
+- [ ] v3 변경에 필요한 스키마(예: 골드 미션 필드/CSV 출석 칼럼 등)가 SQL에 반영되어 있는지 재확인했다
 
 완료 기준:
 - [ ] 로컬/도커 환경에서 마이그레이션 적용 후 API 스모크 OK
@@ -172,7 +226,95 @@
 
 ---
 
-## 11. 배포/롤백 체크리스트(최소)
+## 11. P0 기능 체크리스트: 플래티넘/다이아 조건 변경 (v3)
+설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.2, 2.3
+
+### 11.1 플래티넘 조건 변경
+- [ ] 누적 입금액 조건이 “200,000원” 기준으로 동작한다
+- [ ] 누적 입금 횟수 조건이 “3회” 기준으로 동작한다
+- [ ] 플래티넘 해금은 “골드 금고 해제(선행조건)”를 만족해야만 가능하다
+  - [ ] 선행조건 정의를 명확히 했다(예: `gold_status`가 `UNLOCKED` 또는 `CLAIMED`)
+- [ ] 기존 플래티넘 로직(출석/리뷰 등)과 충돌하지 않도록 정리했다(중복 규칙 제거 또는 우선순위 확정)
+
+### 11.2 다이아 조건/만료 변경
+- [ ] 다이아 누적 충전 조건이 “2,000,000원” 기준으로 동작한다
+- [ ] CC카지노 출석부 기준 출석 “2회” 조건이 동작한다
+  - [ ] 출석 기준 필드가 서버에서 단일 소스로 관리된다(예: `diamond_attendance_days` 또는 별도 필드)
+- [ ] 다이아 해금은 “플래티넘 금고 해제(선행조건)”를 만족해야만 가능하다
+  - [ ] 선행조건 정의를 명확히 했다(예: `platinum_status`가 `UNLOCKED` 또는 `CLAIMED`)
+- [ ] 다이아 만료가 5일(120시간)로 동작한다
+  - [ ] `diamond_expires_at`(또는 동등한 필드) 기준으로 만료/표시/연산이 일관되다
+
+완료 기준:
+- [ ] `backend: pytest (docker)` 통과
+
+---
+
+## 12. P0 기능 체크리스트: UX/IA 요구사항 (v3)
+설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.4
+
+### 12.1 유저 로그인에서 어드민 완전 분리
+- [ ] 유저 UI에서 어드민 메뉴/링크가 아예 보이지 않는다
+- [ ] 직접 URL 접근으로도 어드민 페이지가 열리지 않는다(가드/리다이렉트/403 중 택1, 팀 기준으로 통일)
+- [ ] 유저/어드민 분리 변경이 기존 로그인 플로우를 깨지 않는다
+
+### 12.2 금고 가이드 내 네비게이션
+- [ ] 가이드 화면 상단에 “뒤로가기 / 홈 버튼”이 요구사항대로 존재한다
+- [ ] 동작이 명확하다(뒤로: 이전 화면, 홈: 대시보드/메인)
+
+### 12.3 사이드바 문구 3종(고정)
+- [ ] "현재 변경사항 - 금고조건 변경 후 진행예정입니다." 문구가 고정으로 유지된다
+- [ ] "이벤트 종료일 - 다이아 금고 기준으로 연동" 문구가 v3 다이아 마감(5일) 기준으로 표기된다
+- [ ] "최소 34만원 이사지원 혜택" 문구가 반영된다
+
+완료 기준:
+- [ ] `frontend: lint` 통과
+
+---
+
+## 13. P0 기능 체크리스트: 운영 CSV 업로드(cc_attendance_count) (v3)
+설계 출처: `docs/REFACTORING_PLAN_V3.md`의 2.5
+
+### 13.1 CSV 입력/스키마
+- [ ] CSV 칼럼 `cc_attendance_count`를 파싱한다(정수, 0~2+)
+- [ ] 누락/빈값 처리 정책이 명확하다(기본값 0 등)
+- [ ] 잘못된 값(문자/음수 등) 처리 정책이 명확하다(에러/클램프 중 택1)
+
+### 13.2 admin import 파이프라인 반영
+- [ ] 반영 위치가 계획서대로다(user-daily-import / admin imports)
+- [ ] DB에 값이 저장된다(연동 대상 필드가 명확하다)
+- [ ] 다이아 출석 조건 계산이 이 값과 일관되게 연결된다
+
+완료 기준:
+- [ ] `backend: pytest (docker)` 통과
+
+---
+
+## 14. 신규 테스트 계획(최소 세트)
+설계 출처: `docs/REFACTORING_PLAN_V3.md`의 10.2
+
+### 14.1 v3 조건/만료 회귀(Backend)
+- [ ] `test_vault_unlock_v3.py` 추가 또는 동등한 테스트 묶음이 존재한다
+  - [ ] 플래티넘은 골드 선행조건 없으면 해제되지 않는다
+  - [ ] 플래티넘 누적 입금 20만/3회 조건이 기대대로 동작한다
+  - [ ] 다이아는 플래티넘 선행조건 없으면 해제되지 않는다
+  - [ ] 다이아 만료 5일(120h) 규칙이 기대대로 동작한다
+  - [ ] 다이아 출석 2회/누적 200만 조건이 기대대로 동작한다
+
+### 14.2 SOT 정합성(선택이지만 권장)
+- [ ] `test_sot_consistency.py` 추가 또는 동등한 테스트가 존재한다
+  - [ ] BE/FE SOT의 보상액/만료시간 핵심 값이 일치한다
+
+### 14.3 admin import CSV(v3)
+- [ ] `test_admin_import_v3.py` 추가 또는 동등한 테스트가 존재한다
+  - [ ] `cc_attendance_count` 입력이 DB/조건 계산에 반영된다
+
+완료 기준:
+- [ ] `backend: pytest (docker)` 통과
+
+---
+
+## 15. 배포/롤백 체크리스트(최소)
 - [ ] DB 먼저 적용(Expand)
 - [ ] BE 배포(새 엔드포인트 추가 — 기본 UX에 영향 없게)
 - [ ] FE 배포(토글 UI 노출)
@@ -180,7 +322,7 @@
 
 ---
 
-## 12. 오늘 바로 할 “다음 3개”(추천)
+## 16. 오늘 바로 할 “다음 3개”(추천)
 - [ ] Phase 5(DB): 골드 미션 컬럼 3개 추가를 `docs/DB_MIGRATION_V3.sql`에 반영
 - [ ] Phase P0(BE): `POST /.../gold-missions` 엔드포인트 + 감사로그 + 멱등
 - [ ] Phase P0(FE): Admin v2 유저 상세 패널에 토글 UI + 프록시 라우트

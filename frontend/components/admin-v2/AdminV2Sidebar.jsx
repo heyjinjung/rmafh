@@ -47,6 +47,11 @@ export default function AdminV2Sidebar({ active }) {
           <div className="mt-3 rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/50 p-3">
             <p className="text-xs text-[var(--v2-text)]">Admin v2 콘솔</p>
             <p className="mt-2 text-xs text-[var(--v2-muted)]">좌측 메뉴에서 섹션을 선택하고 작업하세요.</p>
+            <div className="mt-3 space-y-1">
+              <p className="text-xs text-[var(--v2-muted)]">현재 변경사항 - 금고조건 변경 후 진행예정입니다.</p>
+              <p className="text-xs text-[var(--v2-muted)]">이벤트 종료일 - 다이아 금고 기준으로 연동</p>
+              <p className="text-xs text-[var(--v2-muted)]">최소 34만원 이사지원 혜택</p>
+            </div>
           </div>
         </div>
       </div>

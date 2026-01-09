@@ -1,5 +1,5 @@
 import Head from 'next/head';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import {
   AdminV2Layout,
@@ -13,8 +13,34 @@ export default function AdminV2Page() {
   const router = useRouter();
   const basePath = router?.basePath || '';
   const [adminPassword, setAdminPassword] = useState('');
+  const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [didBoot, setDidBoot] = useState(false);
   const [usersTarget, setUsersTarget] = useState(null);
   const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED !== 'false';
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const savedPassword = sessionStorage.getItem('adminPassword');
+    if (savedPassword) {
+      setAdminPassword(savedPassword);
+    }
+
+    const savedUser = localStorage.getItem('user');
+    setUserLoggedIn(Boolean(savedUser));
+    setDidBoot(true);
+  }, []);
+
+  useEffect(() => {
+    if (!didBoot) return;
+    if (userLoggedIn && !adminPassword) {
+      router.replace('/');
+    }
+  }, [didBoot, userLoggedIn, adminPassword, router]);
+
+  if (didBoot && userLoggedIn && !adminPassword) {
+    return null;
+  }
 
   // adminPassword가 없으면 비밀번호 입력 창 표시
   if (!adminPassword) {
@@ -42,6 +68,9 @@ export default function AdminV2Page() {
                 e.preventDefault();
                 const value = e.currentTarget.password.value.trim();
                 if (value) {
+                  if (typeof window !== 'undefined') {
+                    sessionStorage.setItem('adminPassword', value);
+                  }
                   setAdminPassword(value);
                 }
               }}
@@ -78,7 +107,15 @@ export default function AdminV2Page() {
       <Head>
         <title>Vault 어드민 v2</title>
       </Head>
-      <AdminV2Layout active="dashboard" onLogout={() => setAdminPassword('')}>
+      <AdminV2Layout
+        active="dashboard"
+        onLogout={() => {
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('adminPassword');
+          }
+          setAdminPassword('');
+        }}
+      >
         <section className="space-y-6">
 
           <div className="flex flex-wrap items-end justify-between gap-4">

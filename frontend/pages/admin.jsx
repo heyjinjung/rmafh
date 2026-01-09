@@ -31,6 +31,8 @@ export default function AdminPage() {
 
   const [adminPassword, setAdminPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [authBootstrapDone, setAuthBootstrapDone] = useState(false);
   const [externalUserId, setExternalUserId] = useState('');
   const [activeSection, setActiveSection] = useState('status');
   const [busyKey, setBusyKey] = useState('');
@@ -40,12 +42,26 @@ export default function AdminPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedPassword = sessionStorage.getItem('adminPassword');
+      const savedUser = localStorage.getItem('user');
+      setUserLoggedIn(Boolean(savedUser));
       if (savedPassword) {
         setAdminPassword(savedPassword);
         setIsAuthenticated(true);
       }
+      setAuthBootstrapDone(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!authBootstrapDone) return;
+    if (userLoggedIn && !isAuthenticated) {
+      router.replace('/');
+    }
+  }, [authBootstrapDone, userLoggedIn, isAuthenticated, router]);
+
+  if (authBootstrapDone && userLoggedIn && !isAuthenticated) {
+    return null;
+  }
 
   // 로그인 시 sessionStorage에 저장
   const handleLogin = () => {

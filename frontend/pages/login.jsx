@@ -106,16 +106,6 @@ export default function LoginPage() {
               {loading ? '입장 중...' : '금고 입장'}
             </button>
           </form>
-
-          {/* 어드민 링크 */}
-          <div className="text-center">
-            <Link
-              href="/admin"
-              className="text-sm text-cc-textSub hover:text-gold-primary transition-colors"
-            >
-              관리자 페이지
-            </Link>
-          </div>
         </div>
       </div>
     </>

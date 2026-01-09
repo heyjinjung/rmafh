@@ -188,6 +188,21 @@ class AdminStatusUpdateResponse(BaseModel):
     expires_at: Optional[str] = None
 
 
+class AdminGoldMissionsUpdateRequest(BaseModel):
+    gold_mission_1_done: Optional[bool] = None
+    gold_mission_2_done: Optional[bool] = None
+    gold_mission_3_done: Optional[bool] = None
+
+
+class AdminGoldMissionsUpdateResponse(BaseModel):
+    updated: bool
+    gold_mission_1_done: bool
+    gold_mission_2_done: bool
+    gold_mission_3_done: bool
+    gold_status: str
+    expires_at: Optional[str] = None
+
+
 class AdminAttendanceAdjustRequest(BaseModel):
     delta_days: Optional[int] = Field(None, description="변경할 출석 증감값(+/-). set_days가 없을 때만 사용")
     set_days: Optional[int] = Field(None, description="출석일수를 특정 값으로 설정")

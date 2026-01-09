@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
@@ -77,6 +78,8 @@ const VaultDial = ({ size = 'md', animationSpeed = 1 }) => {
 };
 
 const Header = () => {
+  const router = useRouter();
+
   return (
     <header className="bg-gradient-to-r from-[#202420] to-[#333933] text-white py-4 px-4 md:px-8 lg:px-16 sticky top-0 z-50 shadow-md border-b border-[#444]">
       <div className="container mx-auto flex justify-between items-center">
@@ -87,11 +90,18 @@ const Header = () => {
           <h1 className="text-xl md:text-2xl font-bold tracking-tight">금고 시스템</h1>
         </div>
         <div className="flex space-x-2">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="bg-gradient-to-r from-[#282D1A] to-[#394508] text-white px-4 py-2 rounded-lg text-sm font-bold border border-[#D2FD9C] hover:opacity-90 transition-all shadow-md"
+          >
+            뒤로가기
+          </button>
           <Link
             href="/"
-            className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md border border-[#D2FD9C] hidden md:block"
+            className="bg-gradient-to-r from-[#98BF64] to-[#D2FD9C] text-[#282D1A] px-4 py-2 rounded-lg text-sm font-bold hover:opacity-90 transition-all shadow-md border border-[#D2FD9C]"
           >
-            내 금고 확인
+            홈
           </Link>
           <a
             href="https://ccc-010.com"

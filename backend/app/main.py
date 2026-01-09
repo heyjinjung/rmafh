@@ -8,7 +8,7 @@ import csv
 import secrets
 import uuid
 
-from fastapi import FastAPI, HTTPException, Header, Depends, Request, Response
+from fastapi import FastAPI, HTTPException, Depends, Request, Response
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -28,6 +28,8 @@ from app.schemas import (
     AdminDepositUpdateResponse,
     AdminStatusUpdateRequest,
     AdminStatusUpdateResponse,
+    AdminGoldMissionsUpdateRequest,
+    AdminGoldMissionsUpdateResponse,
     AdminUserCreateRequest,
     AdminUserUpdateRequest,
     AdminUserResponse,
@@ -62,117 +64,33 @@ from app.schemas import (
     AdminBulkUpdateRequest,
     AdminBulkUpdateResponse,
 )
+from app.utils.auth import verify_admin_password
+from app.utils.audit import _log_admin_action
+from app.utils.sql_builders import _apply_job_timeouts, _build_user_target_sql
 
-app = FastAPI(title="Vault v2.0 API", version="0.2.0")
+# Phase 2/3: Import routers and services
+from app.routers import health as health_router
+from app.routers import vault as vault_router
+from app.routers import admin_users as admin_users_router
+from app.routers import admin_vault as admin_vault_router
+from app.services.common import (
+    now_utc,
+    validate_idempotency_key as _validate_idempotency_key_v2,
+    hash_request_body as _hash_request_body_v2,
+    idempotency_scope as _idempotency_scope_v2,
+    idempotency_start as _idempotency_start_v2,
+    idempotency_finish as _idempotency_finish_v2,
+)
+from app.services.user_identity_service import (
+    resolve_user_id as _resolve_user_id_v2,
+    bulk_get_or_create_user_ids_by_external_user_ids as _bulk_get_or_create_user_ids_v2,
+)
+from app.services.vault_service import (
+    get_or_create_vault_row as _get_or_create_vault_row_v2,
+)
+
+app = FastAPI(title="Vault v3.0 API", version="0.3.0")
 logger = logging.getLogger("vault.idempotency")
-
-
-def _parse_int_optional(value: Any) -> int | None:
-    if value is None:
-        return None
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        return int(cleaned)
-    return int(value)
-
-
-def _parse_date_optional(value: Any) -> date | None:
-    if value is None:
-        return None
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned:
-            return None
-        # yyyy-mm-dd
-        return datetime.fromisoformat(cleaned).date()
-    if hasattr(value, "year") and hasattr(value, "month") and hasattr(value, "day"):
-        # date-like
-        return value
-    raise ValueError("INVALID_DATE")
-
-
-def _build_user_target_sql(target: dict) -> tuple[str, list]:
-    """Return (where_sql, params) for vault_status/user_identity/user_admin_snapshot join."""
-
-    where: list[str] = [
-        "(vs.gold_status!='CLAIMED' OR vs.platinum_status!='CLAIMED' OR vs.diamond_status!='CLAIMED')"
-    ]
-    params: list[Any] = []
-
-    mode = (target.get("mode") or "").lower()
-    if mode == "filter":
-        filt = target.get("filter") or {}
-        q = (filt.get("query") or "").strip()
-        st = (filt.get("status") or "").strip()
-        if q:
-            like = f"%{q}%"
-            where.append("(ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s)")
-            params.extend([like, like])
-        if st and st.upper() not in {"ALL", "ANY"}:
-            where.append("COALESCE(vs.gold_status, 'LOCKED') = %s")
-            params.append(st.upper())
-        return " AND ".join(where), params
-
-    if mode == "segment":
-        filters = target.get("segment_filters") or {}
-        statuses = filters.get("status") or []
-        if statuses:
-            where.append("COALESCE(vs.gold_status, 'LOCKED') = ANY(%s)")
-            params.append([str(s).upper() for s in statuses])
-
-        expires_after = _parse_date_optional(filters.get("expiresAfter"))
-        expires_before = _parse_date_optional(filters.get("expiresBefore"))
-        if expires_after:
-            where.append("vs.expires_at::date >= %s")
-            params.append(expires_after)
-        if expires_before:
-            where.append("vs.expires_at::date <= %s")
-            params.append(expires_before)
-
-        deposit_min = _parse_int_optional(filters.get("depositMin"))
-        deposit_max = _parse_int_optional(filters.get("depositMax"))
-        if deposit_min is not None:
-            where.append("uas.deposit_total >= %s")
-            params.append(deposit_min)
-        if deposit_max is not None:
-            where.append("uas.deposit_total <= %s")
-            params.append(deposit_max)
-
-        attendance_min = _parse_int_optional(filters.get("attendanceMin"))
-        attendance_max = _parse_int_optional(filters.get("attendanceMax"))
-        capped_attendance_sql = """
-            CASE
-              WHEN uas.joined_date IS NULL THEN COALESCE(vs.platinum_attendance_days, 0)
-              ELSE LEAST(
-                COALESCE(vs.platinum_attendance_days, 0),
-                GREATEST(0, (CURRENT_DATE - uas.joined_date))
-              )
-            END
-        """.strip()
-        if attendance_min is not None:
-            where.append(f"({capped_attendance_sql}) >= %s")
-            params.append(attendance_min)
-        if attendance_max is not None:
-            where.append(f"({capped_attendance_sql}) <= %s")
-            params.append(attendance_max)
-
-        if bool(filters.get("telegramOk")):
-            where.append("uas.telegram_ok = TRUE")
-        if bool(filters.get("reviewOk")):
-            where.append("uas.review_ok = TRUE")
-
-        return " AND ".join(where), params
-
-    raise HTTPException(status_code=400, detail="INVALID_TARGET_MODE")
-
-
-def _apply_job_timeouts(cur):
-    cur.execute("SET LOCAL lock_timeout = %s", (f"{config.JOB_LOCK_TIMEOUT_MS}ms",))
-    cur.execute("SET LOCAL statement_timeout = %s", (f"{config.JOB_STATEMENT_TIMEOUT_MS}ms",))
 
 # Allow local/dev origins for FE preview and Docker usage.
 app.add_middleware(
@@ -183,63 +101,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Admin auth dependency
-def verify_admin_password(x_admin_password: str | None = Header(None)):
-    if x_admin_password is None:
-        if config.ALLOW_INSECURE_ADMIN_BYPASS:
-            return "bypass"
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    if x_admin_password != config.ADMIN_PASSWORD:
-        raise HTTPException(status_code=401, detail="UNAUTHORIZED")
-    return x_admin_password
-
-
-def _log_admin_action(
-    conn,
-    admin_user: str,
-    action: str,
-    endpoint: str,
-    target_user_ids: list[int] | None,
-    request_id: str | None,
-    request_body: dict | None,
-    response_status: str,
-    response_summary: dict | None,
-    error_message: str | None = None,
-    metadata: dict | None = None,
-    *,
-    job_id: str | None = None,
-    idempotency_key: str | None = None,
-):
-    """어드민 감사 로그 기록"""
-    cur = conn.cursor()
-    target_user_ids_array = target_user_ids if target_user_ids else []
-    target_count = len(target_user_ids_array) if target_user_ids_array else 0
-    
-    cur.execute(
-        """
-        INSERT INTO admin_audit_log
-            (admin_user, action, endpoint, target_user_ids, target_count,
-             request_id, request_body, response_status, response_summary, error_message, metadata,
-             job_id, idempotency_key)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """,
-        (
-            admin_user,
-            action,
-            endpoint,
-            target_user_ids_array,
-            target_count,
-            request_id,
-            Json(request_body) if request_body else None,
-            response_status,
-            Json(response_summary) if response_summary else None,
-            error_message,
-            Json(metadata) if metadata else None,
-            job_id,
-            idempotency_key,
-        ),
-    )
+# Phase 2: Include routers (기존 엔드포인트와 경로 동일 유지)
+app.include_router(health_router.router)
+app.include_router(vault_router.router)
+app.include_router(admin_users_router.router)
+app.include_router(admin_vault_router.router)
 
 
 @app.on_event("startup")
@@ -256,349 +122,18 @@ def _shutdown():
     db.close_pool()
 
 
-@app.get("/health", response_model=HealthResponse)
-async def health():
-    return HealthResponse(status="ok")
+# Note: /health endpoint moved to routers/health.py
+# Note: /api/vault/login endpoint moved to routers/vault.py
+# Note: /api/vault/status endpoint moved to routers/vault.py
+# Note: /api/vault/claim endpoint moved to routers/vault.py
+# Note: /api/vault/attendance endpoint moved to routers/vault.py
+# Note: admin user CRUD moved to routers/admin_users.py
+# Note: admin vault operations moved to routers/admin_vault.py
 
 
-@app.post("/api/vault/login", response_model=UserLoginResponse)
-async def user_login(body: UserLoginRequest):
-    """유저 로그인: 입력값을 external_user_id 우선으로 사용하고, 없으면 스냅샷 닉네임으로 역검색"""
-    nickname = body.nickname.strip()
-    if not nickname:
-        raise HTTPException(status_code=400, detail="INVALID_NICKNAME")
-
-    # 입력값을 external_user_id로 그대로 사용 (CSV와 일치 가정)
-    external_user_id = _normalize_external_user_id(nickname)
-
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        # 1차: external_user_id 일치 검색
-        cur.execute(
-            "SELECT user_id, external_user_id FROM user_identity WHERE external_user_id=%s",
-            (external_user_id,),
-        )
-        row = cur.fetchone()
-
-        # 2차: 스냅샷 닉네임으로 역검색 (CSV 닉네임과 동일한 경우)
-        if not row:
-            cur.execute(
-                """
-                SELECT ui.user_id, ui.external_user_id
-                  FROM user_admin_snapshot uas
-                  JOIN user_identity ui ON ui.user_id = uas.user_id
-                 WHERE uas.nickname = %s
-                 LIMIT 1
-                """,
-                (nickname,),
-            )
-            row = cur.fetchone()
-
-        if not row:
-            raise HTTPException(
-                status_code=403,
-                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드한 후에 로그인할 수 있습니다.",
-            )
-
-        user_id = int(row[0])
-        resolved_external_user_id = row[1]
-
-        cur.execute(
-            "SELECT nickname, COALESCE(telegram_ok, false) FROM user_admin_snapshot WHERE user_id=%s",
-            (user_id,),
-        )
-        snapshot_row = cur.fetchone()
-        if not snapshot_row:
-            raise HTTPException(
-                status_code=403,
-                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드한 후에 로그인할 수 있습니다.",
-            )
-
-        # CSV에 저장된 닉네임을 신뢰 소스로 사용
-        snapshot_nickname = snapshot_row[0] or nickname
-        telegram_ok = bool(snapshot_row[1]) if snapshot_row[1] is not None else False
-
-        # vault_status 기본 행이 누락된 경우에만 보정
-        now = _now()
-        expires_at = now + timedelta(hours=72)
-        initial_gold_status = "UNLOCKED" if telegram_ok else "LOCKED"
-        cur.execute(
-            """
-            INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
-            VALUES (%s, %s, %s, 'LOCKED', 'LOCKED')
-            ON CONFLICT (user_id) DO NOTHING
-            """,
-            (user_id, expires_at, initial_gold_status),
-        )
-
-        conn.commit()
-
-    return UserLoginResponse(
-        external_user_id=resolved_external_user_id,
-        nickname=snapshot_nickname,
-        user_id=user_id,
-    )
-
-
-@app.get("/api/vault/status")
-async def vault_status(user_id: int | None = None, external_user_id: str | None = None):
-    """Return vault status snapshot for the given user (default demo user).
-
-    This mirrors the FE contract in docs/API_SPEC_VAULT_V2.md and uses
-    vault_status table if present; otherwise returns a safe default.
-    """
-    now = _now()
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
-        review_row = None
-        cur.execute(
-            """
-            SELECT vs.expires_at,
-                   vs.gold_status,
-                   vs.platinum_status,
-                   vs.diamond_status,
-                   vs.platinum_attendance_days,
-                   vs.platinum_deposit_done,
-                   vs.diamond_deposit_current,
-                   uas.last_deposit_at
-              FROM vault_status vs
-              LEFT JOIN user_admin_snapshot uas ON vs.user_id = uas.user_id
-             WHERE vs.user_id=%s
-            """,
-            (user_id,),
-        )
-        row = cur.fetchone()
-
-        # CSV 업로드된 회원만 접근 가능
-        cur.execute(
-            """
-            SELECT COALESCE(telegram_ok, false),
-                   COALESCE(review_ok, false)
-              FROM user_admin_snapshot
-             WHERE user_id=%s
-            """,
-            (user_id,),
-        )
-        review_row = cur.fetchone()
-        
-        # 프로덕션/로컬에서만 CSV 업로드 필수, 테스트에서는 허용
-        if not review_row and config.APP_ENV not in {"test"}:
-            raise HTTPException(
-                status_code=403,
-                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 금고에 접근할 수 있습니다."
-            )
-
-    # Fallback defaults if user row not found
-    last_deposit_at = row[7] if row and row[7] else None
-    base_time = last_deposit_at if last_deposit_at else now
-    expires_at = row[0] if row else base_time + timedelta(hours=72)
-    gold_status = row[1] if row else "LOCKED"
-    platinum_status = row[2] if row else "LOCKED"
-    diamond_status = row[3] if row else "LOCKED"
-
-    platinum_attendance_days = int(row[4]) if row and row[4] is not None else 0
-    platinum_deposit_done = bool(row[5]) if row and row[5] is not None else False
-    diamond_deposit_current = int(row[6]) if row and row[6] is not None else 0
-
-    telegram_ok = bool(review_row[0]) if review_row and review_row[0] is not None else False
-    platinum_review_done = bool(review_row[1]) if review_row and review_row[1] is not None else False
-
-    remaining_ms = int((expires_at - now).total_seconds() * 1000)
-    ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
-
-    reward_amounts = {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 70000, "BONUS": 0}
-    status_by_type = {"GOLD": gold_status, "PLATINUM": platinum_status, "DIAMOND": diamond_status}
-    loss_breakdown = {
-        k: (0 if status_by_type[k] in {"CLAIMED", "EXPIRED"} else reward_amounts[k])
-        for k in ("GOLD", "PLATINUM", "DIAMOND")
-    }
-    loss_breakdown["BONUS"] = 0
-    loss_total = int(sum(loss_breakdown.values()))
-
-    return {
-        "gold_status": gold_status,
-        "platinum_status": platinum_status,
-        "diamond_status": diamond_status,
-        "platinum_attendance_days": platinum_attendance_days,
-        "platinum_deposit_done": platinum_deposit_done,
-        "platinum_review_done": platinum_review_done,
-        "telegram_ok": telegram_ok,
-        "diamond_deposit_current": diamond_deposit_current,
-        "expires_at": expires_at.isoformat(),
-        "now": now.isoformat(),
-        "loss_total": loss_total,
-        "loss_breakdown": loss_breakdown,
-        "ms_countdown": ms_countdown,
-        "social_proof": {"vault_type": "PLATINUM", "claimed_last_24h": 4231},
-        "curation_tier": "PLATINUM_BIASED",
-    }
-
-
-@app.post("/api/vault/claim", response_model=ClaimResponse)
-async def claim_vault(body: ClaimRequest, user_id: int | None = None, external_user_id: str | None = None):
-    vault_type = body.vault_type.upper()
-    if vault_type not in {"GOLD", "PLATINUM", "DIAMOND"}:
-        raise HTTPException(status_code=400, detail="INVALID_VAULT_TYPE")
-
-    now = _now()
-    status_col = f"{vault_type.lower()}_status"
-    claimed_at_col = f"{vault_type.lower()}_claimed_at"
-
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
-        
-        # CSV 업로드된 회원만 금고 수령 가능
-        cur.execute(
-            "SELECT 1 FROM user_admin_snapshot WHERE user_id=%s",
-            (user_id,)
-        )
-        if not cur.fetchone() and config.APP_ENV not in {"test"}:
-            raise HTTPException(
-                status_code=403,
-                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 금고를 수령할 수 있습니다."
-            )
-        
-        cur.execute(
-            """
-            SELECT expires_at, gold_status, platinum_status, diamond_status
-              FROM vault_status
-             WHERE user_id=%s
-             FOR UPDATE
-            """,
-            (user_id,),
-        )
-        row = cur.fetchone()
-
-        if not row:
-            # Create a baseline row for demo user.
-            expires_at = now + timedelta(hours=72)
-            cur.execute(
-                """
-                INSERT INTO vault_status
-                    (user_id, expires_at, gold_status, platinum_status, diamond_status)
-                VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED')
-                ON CONFLICT (user_id) DO NOTHING
-                """,
-                (user_id, expires_at),
-            )
-            cur.execute(
-                """
-                SELECT expires_at, gold_status, platinum_status, diamond_status
-                  FROM vault_status
-                 WHERE user_id=%s
-                 FOR UPDATE
-                """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-
-        expires_at, gold_status, platinum_status, diamond_status = row
-        current_status = {
-            "GOLD": gold_status,
-            "PLATINUM": platinum_status,
-            "DIAMOND": diamond_status,
-        }[vault_type]
-
-        if current_status == "CLAIMED":
-            raise HTTPException(status_code=409, detail="ALREADY_CLAIMED")
-        if current_status != "UNLOCKED":
-            raise HTTPException(status_code=403, detail="NOT_CLAIMABLE")
-
-        cur.execute(
-            f"""
-            UPDATE vault_status
-               SET {status_col}='CLAIMED',
-                   {claimed_at_col}=%s,
-                   updated_at=NOW()
-             WHERE user_id=%s
-            """,
-            (now, user_id),
-        )
-        conn.commit()
-
-    return ClaimResponse(claimed=True, vault_type=vault_type, now=now.isoformat(), expires_at=expires_at.isoformat())
-
-
-@app.post("/api/vault/attendance", response_model=AttendanceResponse)
-async def attendance(user_id: int | None = None, external_user_id: str | None = None):
-    now = _now()
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        user_id = _resolve_user_id(cur, user_id=user_id, external_user_id=external_user_id, default_user_id=1, create_if_missing=True)
-        
-        # CSV 업로드된 회원만 출석 체크 가능
-        cur.execute(
-            "SELECT 1 FROM user_admin_snapshot WHERE user_id=%s",
-            (user_id,)
-        )
-        if not cur.fetchone():
-            raise HTTPException(
-                status_code=403,
-                detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 출석체크를 할 수 있습니다."
-            )
-        
-        cur.execute(
-            """
-            SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
-              FROM vault_status
-             WHERE user_id=%s
-             FOR UPDATE
-            """,
-            (user_id,),
-        )
-        row = cur.fetchone()
-
-        if not row:
-            expires_at = now + timedelta(hours=72)
-            cur.execute(
-                """
-                INSERT INTO vault_status
-                    (user_id, expires_at, gold_status, platinum_status, diamond_status, platinum_attendance_days, platinum_deposit_done, last_attended_at)
-                VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED', 0, false, NULL)
-                ON CONFLICT (user_id) DO NOTHING
-                """,
-                (user_id, expires_at),
-            )
-            cur.execute(
-                """
-                SELECT expires_at, platinum_attendance_days, last_attended_at, platinum_deposit_done, platinum_status
-                  FROM vault_status
-                 WHERE user_id=%s
-                 FOR UPDATE
-                """,
-                (user_id,),
-            )
-            row = cur.fetchone()
-
-        expires_at, days, last_attended_at, deposit_done, platinum_status = row
-        days = int(days or 0)
-        deposit_done = bool(deposit_done)
-
-        if last_attended_at is not None and last_attended_at.date() == now.date():
-            raise HTTPException(status_code=409, detail="ALREADY_ATTENDED")
-
-        new_days = min(3, days + 1)
-        new_platinum_status = platinum_status
-        if new_days >= 3 and deposit_done and platinum_status == "LOCKED":
-            new_platinum_status = "UNLOCKED"
-
-        cur.execute(
-            """
-            UPDATE vault_status
-               SET platinum_attendance_days=%s,
-                   last_attended_at=%s,
-                   platinum_status=%s,
-                   updated_at=NOW()
-             WHERE user_id=%s
-            """,
-            (new_days, now, new_platinum_status, user_id),
-        )
-        conn.commit()
-
-    return AttendanceResponse(platinum_attendance_days=new_days, now=now.isoformat(), expires_at=expires_at.isoformat())
-
+# ============================================================================
+# Helper functions (used by remaining endpoints)
+# ============================================================================
 
 def _now():
     return datetime.now(timezone.utc)
@@ -675,7 +210,10 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
                diamond_status,
                platinum_attendance_days,
                platinum_deposit_done,
-               diamond_deposit_current
+               diamond_deposit_current,
+               gold_mission_1_done,
+               gold_mission_2_done,
+               gold_mission_3_done
           FROM vault_status
          WHERE user_id=%s
          FOR UPDATE
@@ -703,7 +241,10 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
                diamond_status,
                platinum_attendance_days,
                platinum_deposit_done,
-               diamond_deposit_current
+               diamond_deposit_current,
+               gold_mission_1_done,
+               gold_mission_2_done,
+               gold_mission_3_done
           FROM vault_status
          WHERE user_id=%s
          FOR UPDATE
@@ -1559,6 +1100,9 @@ def _ensure_schema():
                 user_id INTEGER PRIMARY KEY,
                 expires_at TIMESTAMPTZ NOT NULL,
                 gold_status TEXT NOT NULL DEFAULT 'LOCKED',
+                gold_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE,
+                gold_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE,
+                gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE,
                 platinum_status TEXT NOT NULL DEFAULT 'LOCKED',
                 diamond_status TEXT NOT NULL DEFAULT 'LOCKED',
                 expiry_extend_count INTEGER NOT NULL DEFAULT 0,
@@ -1703,6 +1247,9 @@ def _ensure_schema():
 
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'LOCKED'")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_reason TEXT")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_at TIMESTAMPTZ")
@@ -2721,132 +2268,7 @@ async def list_admin_audit_log(
     return AdminAuditLogListResponse(total=total, page=page, page_size=page_size, has_more=has_more, items=items)
 
 
-@app.get("/api/vault/admin/users")
-async def get_all_users(
-    query: str | None = None,
-    status: str | None = None,
-    sort_by: str | None = None,
-    sort_dir: str | None = None,
-    page: int = 1,
-    page_size: int = 50,
-    _auth: str = Depends(verify_admin_password),
-):
-    """회원 리스트 조회 (서버 페이징/정렬/필터).
-
-    - query: external_user_id 또는 nickname 부분 일치
-    - status: gold_status 기준 필터 (LOCKED/UNLOCKED/CLAIMED/EXPIRED)
-    - sort_by: created_at/expires_at/deposit_total/external_user_id/nickname
-    - sort_dir: asc|desc
-    - page/page_size: 최대 200
-    """
-
-    if page < 1:
-        page = 1
-    page_size = max(1, min(page_size, 200))
-
-    sort_by = (sort_by or "created_at").lower()
-    sort_dir = (sort_dir or "desc").lower()
-    sort_map = {
-        "created_at": "ui.created_at",
-        "expires_at": "vs.expires_at",
-        "deposit_total": "uas.deposit_total",
-        "external_user_id": "ui.external_user_id",
-        "nickname": "uas.nickname",
-    }
-    order_col = sort_map.get(sort_by, "ui.created_at")
-    order_dir = "ASC" if sort_dir == "asc" else "DESC"
-
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        _apply_job_timeouts(cur)
-
-        base_sql = [
-            """
-            FROM user_identity ui
-            LEFT JOIN vault_status vs ON ui.user_id = vs.user_id
-            INNER JOIN user_admin_snapshot uas ON ui.user_id = uas.user_id
-            """
-        ]
-        where = []
-        params = []
-        if query:
-            where.append("(ui.external_user_id ILIKE %s OR uas.nickname ILIKE %s)")
-            like = f"%{query}%"
-            params.extend([like, like])
-        if status:
-            where.append("COALESCE(vs.gold_status, 'LOCKED') = %s")
-            params.append(status)
-        if where:
-            base_sql.append("WHERE " + " AND ".join(where))
-
-        # total count
-        cur.execute("SELECT COUNT(*) " + "\n".join(base_sql), params)
-        total = cur.fetchone()[0]
-
-        offset = (page - 1) * page_size
-        cur.execute(
-            """
-            SELECT
-                ui.user_id,
-                ui.external_user_id,
-                ui.created_at,
-                vs.expires_at,
-                vs.gold_status,
-                vs.platinum_status,
-                vs.diamond_status,
-                vs.platinum_attendance_days,
-                vs.platinum_deposit_done,
-                vs.diamond_deposit_current,
-                uas.review_ok,
-                uas.deposit_total,
-                uas.nickname,
-                uas.telegram_ok,
-                uas.joined_date
-            """
-            + "\n".join(base_sql)
-            + f"\nORDER BY {order_col} {order_dir} NULLS LAST LIMIT %s OFFSET %s",
-            params + [page_size, offset],
-        )
-        rows = cur.fetchall()
-
-        from datetime import date
-        today = date.today()
-
-        users = []
-        for row in rows:
-            joined_date = row[14]
-            max_attendance_days = 0
-            if joined_date:
-                days_since_join = (today - joined_date).days
-                max_attendance_days = max(0, days_since_join)
-
-            actual_attendance = row[7] or 0
-            capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
-
-            deposit_total = int(row[11] or 0)
-            platinum_deposit_done = bool(row[8])
-            diamond_deposit_current = int(row[9] or 0) or deposit_total
-
-            users.append({
-                "user_id": row[0],
-                "external_user_id": row[1],
-                "created_at": row[2].isoformat() if row[2] else None,
-                "expires_at": row[3].isoformat() if row[3] else None,
-                "gold_status": row[4] or "LOCKED",
-                "platinum_status": row[5] or "LOCKED",
-                "diamond_status": row[6] or "LOCKED",
-                "platinum_attendance_days": capped_attendance,
-                "max_attendance_days": max_attendance_days,
-                "joined_date": joined_date.isoformat() if joined_date else None,
-                "platinum_deposit_done": platinum_deposit_done,
-                "diamond_deposit_current": diamond_deposit_current,
-                "review_ok": row[10] or False,
-                "deposit_total": deposit_total,
-                "nickname": row[12] or "",
-                "telegram_ok": row[13] or False,
-            })
-
-        return {"users": users, "total": total, "page": page, "page_size": page_size}
+# Note: /api/vault/admin/users GET moved to routers/admin_users.py
 
 
 @app.get("/api/vault/admin/segments", response_model=AdminSegmentsListResponse)
@@ -3288,7 +2710,7 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
         if not row:
             raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
 
-        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current = row
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current, *_rest = row
         current = {
             "gold_status": gold_status,
             "platinum_status": platinum_status,
@@ -3867,6 +3289,138 @@ async def admin_delete_user(user_id: int, request: Request, response: Response, 
         return response_body
 
 
+@app.post("/api/vault/admin/users/{user_id}/vault/gold-missions", response_model=AdminGoldMissionsUpdateResponse)
+async def admin_update_gold_missions(user_id: int, body: AdminGoldMissionsUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
+    if all(
+        getattr(body, field) is None
+        for field in ("gold_mission_1_done", "gold_mission_2_done", "gold_mission_3_done")
+    ):
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    updates: dict[str, bool] = {}
+    if body.gold_mission_1_done is not None:
+        updates["gold_mission_1_done"] = bool(body.gold_mission_1_done)
+    if body.gold_mission_2_done is not None:
+        updates["gold_mission_2_done"] = bool(body.gold_mission_2_done)
+    if body.gold_mission_3_done is not None:
+        updates["gold_mission_3_done"] = bool(body.gold_mission_3_done)
+
+    key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = _idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/gold-missions"
+    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+
+    now = _now()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+
+        cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+
+        idem = _idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminGoldMissionsUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        row = _get_or_create_vault_row(cur, user_id, now)
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        (
+            expires_at,
+            gold_status,
+            _platinum_status,
+            _diamond_status,
+            _attendance_days,
+            _platinum_deposit_done,
+            _diamond_deposit_current,
+            gold_mission_1_done,
+            gold_mission_2_done,
+            gold_mission_3_done,
+        ) = row
+
+        new_m1 = updates.get("gold_mission_1_done", bool(gold_mission_1_done))
+        new_m2 = updates.get("gold_mission_2_done", bool(gold_mission_2_done))
+        new_m3 = updates.get("gold_mission_3_done", bool(gold_mission_3_done))
+
+        new_gold_status = gold_status
+        if gold_status not in {"CLAIMED", "EXPIRED"}:
+            new_gold_status = "UNLOCKED" if (new_m1 and new_m2 and new_m3) else "LOCKED"
+
+        set_clauses = []
+        params: list[Any] = []
+        if "gold_mission_1_done" in updates:
+            set_clauses.append("gold_mission_1_done=%s")
+            params.append(new_m1)
+        if "gold_mission_2_done" in updates:
+            set_clauses.append("gold_mission_2_done=%s")
+            params.append(new_m2)
+        if "gold_mission_3_done" in updates:
+            set_clauses.append("gold_mission_3_done=%s")
+            params.append(new_m3)
+        if gold_status not in {"CLAIMED", "EXPIRED"}:
+            set_clauses.append("gold_status=%s")
+            params.append(new_gold_status)
+        set_clauses.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"""
+            UPDATE vault_status
+               SET {', '.join(set_clauses)}
+             WHERE user_id=%s
+            """,
+            params,
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_GOLD_MISSIONS_UPDATE",
+            endpoint=endpoint,
+            target_user_ids=[user_id],
+            request_id=key,
+            request_body=updates,
+            response_status="SUCCESS",
+            response_summary={
+                "gold_mission_1_done": new_m1,
+                "gold_mission_2_done": new_m2,
+                "gold_mission_3_done": new_m3,
+                "gold_status": new_gold_status,
+            },
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "updated": True,
+            "gold_mission_1_done": new_m1,
+            "gold_mission_2_done": new_m2,
+            "gold_mission_3_done": new_m3,
+            "gold_status": new_gold_status,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        _idempotency_finish(
+            cur,
+            key=key,
+            scope=scope,
+            endpoint=endpoint,
+            response_status=200,
+            response_body=response_body,
+        )
+
+        conn.commit()
+
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminGoldMissionsUpdateResponse(**response_body)
+
+
 @app.post("/api/vault/admin/users/{user_id}/vault/status", response_model=AdminStatusUpdateResponse)
 async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
     now = _now()
@@ -4002,7 +3556,7 @@ async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustReque
         if not row:
             raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
 
-        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, _diamond_deposit_current = row
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, _diamond_deposit_current, *_rest = row
         current_days = int(attendance_days or 0)
 
         if body.set_days is not None:
@@ -4093,7 +3647,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
         if not row:
             raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
 
-        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current = row
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current, *_rest = row
         new_platinum_deposit_done = bool(body.platinum_deposit_done) if body.platinum_deposit_done is not None else bool(platinum_deposit_done)
         new_diamond_deposit_current = int(body.diamond_deposit_current) if body.diamond_deposit_current is not None else int(diamond_deposit_current or 0)
 
