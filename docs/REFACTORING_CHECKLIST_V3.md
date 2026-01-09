@@ -171,6 +171,12 @@
 완료 기준:
 - [x] `backend: pytest (docker)` 통과 (23 passed)
 
+
+테스트 파일	테스트 수	결과
+test_vault_unlock_v3.py	12개	✅ 12 passed
+test_sot_consistency.py	14개	✅ 12 passed, 2 skipped
+
+
 ---
 
 ## 7. Phase 3: 서비스 레이어(난이도: 중~상)
