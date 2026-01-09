@@ -216,13 +216,15 @@ class AdminAttendanceAdjustResponse(BaseModel):
 
 
 class AdminDepositUpdateRequest(BaseModel):
-    platinum_deposit_done: Optional[bool] = None
-    diamond_deposit_current: Optional[int] = None
+    platinum_deposit_total: Optional[int] = None
+    platinum_deposit_count: Optional[int] = None
+    diamond_deposit_total: Optional[int] = None
 
 
 class AdminDepositUpdateResponse(BaseModel):
-    platinum_deposit_done: bool
-    diamond_deposit_current: int
+    platinum_deposit_total: int
+    platinum_deposit_count: int
+    diamond_deposit_total: int
     platinum_status: str
     diamond_status: str
     expires_at: Optional[str]

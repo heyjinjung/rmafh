@@ -58,6 +58,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     telegram_ok: false,
     review_ok: false,
   });
+  const [goldStatus, setGoldStatus] = useState('LOCKED');
+  const [goldMission1, setGoldMission1] = useState(false);
+  const [goldMission2, setGoldMission2] = useState(false);
+  const [goldMission3, setGoldMission3] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -126,6 +130,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setExpiryReason('OPS');
     setPlatinumDepositDone(Boolean(row?.platinum_deposit_done) || Number(row?.deposit_total || 0) >= 150000);
     setDiamondDepositCurrent(Number(row?.diamond_deposit_current || row?.deposit_total || 0));
+    setGoldStatus(row?.gold_status || 'LOCKED');
+    setGoldMission1(Boolean(row?.gold_mission_1_done));
+    setGoldMission2(Boolean(row?.gold_mission_2_done));
+    setGoldMission3(Boolean(row?.gold_mission_3_done));
   };
 
   const openCreate = () => {
@@ -354,6 +362,55 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     } finally {
       setDepositSaving(false);
     }
+
+  };
+
+  const submitGoldMissions = async (updates = {}) => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const body = { ...updates };
+    if (!Object.keys(body).length) return;
+
+    try {
+      setSaving(true);
+      const res = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/gold-missions`, {
+        method: 'POST',
+        body,
+        idempotencyKey: makeRequestId(),
+      });
+      const data = res?.data || {}; // Proxy returns { data: ... } or just body depending on implementation. Inspecting proxy: it returns body directly.
+      // Actually AdminV2UsersGrid uses `withIdempotency` which wraps the response in { data, ... } or throws error.
+      // My proxy returns res.json(body), so `apiFetch` (withIdempotency) will see that as `data`.
+      // Let's verify `withIdempotency` implementation if possible, but standard is `data` property.
+
+      const newM1 = Boolean(data.gold_mission_1_done ?? goldMission1);
+      const newM2 = Boolean(data.gold_mission_2_done ?? goldMission2);
+      const newM3 = Boolean(data.gold_mission_3_done ?? goldMission3);
+      const newStatus = data.gold_status ?? goldStatus;
+
+      setGoldMission1(newM1);
+      setGoldMission2(newM2);
+      setGoldMission3(newM3);
+      setGoldStatus(newStatus);
+
+      setSelectedRow((prev) => (prev ? {
+        ...prev,
+        gold_mission_1_done: newM1,
+        gold_mission_2_done: newM2,
+        gold_mission_3_done: newM3,
+        gold_status: newStatus,
+        expires_at: data.expires_at || prev.expires_at,
+      } : prev));
+
+      pushToast({ ok: true, message: '미션 상태 업데이트', detail: `상태: ${newStatus}` });
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '미션 업데이트 실패', detail: info.detail });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitDelete = async () => {
@@ -560,58 +617,58 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             role="presentation"
           >
             <table className="table-fixed min-w-full text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
-                  <tr>
-                    {columnDefs.map((col) => (
-                        <th key={col.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
-                          <button
-                            type="button"
-                            onClick={() => toggleSort(col.key)}
-                            className="flex items-center gap-1 text-[var(--v2-text)] hover:text-[var(--v2-accent)]"
-                          >
-                            <span>{col.label}</span>
-                            {sortBy === col.key ? <span className="text-[var(--v2-muted)]">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
-                          </button>
-                        </th>
-                      ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--v2-border)]">
-                  {rows.map((row) => {
-                    const isSelected = selectedRow?.external_user_id === row.external_user_id;
-                    return (
-                      <tr
-                        key={row.external_user_id}
-                        className={[
-                          'cursor-pointer transition hover:bg-[var(--v2-surface)]',
-                          isSelected ? 'bg-[var(--v2-surface)]/80 border-l-2 border-[var(--v2-accent)]' : '',
-                        ].join(' ')}
-                        onClick={() => onRowClick(row)}
+              <thead className="sticky top-0 z-10 bg-[var(--v2-surface-2)] text-[var(--v2-muted)]">
+                <tr>
+                  {columnDefs.map((col) => (
+                    <th key={col.key} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]">
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(col.key)}
+                        className="flex items-center gap-1 text-[var(--v2-text)] hover:text-[var(--v2-accent)]"
                       >
-                        {columnDefs.map((col) => {
-                            const val = row[col.key];
-                            let display = '';
-                            if (col.key === 'created_at' || col.key === 'expires_at') {
-                              // ISO8601 → YYYY-MM-DD
-                              display = val ? val.slice(0, 10) : '';
-                            } else if (col.key === 'telegram_ok' || col.key === 'review_ok') {
-                              // 체크마크 또는 공백
-                              display = val ? '✓' : '';
-                            } else if (typeof val === 'number') {
-                              display = val.toLocaleString();
-                            } else {
-                              display = (val || '').toString();
-                            }
-                            return (
-                              <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
-                                {col.key === 'external_user_id' ? <span className="font-mono text-[var(--v2-accent)]">{display}</span> : display}
-                              </td>
-                            );
-                          })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                        <span>{col.label}</span>
+                        {sortBy === col.key ? <span className="text-[var(--v2-muted)]">{sortDir === 'asc' ? '↑' : '↓'}</span> : null}
+                      </button>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--v2-border)]">
+                {rows.map((row) => {
+                  const isSelected = selectedRow?.external_user_id === row.external_user_id;
+                  return (
+                    <tr
+                      key={row.external_user_id}
+                      className={[
+                        'cursor-pointer transition hover:bg-[var(--v2-surface)]',
+                        isSelected ? 'bg-[var(--v2-surface)]/80 border-l-2 border-[var(--v2-accent)]' : '',
+                      ].join(' ')}
+                      onClick={() => onRowClick(row)}
+                    >
+                      {columnDefs.map((col) => {
+                        const val = row[col.key];
+                        let display = '';
+                        if (col.key === 'created_at' || col.key === 'expires_at') {
+                          // ISO8601 → YYYY-MM-DD
+                          display = val ? val.slice(0, 10) : '';
+                        } else if (col.key === 'telegram_ok' || col.key === 'review_ok') {
+                          // 체크마크 또는 공백
+                          display = val ? '✓' : '';
+                        } else if (typeof val === 'number') {
+                          display = val.toLocaleString();
+                        } else {
+                          display = (val || '').toString();
+                        }
+                        return (
+                          <td key={col.key} className="px-4 py-2 text-[var(--v2-text)]">
+                            {col.key === 'external_user_id' ? <span className="font-mono text-[var(--v2-accent)]">{display}</span> : display}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
+              </tbody>
             </table>
           </div>
 
@@ -791,6 +848,45 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2">
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">골드 볼트 (미션)</div>
+                      <div className="text-[10px] text-[var(--v2-accent)] border border-[var(--v2-accent)] px-1 rounded">{statusLabel(goldStatus)}</div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
+                        <input
+                          type="checkbox"
+                          checked={goldMission1}
+                          onChange={(e) => submitGoldMissions({ gold_mission_1_done: e.target.checked })}
+                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                          className="accent-[var(--v2-accent)]"
+                        />
+                        <span>1. 입장 (CC/매니저)</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
+                        <input
+                          type="checkbox"
+                          checked={goldMission2}
+                          onChange={(e) => submitGoldMissions({ gold_mission_2_done: e.target.checked })}
+                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                          className="accent-[var(--v2-accent)]"
+                        />
+                        <span>2. 본인인증 (간편)</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer hover:text-[var(--v2-accent)] transition">
+                        <input
+                          type="checkbox"
+                          checked={goldMission3}
+                          onChange={(e) => submitGoldMissions({ gold_mission_3_done: e.target.checked })}
+                          disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                          className="accent-[var(--v2-accent)]"
+                        />
+                        <span>3. 기타 (예비)</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">만료일 연장</div>

@@ -93,7 +93,7 @@ async def admin_update_gold_missions(
 
         (
             expires_at, gold_status, _platinum_status, _diamond_status,
-            _attendance_days, _platinum_deposit_done, _diamond_deposit_current,
+            _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
             gold_mission_1_done, gold_mission_2_done, gold_mission_3_done,
         ) = row
 
@@ -305,7 +305,7 @@ async def admin_adjust_attendance(
 
         (
             expires_at, gold_status, platinum_status, diamond_status,
-            attendance_days, platinum_deposit_done, _diamond_deposit_current, *_rest
+            attendance_days, platinum_deposit_total, platinum_deposit_count, _diamond_deposit_total, *_rest
         ) = row
         current_days = int(attendance_days or 0)
 
@@ -315,7 +315,7 @@ async def admin_adjust_attendance(
             target_days = clamp_attendance_days(current_days + delta_days)
 
         new_platinum_status = compute_platinum_status(
-            target_days, bool(platinum_deposit_done), review_ok, platinum_status
+            target_days, int(platinum_deposit_total or 0), int(platinum_deposit_count or 0), review_ok, platinum_status
         )
 
         now = now_utc()
@@ -371,7 +371,7 @@ async def admin_update_deposit(
     _auth: str = Depends(verify_admin_password),
 ):
     """Update deposit status."""
-    if body.platinum_deposit_done is None and body.diamond_deposit_current is None:
+    if body.platinum_deposit_total is None and body.platinum_deposit_count is None and body.diamond_deposit_total is None:
         raise HTTPException(status_code=400, detail="NO_FIELDS")
 
     key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
@@ -400,39 +400,55 @@ async def admin_update_deposit(
 
         (
             expires_at, gold_status, platinum_status, diamond_status,
-            attendance_days, platinum_deposit_done, diamond_deposit_current, *_rest
+            attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total, *_rest
         ) = row
         
-        new_platinum_deposit_done = (
-            bool(body.platinum_deposit_done)
-            if body.platinum_deposit_done is not None
-            else bool(platinum_deposit_done)
+        new_platinum_deposit_total = (
+            int(body.platinum_deposit_total)
+            if body.platinum_deposit_total is not None
+            else int(platinum_deposit_total or 0)
         )
-        new_diamond_deposit_current = (
-            int(body.diamond_deposit_current)
-            if body.diamond_deposit_current is not None
-            else int(diamond_deposit_current or 0)
+        new_platinum_deposit_count = (
+            int(body.platinum_deposit_count)
+            if body.platinum_deposit_count is not None
+            else int(platinum_deposit_count or 0)
+        )
+        new_diamond_deposit_total = (
+            int(body.diamond_deposit_total)
+            if body.diamond_deposit_total is not None
+            else int(diamond_deposit_total or 0)
         )
 
-        new_platinum_status = platinum_status
-        if platinum_status not in {"CLAIMED", "EXPIRED"}:
-            if new_platinum_deposit_done:
-                new_platinum_status = "UNLOCKED"
-
-        new_diamond_status = compute_diamond_status(new_diamond_deposit_current, diamond_status)
+        new_platinum_status = compute_platinum_status(
+            int(attendance_days or 0), new_platinum_deposit_total, new_platinum_deposit_count, review_ok, platinum_status
+        )
+        new_diamond_status = compute_diamond_status(new_diamond_deposit_total, diamond_status)
 
         now = now_utc()
+        set_clauses = []
+        params = []
+        
+        if body.platinum_deposit_total is not None:
+             set_clauses.append("platinum_deposit_total=%s")
+             params.append(new_platinum_deposit_total)
+        if body.platinum_deposit_count is not None:
+             set_clauses.append("platinum_deposit_count=%s")
+             params.append(new_platinum_deposit_count)
+        if body.diamond_deposit_total is not None:
+             set_clauses.append("diamond_deposit_total=%s")
+             params.append(new_diamond_deposit_total)
+        
+        set_clauses.append("platinum_status=%s")
+        params.append(new_platinum_status)
+        set_clauses.append("diamond_status=%s")
+        params.append(new_diamond_status)
+        set_clauses.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
         cur.execute(
-            """
-            UPDATE vault_status
-               SET platinum_deposit_done=%s,
-                   diamond_deposit_current=%s,
-                   platinum_status=%s,
-                   diamond_status=%s,
-                   updated_at=%s
-             WHERE user_id=%s
-            """,
-            (new_platinum_deposit_done, new_diamond_deposit_current, new_platinum_status, new_diamond_status, now, user_id),
+            f"UPDATE vault_status SET {', '.join(set_clauses)} WHERE user_id=%s",
+            params,
         )
 
         admin_user = request.client.host if request.client else "unknown"
@@ -440,12 +456,13 @@ async def admin_update_deposit(
             conn=conn,
             admin_user=admin_user,
             action="ADMIN_DEPOSIT_UPDATE",
-            endpoint=f"/api/vault/admin/users/{user_id}/vault/deposit",
+            endpoint=endpoint,
             target_user_ids=[user_id],
             request_id=key,
             request_body={
-                "platinum_deposit_done": body.platinum_deposit_done,
-                "diamond_deposit_current": body.diamond_deposit_current,
+                "platinum_deposit_total": body.platinum_deposit_total,
+                "platinum_deposit_count": body.platinum_deposit_count,
+                "diamond_deposit_total": body.diamond_deposit_total,
             },
             response_status="SUCCESS",
             response_summary={
@@ -456,8 +473,9 @@ async def admin_update_deposit(
         )
 
         response_body = {
-            "platinum_deposit_done": new_platinum_deposit_done,
-            "diamond_deposit_current": new_diamond_deposit_current,
+            "platinum_deposit_total": new_platinum_deposit_total,
+            "platinum_deposit_count": new_platinum_deposit_count,
+            "diamond_deposit_total": new_diamond_deposit_total,
             "platinum_status": new_platinum_status,
             "diamond_status": new_diamond_status,
             "expires_at": expires_at.isoformat() if expires_at else None,

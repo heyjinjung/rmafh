@@ -34,7 +34,7 @@ def _log_admin_action(
             admin_user,
             action,
             endpoint,
-            target_user_ids_array,
+            Json(target_user_ids_array),
             target_count,
             request_id,
             Json(request_body) if request_body else None,

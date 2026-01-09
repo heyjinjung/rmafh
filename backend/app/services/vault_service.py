@@ -22,8 +22,9 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
                platinum_status,
                diamond_status,
                platinum_attendance_days,
-               platinum_deposit_done,
-               diamond_deposit_current,
+               platinum_deposit_total,
+               platinum_deposit_count,
+               diamond_deposit_total,
                gold_mission_1_done,
                gold_mission_2_done,
                gold_mission_3_done
@@ -53,8 +54,9 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
                platinum_status,
                diamond_status,
                platinum_attendance_days,
-               platinum_deposit_done,
-               diamond_deposit_current,
+               platinum_deposit_total,
+               platinum_deposit_count,
+               diamond_deposit_total,
                gold_mission_1_done,
                gold_mission_2_done,
                gold_mission_3_done
@@ -82,7 +84,8 @@ def compute_gold_status(m1: bool, m2: bool, m3: bool, current_status: str) -> st
 
 def compute_platinum_status(
     attendance_days: int,
-    deposit_done: bool,
+    deposit_total: int,
+    deposit_count: int,
     review_ok: bool,
     current_status: str,
 ) -> str:
@@ -90,27 +93,27 @@ def compute_platinum_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If attendance >= 3 AND deposit_done AND review_ok, status is UNLOCKED
+    - If attendance >= 3 AND total >= 200,000 AND count >= 3 AND review_ok, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if attendance_days >= 3 and deposit_done and review_ok:
+    if attendance_days >= 3 and deposit_total >= 200000 and deposit_count >= 3 and review_ok:
         return "UNLOCKED"
     return current_status
 
 
-def compute_diamond_status(deposit_current: int, current_status: str) -> str:
-    """Compute diamond status based on deposit.
+def compute_diamond_status(deposit_total: int, current_status: str) -> str:
+    """Compute diamond status based on total charge.
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If deposit_current >= 500000, status is UNLOCKED
+    - If deposit_total >= 2,000,000, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if deposit_current >= 500000:
+    if deposit_total >= 2000000:
         return "UNLOCKED"
     return current_status
 
@@ -176,8 +179,9 @@ def apply_bulk_updates_for_user(
     status_updates: dict | None = None,
     attendance_delta: int | None = None,
     attendance_set: int | None = None,
-    deposit_platinum_done: bool | None = None,
-    deposit_diamond_current: int | None = None,
+    deposit_platinum_total: int | None = None,
+    deposit_platinum_count: int | None = None,
+    deposit_diamond_total: int | None = None,
 ) -> dict:
     """Apply bulk updates to a single user's vault status.
     
@@ -195,7 +199,7 @@ def apply_bulk_updates_for_user(
 
     (
         expires_at, gold_status, platinum_status, diamond_status,
-        attendance_days, platinum_deposit_done, diamond_deposit_current,
+        attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total,
         *_rest
     ) = row
     
@@ -213,18 +217,22 @@ def apply_bulk_updates_for_user(
         new_attendance_days = clamp_attendance_days(int(attendance_days or 0) + int(attendance_delta))
 
     # Apply deposit changes
-    new_platinum_deposit_done = bool(platinum_deposit_done)
-    new_diamond_deposit_current = int(diamond_deposit_current or 0)
-    if deposit_platinum_done is not None:
-        new_platinum_deposit_done = bool(deposit_platinum_done)
-    if deposit_diamond_current is not None:
-        new_diamond_deposit_current = int(deposit_diamond_current)
+    new_platinum_deposit_total = int(platinum_deposit_total or 0)
+    new_platinum_deposit_count = int(platinum_deposit_count or 0)
+    new_diamond_deposit_total = int(diamond_deposit_total or 0)
+
+    if deposit_platinum_total is not None:
+        new_platinum_deposit_total = int(deposit_platinum_total)
+    if deposit_platinum_count is not None:
+        new_platinum_deposit_count = int(deposit_platinum_count)
+    if deposit_diamond_total is not None:
+        new_diamond_deposit_total = int(deposit_diamond_total)
 
     # Recompute unlock statuses
     new_platinum_status = compute_platinum_status(
-        new_attendance_days, new_platinum_deposit_done, review_ok, platinum_status
+        new_attendance_days, new_platinum_deposit_total, new_platinum_deposit_count, review_ok, platinum_status
     )
-    new_diamond_status = compute_diamond_status(new_diamond_deposit_current, diamond_status)
+    new_diamond_status = compute_diamond_status(new_diamond_deposit_total, diamond_status)
 
     # Apply explicit status overrides
     explicit_updates: dict[str, str] = {}
@@ -246,9 +254,16 @@ def apply_bulk_updates_for_user(
     if attendance_delta is not None or attendance_set is not None:
         set_cols.extend(["platinum_attendance_days=%s", "last_attended_at=%s"])
         params.extend([new_attendance_days, now])
-    if deposit_platinum_done is not None or deposit_diamond_current is not None:
-        set_cols.extend(["platinum_deposit_done=%s", "diamond_deposit_current=%s"])
-        params.extend([new_platinum_deposit_done, new_diamond_deposit_current])
+    
+    if deposit_platinum_total is not None:
+        set_cols.append("platinum_deposit_total=%s")
+        params.append(new_platinum_deposit_total)
+    if deposit_platinum_count is not None:
+        set_cols.append("platinum_deposit_count=%s")
+        params.append(new_platinum_deposit_count)
+    if deposit_diamond_total is not None:
+        set_cols.append("diamond_deposit_total=%s")
+        params.append(new_diamond_deposit_total)
 
     set_cols.append("updated_at=%s")
     params.append(now)

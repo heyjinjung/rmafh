@@ -383,15 +383,7 @@ cd frontend && npm run lint
 
 ## 7. 롤백 계획
 
-### 7.1 Git 브랜치 전략
-```
-main ← 현재 안정 버전
-  └── feature/vault-v3-refactor ← 리팩토링 브랜치
-        ├── phase-0-sot
-        ├── phase-1-utils
-        ├── phase-2-routers
-        └── phase-3-services
-```
+``
 
 ### 7.2 롤백 시나리오
 - Phase별 독립 커밋으로 부분 롤백 가능

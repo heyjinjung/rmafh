@@ -209,8 +209,9 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
                platinum_status,
                diamond_status,
                platinum_attendance_days,
-               platinum_deposit_done,
-               diamond_deposit_current,
+               platinum_deposit_total,
+               platinum_deposit_count,
+               diamond_deposit_total,
                gold_mission_1_done,
                gold_mission_2_done,
                gold_mission_3_done
@@ -240,8 +241,9 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
                platinum_status,
                diamond_status,
                platinum_attendance_days,
-               platinum_deposit_done,
-               diamond_deposit_current,
+               platinum_deposit_total,
+               platinum_deposit_count,
+               diamond_deposit_total,
                gold_mission_1_done,
                gold_mission_2_done,
                gold_mission_3_done
@@ -541,15 +543,15 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
             cur,
             """
             UPDATE vault_status AS vs
-               SET diamond_deposit_current = v.deposit_total,
+               SET diamond_deposit_total = v.deposit_total,
                                      gold_status = CASE
                                          WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
                                          WHEN v.telegram_ok THEN 'UNLOCKED'
                                          ELSE 'LOCKED'
                                      END,
-                   platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
+                   platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 2000000 THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                    expires_at = CASE
@@ -637,15 +639,11 @@ def _bump_platinum_progress(cur, user_ids: list[int]):
         UPDATE vault_status AS vs
            SET platinum_attendance_days = LEAST(3, vs.platinum_attendance_days + 1),
                last_attended_at = COALESCE(vs.last_attended_at, NOW()),
-               platinum_deposit_done = CASE
-                   WHEN vs.platinum_deposit_done THEN true
-                   WHEN uas.deposit_total >= 150000 THEN true
-                   ELSE false
-               END,
+               platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), uas.deposit_total),
                platinum_status = CASE
                    WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
                         AND uas.review_ok
-                        AND (CASE WHEN vs.platinum_deposit_done THEN true ELSE uas.deposit_total >= 150000 END)
+                        AND (GREATEST(COALESCE(vs.platinum_deposit_total, 0), uas.deposit_total) >= 200000)
                         AND LEAST(3, vs.platinum_attendance_days + 1) >= 3
                    THEN 'UNLOCKED'
                    ELSE vs.platinum_status
@@ -722,15 +720,15 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
         cur,
         """
         UPDATE vault_status AS vs
-           SET diamond_deposit_current = v.deposit_total,
+           SET diamond_deposit_total = v.deposit_total,
                                  gold_status = CASE
                                      WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
                                      WHEN v.telegram_ok THEN 'UNLOCKED'
                                      ELSE 'LOCKED'
                                  END,
-                   platinum_deposit_total_last = GREATEST(COALESCE(vs.platinum_deposit_total_last, 0), v.deposit_total),
+                   platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 500000 THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 2000000 THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                expires_at = CASE

@@ -293,7 +293,7 @@ async def admin_create_user(
             raise
         except Exception as e:
             conn.rollback()
-            raise HTTPException(status_code=500, detail="ADMIN_USER_CREATE_ERROR") from e
+            raise HTTPException(status_code=500, detail=f"ADMIN_USER_CREATE_ERROR: {str(e)}") from e
 
 
 @router.patch("/{user_id}", response_model=AdminUserResponse)
