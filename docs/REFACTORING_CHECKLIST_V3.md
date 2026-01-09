@@ -3,13 +3,14 @@
 ## 1. 메타
 - 문서명: Vault v3 리팩토링 실행 체크리스트
 - 문서 타입: 실행 가이드/체크리스트
-- 문서 버전: v1.0.2
+- 문서 버전: v1.0.3
 - 작성일: 2026-01-09
 - 작성자: GitHub Copilot (GPT-5.2)
 - 대상: Lead Architect/운영자/개발자
 - 범위: `docs/REFACTORING_PLAN_V3.md`의 Phase 0~5 + v3 신규 기능(특히 골드 미션 O/X)
 
 ## Changelog
+- 2026-01-09 v1.0.3: Sprint 1(SOT 1~6) 실제 진행상태 반영(1~3 완료, 4~5 미완료, 6 재검증 대기)
 - 2026-01-09 v1.0.2: v3 핵심 기능/UX/CSV/테스트 항목까지 완전 커버 보강
 - 2026-01-09 v1.0.1: 속도 우선(Fast Track) 실행 가이드 추가
 - 2026-01-09 v1.0.0: 최초 작성 (Phase 게이트 + P0 검증 기준 포함)
@@ -70,6 +71,10 @@
 - SOT 3종은 생성 완료 상태(Phase 0 ✅)
 - 관련 파일: `docs/DB_MIGRATION_V3.sql`(Phase 5 대상)
 
+현재 확인 결과(중요):
+- SOT 파일 3종은 존재/생성 완료
+- 단, 백엔드/프론트 코드에는 하드코딩된 “조건/보상/만료 시간” 숫자가 아직 남아있음 → Sprint 1의 #4/#5 작업이 필요
+
 체크리스트:
 - [ ] v3 규칙 변경이 생기면 **SOT → 문서 → 코드** 순으로 반영한다
 - [ ] SOT 값이 바뀌면 관련 테스트(조건/만료/보상)가 깨지지 않는지 확인했다
@@ -77,6 +82,20 @@
 
 완료 기준:
 - [ ] `backend: pytest (docker)` 통과
+
+---
+
+## 4.1 Sprint 1: SOT + 비즈니스 로직 변경 (Plan v3 5장 기준)
+체크리스트:
+- [x] (1) SOT 파일 생성 (Backend): `backend/app/constants/vault_config.py`
+- [x] (2) SOT 파일 생성 (Frontend): `frontend/lib/vaultConfig.js`
+- [x] (3) SOT 문서화: `docs/VAULT_SOT.md`
+- [ ] (4) Backend 상수 참조 변경: `backend/app/main.py` 등에서 SOT로 치환
+- [ ] (5) Frontend 상수 참조 변경: `frontend/pages/index.jsx`에서 SOT로 치환
+- [ ] (6) 테스트 실행 및 검증: (4)(5) 완료 후 재실행
+
+메모(완료 기준 해석):
+- (6)은 “현재 기준으로 테스트/린트가 통과”하더라도, (4)(5)를 적용한 뒤 다시 통과해야 Sprint 1 완료로 간주
 
 ---
 
