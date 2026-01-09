@@ -63,6 +63,14 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [goldMission1, setGoldMission1] = useState(false);
   const [goldMission2, setGoldMission2] = useState(false);
   const [goldMission3, setGoldMission3] = useState(false);
+  const [platinumStatus, setPlatinumStatus] = useState('LOCKED');
+  const [platinumMission1, setPlatinumMission1] = useState(false);
+  const [platinumMission2, setPlatinumMission2] = useState(false);
+  const [platinumMission3, setPlatinumMission3] = useState(false);
+  const [platinumMission4, setPlatinumMission4] = useState(false);
+  const [diamondStatus, setDiamondStatus] = useState('LOCKED');
+  const [diamondMission1, setDiamondMission1] = useState(false);
+  const [diamondMission2, setDiamondMission2] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -135,6 +143,14 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setGoldMission1(Boolean(row?.gold_mission_1_done));
     setGoldMission2(Boolean(row?.gold_mission_2_done));
     setGoldMission3(Boolean(row?.gold_mission_3_done));
+    setPlatinumStatus(row?.platinum_status || 'LOCKED');
+    setPlatinumMission1(Boolean(row?.platinum_mission_1_done));
+    setPlatinumMission2(Boolean(row?.platinum_mission_2_done));
+    setPlatinumMission3(Boolean(row?.platinum_mission_3_done));
+    setPlatinumMission4(Boolean(row?.platinum_mission_4_done));
+    setDiamondStatus(row?.diamond_status || 'LOCKED');
+    setDiamondMission1(Boolean(row?.diamond_mission_1_done));
+    setDiamondMission2(Boolean(row?.diamond_mission_2_done));
   };
 
   const openCreate = () => {
@@ -409,6 +425,96 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     } catch (err) {
       const info = extractErrorInfo(err);
       pushToast({ ok: false, message: info.summary || '미션 업데이트 실패', detail: info.detail });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitPlatinumMissions = async (updates) => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const body = { ...updates };
+    if (!Object.keys(body).length) return;
+
+    try {
+      setSaving(true);
+      const res = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/platinum-missions`, {
+        method: 'POST',
+        body,
+        idempotencyKey: makeRequestId(),
+      });
+      const data = res?.data || {};
+
+      const newM1 = Boolean(data.platinum_mission_1_done ?? platinumMission1);
+      const newM2 = Boolean(data.platinum_mission_2_done ?? platinumMission2);
+      const newM3 = Boolean(data.platinum_mission_3_done ?? platinumMission3);
+      const newM4 = Boolean(data.platinum_mission_4_done ?? platinumMission4);
+      const newStatus = data.platinum_status ?? platinumStatus;
+
+      setPlatinumMission1(newM1);
+      setPlatinumMission2(newM2);
+      setPlatinumMission3(newM3);
+      setPlatinumMission4(newM4);
+      setPlatinumStatus(newStatus);
+
+      setSelectedRow((prev) => (prev ? {
+        ...prev,
+        platinum_mission_1_done: newM1,
+        platinum_mission_2_done: newM2,
+        platinum_mission_3_done: newM3,
+        platinum_mission_4_done: newM4,
+        platinum_status: newStatus,
+        expires_at: data.expires_at || prev.expires_at,
+      } : prev));
+
+      pushToast({ ok: true, message: '플래티넘 미션 업데이트', detail: `상태: ${newStatus}` });
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '플래티넘 미션 업데이트 실패', detail: info.detail });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitDiamondMissions = async (updates) => {
+    if (!ensureAuth()) return;
+    if (!selectedRow?.user_id) return;
+
+    const body = { ...updates };
+    if (!Object.keys(body).length) return;
+
+    try {
+      setSaving(true);
+      const res = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/diamond-missions`, {
+        method: 'POST',
+        body,
+        idempotencyKey: makeRequestId(),
+      });
+      const data = res?.data || {};
+
+      const newM1 = Boolean(data.diamond_mission_1_done ?? diamondMission1);
+      const newM2 = Boolean(data.diamond_mission_2_done ?? diamondMission2);
+      const newStatus = data.diamond_status ?? diamondStatus;
+
+      setDiamondMission1(newM1);
+      setDiamondMission2(newM2);
+      setDiamondStatus(newStatus);
+
+      setSelectedRow((prev) => (prev ? {
+        ...prev,
+        diamond_mission_1_done: newM1,
+        diamond_mission_2_done: newM2,
+        diamond_status: newStatus,
+        expires_at: data.expires_at || prev.expires_at,
+      } : prev));
+
+      pushToast({ ok: true, message: '다이아 미션 업데이트', detail: `상태: ${newStatus}` });
+      fetchUsers();
+    } catch (err) {
+      const info = extractErrorInfo(err);
+      pushToast({ ok: false, message: info.summary || '다이아 미션 업데이트 실패', detail: info.detail });
     } finally {
       setSaving(false);
     }
@@ -898,6 +1004,74 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                             type="button"
                             disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
                             onClick={() => submitGoldMissions({ [m.key]: !m.done })}
+                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
+                              }`}>
+                              {m.done ? '✓' : idx + 1}
+                            </div>
+                            <span className="text-[10px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">플래티넘 볼트 미션</div>
+                        <div className={`text-[10px] px-2 py-0.5 rounded border ${platinumStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
+                            platinumStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          }`}>
+                          {statusLabel(platinumStatus)}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 relative">
+                        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                        {[
+                          { label: '입금20만', done: platinumMission1, key: 'platinum_mission_1_done' },
+                          { label: '입금3회', done: platinumMission2, key: 'platinum_mission_2_done' },
+                          { label: '출석3일', done: platinumMission3, key: 'platinum_mission_3_done' },
+                          { label: '리뷰', done: platinumMission4, key: 'platinum_mission_4_done' }
+                        ].map((m, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={saving || platinumStatus === 'CLAIMED' || platinumStatus === 'EXPIRED'}
+                            onClick={() => submitPlatinumMissions({ [m.key]: !m.done })}
+                            className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
+                          >
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'
+                              }`}>
+                              {m.done ? '✓' : idx + 1}
+                            </div>
+                            <span className="text-[9px] font-medium bg-[var(--v2-surface)] px-1">{m.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트 미션</div>
+                        <div className={`text-[10px] px-2 py-0.5 rounded border ${diamondStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
+                            diamondStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          }`}>
+                          {statusLabel(diamondStatus)}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-center gap-8 relative">
+                        <div className="absolute top-1/2 left-1/4 w-1/2 h-0.5 bg-[var(--v2-border)] -z-0"></div>
+                        {[
+                          { label: '충전200만', done: diamondMission1, key: 'diamond_mission_1_done' },
+                          { label: 'CC출석2회', done: diamondMission2, key: 'diamond_mission_2_done' }
+                        ].map((m, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            disabled={saving || diamondStatus === 'CLAIMED' || diamondStatus === 'EXPIRED'}
+                            onClick={() => submitDiamondMissions({ [m.key]: !m.done })}
                             className={`relative z-10 flex flex-col items-center gap-1 group ${m.done ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}
                           >
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all bg-[var(--v2-surface)] ${m.done ? 'border-[var(--v2-accent)] shadow-[0_0_10px_rgba(183,247,90,0.3)]' : 'border-[var(--v2-border)] group-hover:border-[var(--v2-muted)]'

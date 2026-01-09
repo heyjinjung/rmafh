@@ -107,7 +107,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Phase 2: Include routers (기존 ?�드?�인?��? 경로 ?�일 ?��?)
+# Phase 2: Include routers (기존 ?드?인?? 경로 ?일 ??)
 app.include_router(health_router.router)
 app.include_router(vault_router.router)
 app.include_router(admin_users_router.router)
@@ -153,7 +153,7 @@ def _parse_bool(value) -> bool:
     s = str(value).strip().lower()
     if not s:
         return False
-    return s in {"1", "true", "t", "yes", "y", "ok", "o", "응", "확인", "완료"}
+    return s in {"1", "true", "t", "yes", "y", "ok", "o"}
 
 
 def _parse_int(value, default: int = 0) -> int:
@@ -435,13 +435,13 @@ def _dedupe_str_list(values: list[str] | None, *, max_items: int) -> list[str]:
 
 @app.post("/api/vault/user-daily-import", response_model=DailyUserImportResponse)
 async def user_daily_import(body: DailyUserImportRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
-    """?�일 ?��?/CSV ?�로???�이?�로 ?�영 ?�냅??+ 조건??갱신.
+    """?일 ??/CSV ?로???이?로 ?영 ?냅??+ 조건??갱신.
 
-    ?�력(권장): external_user_id, nickname, deposit_total(?�적), joined_at, last_deposit_at, telegram_ok
+    ?력(권장): external_user_id, nickname, deposit_total(?적), joined_at, last_deposit_at, telegram_ok
 
     반영:
-    - user_identity: external_user_id ??user_id 매핑 ?�성/?�결
-    - user_admin_snapshot: ?�로?�된 ?�영 컬럼 ?�서??
+    - user_identity: external_user_id ??user_id 매핑 ?성/?결
+    - user_admin_snapshot: ?로?된 ?영 컬럼 ?서??
     - vault_status:
       - diamond_deposit_current = deposit_total
       - gold_status: LOCKED ??UNLOCKED (telegram_ok=true)
@@ -1050,10 +1050,10 @@ def _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_user_ids: li
 
 @app.post("/api/vault/user-identity/bulk", response_model=UserIdentityBulkResponse)
 async def user_identity_bulk(body: UserIdentityBulkRequest):
-    """?��? ?�이??목록??user_identity???�괄 ?�록/?�결.
+    """?? ?이??목록??user_identity???괄 ?록/?결.
 
-    - ?�력: external_user_ids (CSV ?�로??결과)
-    - ?�작: ?�으�??�성, ?�으�?그�?�??�용 (멱등)
+    - ?력: external_user_ids (CSV ?로??결과)
+    - ?작: ?으??성, ?으?그???용 (멱등)
     """
     cleaned = [str(v).strip() for v in (body.external_user_ids or []) if str(v).strip()]
     cleaned = cleaned[:10000]
@@ -1353,7 +1353,7 @@ def _ensure_schema():
 
 @app.post("/api/vault/extend-expiry", response_model=ExtendExpiryResponse)
 async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: Response, _auth: str = Depends(verify_admin_password)):
-    """?�영/?�로모션 만료 ?�장. shadow=true�?미적???�리�?"""
+    """?영/?로모션 만료 ?장. shadow=true?미적???리?"""
     request_id = _validate_request_id(getattr(body, "request_id", None))
     if body.scope not in {"ALL_ACTIVE", "USER_IDS"}:
         raise HTTPException(status_code=400, detail="INVALID_SCOPE")
@@ -1500,7 +1500,7 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
             admin_user=admin_user,
             action="EXTEND_EXPIRY",
             endpoint="/api/vault/extend-expiry",
-            target_user_ids=target_ids[:1000],  # 최�? 1000개만 ?�??(?�플�?
+            target_user_ids=target_ids[:1000],  # 최? 1000개만 ???(?플?
             request_id=key,
             request_body={"scope": body.scope, "extend_hours": body.extend_hours, "reason": body.reason, "shadow": body.shadow},
             response_status="SUCCESS",
@@ -1557,7 +1557,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
     dedup_day = scheduled_at.date()
     inserted = 0
     
-    # 메시지 ?�플�?로드
+    # 메시지 ?플?로드
     template_message = None
     with db.get_conn() as template_conn:
         tc = template_conn.cursor()
@@ -1593,7 +1593,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
         resolved_user_ids = _dedupe_int_list(resolved_user_ids, max_items=10000)
         for uid in resolved_user_ids or []:
             dedup_key = f"{body.type}:{uid}:{dedup_suffix}:{dedup_day}"
-            # 커스?� 메시지 ?�는 ?�플�?메시지 ?�용
+            # 커스? 메시지 ?는 ?플?메시지 ?용
             payload_dict = {
                 "type": body.type,
                 "variant_id": body.variant_id,
@@ -1622,7 +1622,7 @@ async def notify(body: NotifyRequest, request: Request, response: Response, _aut
             admin_user=admin_user,
             action="NOTIFY",
             endpoint="/api/vault/notify",
-            target_user_ids=resolved_user_ids[:1000],  # 최�? 1000개만 ?�??
+            target_user_ids=resolved_user_ids[:1000],  # 최? 1000개만 ???
             request_id=key,
             request_body={"type": body.type, "variant_id": body.variant_id, "scheduled_at": scheduled_at.isoformat() if scheduled_at else None},
             response_status="SUCCESS",
@@ -1740,7 +1740,7 @@ async def list_notifications(
             "scheduled_at": row[6].isoformat() if row[6] else None,
             "created_at": row[7].isoformat() if row[7] else None,
             "payload": payload,
-            # payload?�서 메시지 ?�드 추출
+            # payload?서 메시지 ?드 추출
             "title": payload.get("title"),
             "body": payload.get("body"),
             "cta_text": payload.get("cta_text"),
@@ -2766,7 +2766,7 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
             if body.status.diamond_status is not None:
                 explicit_updates["diamond_status"] = _validate_status(body.status.diamond_status, "diamond_status")
 
-        # CLAIMED?� ?�돌리�? ?�음 (per single-user behavior)
+        # CLAIMED? ?돌리? ?음 (per single-user behavior)
         for col, new_val in explicit_updates.items():
             if current.get(col) == "CLAIMED" and new_val != "CLAIMED":
                 raise HTTPException(status_code=409, detail="CANNOT_MODIFY_CLAIMED")

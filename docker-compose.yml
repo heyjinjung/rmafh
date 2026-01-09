@@ -10,7 +10,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vault}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vault}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,11 +25,11 @@ services:
     environment:
       DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-vault}:${POSTGRES_PASSWORD:-vaultpass}@db:5432/${POSTGRES_DB:-vault}}"
       APP_ENV: ${APP_ENV:-local}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin1234}
       IDEMPOTENCY_TTL_HOURS: ${IDEMPOTENCY_TTL_HOURS:-24}
     ports:
       - "${API_PORT:-18000}:8000"
-    command: ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    command: [ "sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port 8000" ]
 
   worker:
     build:
@@ -42,7 +42,7 @@ services:
       DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-vault}:${POSTGRES_PASSWORD:-vaultpass}@db:5432/${POSTGRES_DB:-vault}}"
       APP_ENV: ${APP_ENV:-local}
       IDEMPOTENCY_TTL_HOURS: ${IDEMPOTENCY_TTL_HOURS:-24}
-    command: ["sh", "-c", "python -m app.worker"]
+    command: [ "sh", "-c", "python -m app.worker" ]
 
   web:
     build:

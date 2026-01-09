@@ -6,12 +6,12 @@ from app.services.common import hash_request_body
 
 
 
-def _auth_headers(password="admin123"):
+def _auth_headers(password="admin1234"):
     return {"x-admin-password": password}
 
 def _idem_headers(key_suffix: str):
     return {
-        "x-admin-password": "admin123",
+        "x-admin-password": "admin1234",
         "x-idempotency-key": f"test-import-v3-{uuid4()}-{key_suffix}",
     }
 
