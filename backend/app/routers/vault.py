@@ -335,9 +335,21 @@ async def attendance(user_id: int | None = None, external_user_id: str | None = 
         if last_attended_at is not None and last_attended_at.date() == now.date():
             raise HTTPException(status_code=409, detail="ALREADY_ATTENDED")
 
+        cur.execute(
+            """
+            SELECT platinum_mission_1_done, platinum_mission_2_done
+              FROM vault_status
+             WHERE user_id=%s
+            """,
+            (user_id,),
+        )
+        mission_row = cur.fetchone()
+        m1 = mission_row[0] if mission_row else False
+        m2 = mission_row[1] if mission_row else False
+
         new_days = min(3, days + 1)
         new_platinum_status = platinum_status
-        if new_days >= 3 and deposit_done and platinum_status == "LOCKED":
+        if new_days >= 3 and deposit_done and m1 and m2 and platinum_status == "LOCKED":
             new_platinum_status = "UNLOCKED"
 
         cur.execute(

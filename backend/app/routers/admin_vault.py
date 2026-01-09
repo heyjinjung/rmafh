@@ -594,6 +594,8 @@ async def admin_adjust_attendance(
             deposit_count=int(platinum_deposit_count or 0),
             attendance_days=target_days,
             review_ok=review_ok,
+            m1=bool(row[12]), # plat_mission_1_done
+            m2=bool(row[13]), # plat_mission_2_done
             gold_status=gold_status,
             current_status=platinum_status,
         )
