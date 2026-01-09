@@ -6,8 +6,8 @@ import { motion } from 'framer-motion';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
-const ICON_GAME = 'https://www.figma.com/api/mcp/asset/8625e6d9-bea3-4dd6-9416-86f0f54cb37c';
-const ICON_TELEGRAM = 'https://www.figma.com/api/mcp/asset/01bcbc61-1f54-4542-8ffb-a7d7bdd11c9c';
+const ICON_GAME = '/logo.png';
+const ICON_TELEGRAM = '/telegram.png';
 
 /* ─── Design Tokens (from Figma) ─── */
 const TOKENS = {
@@ -111,7 +111,7 @@ export default function Home() {
             <h3 style={styles.offeringsTitle} className="cc-offeringsTitle">게임 바로가기</h3>
             <div style={styles.modules} className="modules">
               <a href="https://ccc-001.com" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
-                <img src={ICON_GAME} alt="" style={styles.navCardIcon} />
+                <img src={ICON_GAME} alt="CC Casino" style={styles.logoIcon} />
                 <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>바로가기</span>
@@ -280,7 +280,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
     } finally {
       setLoading(false);
     }
-  }, [apiFetch]);
+  }, [apiFetch, basePath]);
 
   useEffect(() => {
     refreshStatus();
@@ -378,28 +378,28 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         missions: [
           {
             id: 'g1',
-            label: 'CC카지노 텔레공식채널 입장 확인',
+            label: 'CC카지노 공식채널 입장',
             isDone: Boolean(api.telegram_ok),
-            hint: '입장기록은 텔레그램 확인 후 다음날 반영됩니다.',
+            hint: '각종 이벤트 및 보너스 드랍 진행',
           },
           {
             id: 'g2',
-            label: '담당실장 텔레공식채널 입장 확인',
+            label: '담당실장 공식채널 입장',
             isDone: Boolean(api.telegram_ok),
-            hint: '담당실장 채널 입장도 확인 후 다음날 반영됩니다.',
+            hint: '본사혜택 외 추가 이벤트 진행',
           },
-          { id: 'g3', label: '수령 가능 시 금고 열기', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
+          { id: 'g3', label: '간편 본인확인 -담당실장에게 본인 확인', isDone: api.gold_status === 'UNLOCKED' || api.gold_status === 'CLAIMED' },
           { id: 'g4', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },
         ],
       },
       {
         id: 'platinum-vault',
         tier: 'platinum',
-        rewardAmount: 20000,
+        rewardAmount: 30000,
         status: mapApiStatusToUi(api.platinum_status),
         expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
         missions: [
-          { id: 'p1', label: '누적입금 15만원 이상', isDone: Boolean(api.platinum_deposit_done), hint: '15만원 이상 입금 시 자동 확인됩니다.' },
+          { id: 'p1', label: '누적 입금 20만원 달성', isDone: Boolean(api.platinum_deposit_done), hint: '신규 입플도 놓치지 마세요!' },
           { id: 'p2', label: `리뷰 작성 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
           { id: 'p3', label: '플래티넘 금고 해금', isDone: api.platinum_status === 'UNLOCKED' || api.platinum_status === 'CLAIMED' },
           { id: 'p4', label: '수령 완료', isDone: api.platinum_status === 'CLAIMED' },
@@ -457,7 +457,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         setError(e?.message || '수령 처리에 실패했습니다.');
       }
     },
-    [apiFetch, refreshStatus]
+    [apiFetch, refreshStatus, basePath]
   );
 
   // NOTE: 플래티넘 연속일수는 어드민 업로드(입금 데이터)로 자동 반영됩니다.

@@ -2,11 +2,13 @@
 
 ## 1. 메타
 - 문서 타입: 시퀀스/상태
-- 버전: v0.2
+- 버전: v0.3
 - 작성일: 2025-12-20
+- 최종 수정: 2026-01-09
 - 대상: 백엔드/프론트엔드/기획자
 
 ## Changelog
+- 2026-01-09 v0.3: v3.0 금고 조건 변경 반영 (골드 3조건, 플래티넘 누적20만+3회+골드필수, 다이아 누적200만+출석2회+플래티넘필수+5일마감)
 - 2025-12-20 v0.2: 플래티넘 진행률은 운영 업로드 기반을 기본으로 정합화(수동 attendance는 참고/데모)
 
 ## 2. 시퀀스: 입금 훅
@@ -15,19 +17,19 @@
 - 플로우:
   1) PaymentSystem → deposit-hook (user_id, amount, tx_id, occurred_at)
   2) VaultService: idempotency(tx_id) 검사
-  3) amount 누적 → diamond_deposit_current 업데이트
-  4) amount >= 50,000 → platinum_deposit_done=true
-  5) 조건 충족 시 상태 UNLOCKED 전이 + 알림 enqueue
+  3) amount 누적 → deposit_total(누적입금/누적충전) 업데이트
+  4) amount >= 10,000 → deposit_count(누적입금 횟수) +1
+  5) (조건 충족 시) Platinum/Diamond UNLOCKED 전이 + 알림 enqueue
 
 ## 3. 시퀀스: 플래티넘 진행률(운영 업로드 기반)
 - Actor: Admin/OPS → /api/vault/user-daily-import → VaultService
 - 기본 전제: 유저 UI는 출석 버튼으로 진행률을 만들지 않고, 운영 업로드(누적입금/리뷰OK 등)로 진행률이 갱신됩니다.
 - 플로우(요약):
-  1) Admin/OPS → user-daily-import(rows: external_user_id, deposit_total, last_deposit_at, review_ok, telegram_ok 등)
+  1) Admin/OPS → user-daily-import(rows: external_user_id, deposit_total, deposit_count, gold_unlocked, cc_attendance_count 등)
   2) Service: external_user_id → user_id 매핑 생성/해결
   3) Service: user_admin_snapshot 업서트
-  4) Service: deposit_total 델타/날짜 기준으로 연속일수(platinum_attendance_days) 계산 갱신
-  5) review_ok + 연속일수 조건 충족 시 platinum_status=UNLOCKED
+  4) Service: deposit_total/ deposit_count 등 누적 지표 갱신
+  5) gold_unlocked + (deposit_total>=200,000) + (deposit_count>=3) 충족 시 platinum_status=UNLOCKED
 
 ### 3.1 참고: 수동 출석(데모/QA)
 - Actor: FE/QA → /api/vault/attendance
@@ -72,10 +74,11 @@
 
 ## 6. 상태 머신 요약 (텍스트)
 - 공통: LOCKED → UNLOCKED → CLAIMED, 만료 시 EXPIRED
-- Gold: 채널 추가 시 UNLOCKED → CLAIMED
-- Platinum: (출석 3 AND 단일 50,000 충전) → UNLOCKED → CLAIMED
-- Diamond: (누적 500,000 충전) → UNLOCKED → CLAIMED
+- Gold: 공식채널 입장 + 담당실장 채널 입장 + 본인확인 → UNLOCKED → CLAIMED
+- Platinum: (골드해금 필수) + (누적입금 20만원) + (입금 3회) → UNLOCKED → CLAIMED
+- Diamond: (플래티넘해금 필수) + (누적충전 200만원) + (CC출석 2회) → UNLOCKED → CLAIMED
 - 만료: expires_at 도래 시 LOCKED/UNLOCKED는 EXPIRED로 전환
+- 마감기한: Gold/Platinum 72시간(3일), Diamond 120시간(5일)
 
 ## 7. 상태 전이 가드
 - EXPIRED이면 어떤 액션도 거부
@@ -98,10 +101,10 @@ sequenceDiagram
   API->>SVC: validate + route
   SVC->>DB: check tx_id idempotency
   DB-->>SVC: ok/duplicate
-  SVC->>DB: update diamond_deposit_current
-  SVC->>DB: set platinum_deposit_done if amount>=50k
+  SVC->>DB: update deposit_total
+  SVC->>DB: increment deposit_count if amount>=10k
   SVC-->>API: status updated
-  API-->>PS: 200 {platinum_deposit_done, diamond_deposit_current}
+  API-->>PS: 200 {deposit_total, deposit_count}
   SVC-->>API: enqueue notify if unlocked
 ```
 
@@ -116,7 +119,7 @@ sequenceDiagram
   API->>SVC: auth + validate
   SVC->>DB: check expires_at, dup attendance
   DB-->>SVC: ok/dup
-  SVC->>DB: increment platinum_attendance_days (<=3)
+  SVC->>DB: increment cc_attendance_count
   SVC-->>API: updated status
   API-->>FE: 200 {days, status}
   SVC-->>API: enqueue notify if unlock condition met
@@ -169,24 +172,24 @@ stateDiagram-v2
 stateDiagram-v2
   state GOLD {
     [*] --> LOCKED
-    LOCKED --> UNLOCKED: 채널 추가 완료
+    LOCKED --> UNLOCKED: 공식채널+담당실장+본인확인
     UNLOCKED --> CLAIMED: 수령
-    LOCKED --> EXPIRED: 만료
-    UNLOCKED --> EXPIRED: 만료
+    LOCKED --> EXPIRED: 만료(72h)
+    UNLOCKED --> EXPIRED: 만료(72h)
   }
   state PLATINUM {
     [*] --> LOCKED
-    LOCKED --> UNLOCKED: 출석 3/3 AND 단일 50k
+    LOCKED --> UNLOCKED: 골드해금+누적20만+입금3회
     UNLOCKED --> CLAIMED: 수령
-    LOCKED --> EXPIRED: 만료
-    UNLOCKED --> EXPIRED: 만료
+    LOCKED --> EXPIRED: 만료(72h)
+    UNLOCKED --> EXPIRED: 만료(72h)
   }
   state DIAMOND {
     [*] --> LOCKED
-    LOCKED --> UNLOCKED: 누적 500k
+    LOCKED --> UNLOCKED: 플래티넘해금+누적200만+출석2회
     UNLOCKED --> CLAIMED: 수령
-    LOCKED --> EXPIRED: 만료
-    UNLOCKED --> EXPIRED: 만료
+    LOCKED --> EXPIRED: 만료(120h/5일)
+    UNLOCKED --> EXPIRED: 만료(120h/5일)
   }
 ```
 
@@ -194,7 +197,7 @@ stateDiagram-v2
 - 알림 조건 (예시)
   - EXPIRY_D2: now >= expires_at - 48h AND status != CLAIMED
   - EXPIRY_D0: now >= expires_at (당일) AND status != CLAIMED
-  - ATTENDANCE_D2: platinum_attendance_days = 2 AND platinum_status != CLAIMED AND now < expires_at
+  - ATTENDANCE_D2: cc_attendance_count = 1 AND diamond_status != CLAIMED AND now < expires_at
   - TICKET_ZERO: ticket_balance = 0 AND platinum_status != CLAIMED AND now < expires_at
 - 전이 영향
   - LOCKED/UNLOCKED 상태에서만 임박 알림 트리거

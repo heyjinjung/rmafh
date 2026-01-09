@@ -407,7 +407,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
 
-    reward_amounts = {"GOLD": 10000, "PLATINUM": 20000, "DIAMOND": 70000, "BONUS": 0}
+    reward_amounts = {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 70000, "BONUS": 0}
     status_by_type = {"GOLD": gold_status, "PLATINUM": platinum_status, "DIAMOND": diamond_status}
     loss_breakdown = {
         k: (0 if status_by_type[k] in {"CLAIMED", "EXPIRED"} else reward_amounts[k])

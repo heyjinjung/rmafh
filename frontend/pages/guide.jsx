@@ -1,12 +1,16 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
 // 이미지 폴백 컴포넌트
 function ImageWithFallback(props) {
   const [didError, setDidError] = useState(false);
-  const { src, alt = '', style, className, ...rest } = props;
+  const { src, alt, style, className, ...rest } = props;
+  const altText = typeof alt === 'string' && alt.trim() ? alt : '이미지';
+  const width = typeof style?.width === 'number' ? style.width : 1;
+  const height = typeof style?.height === 'number' ? style.height : 1;
 
   return didError ? (
     <div
@@ -23,7 +27,17 @@ function ImageWithFallback(props) {
       </div>
     </div>
   ) : (
-    <img src={src} alt={alt} className={className} style={style} {...rest} onError={() => setDidError(true)} />
+    <Image
+      src={src}
+      alt={altText}
+      className={className}
+      style={style}
+      width={width}
+      height={height}
+      unoptimized
+      {...rest}
+      onError={() => setDidError(true)}
+    />
   );
 }
 
