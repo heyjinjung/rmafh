@@ -61,6 +61,49 @@ def db_conn(db_url):
     conn.close()
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_test_schema(db_url):
+    """Ensure required tables exist for tests.
+
+    In tests we set APP_ENV=test, so the app startup does not run best-effort DDL.
+    The suite assumes a prepared DB, but we still defensively create any tables
+    that tests rely on.
+    """
+    try:
+        conn = psycopg2.connect(db_url, connect_timeout=3, application_name="pytest-schema")
+    except OperationalError as exc:  # pragma: no cover - skip if DB unavailable
+        pytest.skip(f"database not reachable: {exc}")
+
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS notification_templates (
+                  id BIGSERIAL PRIMARY KEY,
+                  type VARCHAR(32) NOT NULL UNIQUE,
+                  title VARCHAR(128) NOT NULL,
+                  body TEXT NOT NULL,
+                  cta_text VARCHAR(64),
+                  icon_emoji VARCHAR(8),
+                  category VARCHAR(32),
+                  priority INT DEFAULT 0,
+                  enabled BOOLEAN DEFAULT TRUE,
+                  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                """
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_notification_templates_enabled ON notification_templates (enabled)"
+            )
+            cur.execute(
+                "CREATE INDEX IF NOT EXISTS idx_notification_templates_priority ON notification_templates (priority DESC)"
+            )
+    finally:
+        conn.close()
+
+
 @pytest.fixture(scope="session")
 def client(db_url):
     os.environ["DATABASE_URL"] = db_url
