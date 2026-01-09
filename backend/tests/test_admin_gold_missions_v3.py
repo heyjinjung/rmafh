@@ -98,7 +98,7 @@ def test_gold_missions_does_not_override_claimed_status(client):
     assert data["gold_mission_1_done"] is True
     assert data["gold_mission_2_done"] is True
     assert data["gold_mission_3_done"] is True
-    # CLAIMED/EXPIRED는 자동 변경하지 않는 정책
+    # Policy: do not automatically change CLAIMED/EXPIRED status
     assert data["gold_status"] == "CLAIMED"
 
 

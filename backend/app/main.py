@@ -24,8 +24,6 @@ from app.schemas import (
     CompensationEnqueueRequest,
     AdminAttendanceAdjustRequest,
     AdminAttendanceAdjustResponse,
-    AdminDepositUpdateRequest,
-    AdminDepositUpdateResponse,
     AdminStatusUpdateRequest,
     AdminStatusUpdateResponse,
     AdminGoldMissionsUpdateRequest,
@@ -2687,8 +2685,7 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
         getattr(body.status, k) is not None for k in ("gold_status", "platinum_status", "diamond_status")
     )
     has_attendance = body.attendance is not None and (body.attendance.delta_days is not None or body.attendance.set_days is not None)
-    has_deposit = body.deposit is not None and (body.deposit.platinum_deposit_done is not None or body.deposit.diamond_deposit_current is not None)
-    if not (has_status or has_attendance or has_deposit):
+    if not (has_status or has_attendance):
         raise HTTPException(status_code=400, detail="NO_FIELDS")
 
     key = _validate_idempotency_key(request_id)
@@ -2722,7 +2719,7 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
         if not row:
             raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
 
-        expires_at, gold_status, platinum_status, diamond_status, attendance_days, platinum_deposit_done, diamond_deposit_current, *_rest = row
+        expires_at, gold_status, platinum_status, diamond_status, attendance_days, *_rest = row
         current = {
             "gold_status": gold_status,
             "platinum_status": platinum_status,
@@ -2730,8 +2727,6 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
         }
 
         new_attendance_days = int(attendance_days or 0)
-        new_platinum_deposit_done = bool(platinum_deposit_done)
-        new_diamond_deposit_current = int(diamond_deposit_current or 0)
         new_platinum_status = platinum_status
         new_diamond_status = diamond_status
 
@@ -2740,21 +2735,6 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
                 new_attendance_days = _clamp_attendance_days(int(body.attendance.set_days))
             else:
                 new_attendance_days = _clamp_attendance_days(int(attendance_days or 0) + int(body.attendance.delta_days or 0))
-
-        if has_deposit:
-            if body.deposit.platinum_deposit_done is not None:
-                new_platinum_deposit_done = bool(body.deposit.platinum_deposit_done)
-            if body.deposit.diamond_deposit_current is not None:
-                new_diamond_deposit_current = int(body.deposit.diamond_deposit_current)
-
-        # Recompute unlock statuses from attendance/deposit where applicable.
-        if has_attendance or has_deposit:
-            if new_platinum_status not in {"CLAIMED", "EXPIRED"}:
-                if new_attendance_days >= 3 and new_platinum_deposit_done and review_ok:
-                    new_platinum_status = "UNLOCKED"
-            if new_diamond_status not in {"CLAIMED", "EXPIRED"}:
-                if new_diamond_deposit_current >= 500000:
-                    new_diamond_status = "UNLOCKED"
 
         # Apply explicit status overrides last.
         explicit_updates: dict[str, str] = {}
@@ -2786,9 +2766,6 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
         if has_attendance:
             set_cols.extend(["platinum_attendance_days=%s", "last_attended_at=%s"])
             params.extend([new_attendance_days, now])
-        if has_deposit:
-            set_cols.extend(["platinum_deposit_done=%s", "diamond_deposit_current=%s"])
-            params.extend([new_platinum_deposit_done, new_diamond_deposit_current])
 
         set_cols.append("updated_at=%s")
         params.append(now)

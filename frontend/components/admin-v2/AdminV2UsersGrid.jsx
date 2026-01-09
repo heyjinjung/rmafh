@@ -1,7 +1,6 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
-import { PLATINUM_UNLOCK, DIAMOND_UNLOCK } from '../../lib/vaultConfig';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 const columnDefs = [
   { key: 'external_user_id', label: '외부 사용자 ID' },
@@ -11,7 +10,6 @@ const columnDefs = [
   { key: 'platinum_status', label: '플래티넘 상태' },
   { key: 'diamond_status', label: '다이아 상태' },
   { key: 'platinum_attendance_days', label: '출석(일)' },
-  { key: 'deposit_total', label: '누적 입금' },
   { key: 'expires_at', label: '만료일' },
 ];
 
@@ -30,7 +28,7 @@ const statusLabel = (s) => {
   }
 };
 
-const sortableKeys = new Set(['created_at', 'expires_at', 'deposit_total', 'external_user_id', 'nickname']);
+const sortableKeys = new Set(['created_at', 'expires_at', 'external_user_id', 'nickname']);
 
 const Switch = ({ checked, onChange, disabled, activeColor = 'var(--v2-accent)' }) => (
   <button
@@ -63,14 +61,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [extending, setExtending] = useState(false);
   const [expiryExtendDays, setExpiryExtendDays] = useState(1);
   const [expiryReason, setExpiryReason] = useState('OPS');
-  const [depositSaving, setDepositSaving] = useState(false);
-  const [platinumDepositDone, setPlatinumDepositDone] = useState(false);
-  const [diamondDepositCurrent, setDiamondDepositCurrent] = useState(0);
   const [form, setForm] = useState({
     external_user_id: '',
     nickname: '',
     joined_date: '',
-    deposit_total: '0',
   });
   const [goldStatus, setGoldStatus] = useState('LOCKED');
   const [goldMission1, setGoldMission1] = useState(false);
@@ -128,7 +122,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       external_user_id: '',
       nickname: '',
       joined_date: '',
-      deposit_total: '0',
     });
   };
 
@@ -138,14 +131,11 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       external_user_id: row?.external_user_id || '',
       nickname: row?.nickname || '',
       joined_date: row?.joined_date || '',
-      deposit_total: String(row?.deposit_total ?? 0),
     };
     console.log('setFormFromRow new form state:', newForm);
     setForm(newForm);
     setExpiryExtendDays(1);
     setExpiryReason('OPS');
-    setPlatinumDepositDone(Boolean(row?.platinum_deposit_done) || Number(row?.deposit_total || 0) >= PLATINUM_UNLOCK.depositTotal);
-    setDiamondDepositCurrent(Number(row?.diamond_deposit_current || row?.deposit_total || 0));
     setGoldStatus(row?.gold_status || 'LOCKED');
     setGoldMission1(Boolean(row?.gold_mission_1_done));
     setGoldMission2(Boolean(row?.gold_mission_2_done));
@@ -192,7 +182,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       external_user_id,
       nickname: form.nickname?.trim() || null,
       joined_date: form.joined_date?.trim() || null,
-      deposit_total: Number(form.deposit_total || 0),
     };
 
     try {
@@ -253,24 +242,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       const response = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}`, { method: 'PATCH', body: payload });
       console.log('Update response:', response);
       pushToast({ ok: true, message: '저장 완료' });
-      const depositAmount = Number(form.deposit_total || 0);
-      const platinumReached = depositAmount >= PLATINUM_UNLOCK.depositTotal;
-      const diamondReached = depositAmount >= DIAMOND_UNLOCK.depositTotal;
-      if ((platinumReached && !platinumDepositDone) || (diamondReached && diamondDepositCurrent < DIAMOND_UNLOCK.depositTotal)) {
-        try {
-          await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/deposit`, {
-            method: 'POST',
-            body: {
-              platinum_deposit_done: platinumReached ? true : undefined,
-              diamond_deposit_current: diamondReached ? depositAmount : undefined,
-            },
-          });
-          if (platinumReached) setPlatinumDepositDone(true);
-          if (diamondReached) setDiamondDepositCurrent(depositAmount);
-        } catch (e) {
-          console.error('Auto deposit unlock failed', e);
-        }
-      }
       setDrawerOpen(false);
       setPanelMode('none');
       setSelectedRow(null);
@@ -335,46 +306,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     } finally {
       setExtending(false);
     }
-  };
-
-  const submitDepositUpdate = async (updates = {}, { silent } = {}) => {
-    if (!ensureAuth()) return;
-    if (!selectedRow?.user_id) return;
-
-    const requestId = makeRequestId();
-    const body = {};
-    if (updates.platinum_deposit_done !== undefined) body.platinum_deposit_done = Boolean(updates.platinum_deposit_done);
-    if (updates.diamond_deposit_current !== undefined) body.diamond_deposit_current = Number(updates.diamond_deposit_current);
-
-    if (!Object.keys(body).length) return;
-
-    try {
-      setDepositSaving(true);
-      const res = await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/deposit`, { method: 'POST', body, idempotencyKey: requestId });
-      const data = res?.data || {};
-      setPlatinumDepositDone(Boolean(data.platinum_deposit_done ?? platinumDepositDone));
-      setDiamondDepositCurrent(Number(data.diamond_deposit_current ?? diamondDepositCurrent));
-      setSelectedRow((prev) => (prev ? {
-        ...prev,
-        platinum_deposit_done: Boolean(data.platinum_deposit_done ?? prev.platinum_deposit_done),
-        diamond_deposit_current: Number(data.diamond_deposit_current ?? prev.diamond_deposit_current),
-        platinum_status: data.platinum_status ?? prev.platinum_status,
-        diamond_status: data.diamond_status ?? prev.diamond_status,
-      } : prev));
-      if (!silent) {
-        const msgs = [];
-        if (updates.platinum_deposit_done !== undefined) msgs.push(updates.platinum_deposit_done ? '플레티넘 해금' : '플레티넘 해제');
-        if (updates.diamond_deposit_current !== undefined) msgs.push(updates.diamond_deposit_current >= DIAMOND_UNLOCK.depositTotal ? '다이아 해금' : '다이아 해제');
-        pushToast({ ok: true, message: msgs.join(' + ') || '입금 상태 업데이트', detail: `PT: ${data.platinum_status} / DM: ${data.diamond_status}` });
-      }
-      fetchUsers();
-    } catch (err) {
-      const info = extractErrorInfo(err);
-      pushToast({ ok: false, message: info.summary || '입금 상태 업데이트 실패', detail: info.detail || info.code });
-    } finally {
-      setDepositSaving(false);
-    }
-
   };
 
   const submitGoldMissions = async (updates = {}) => {
@@ -747,9 +678,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         if (col.key === 'created_at' || col.key === 'expires_at') {
                           // ISO8601 → YYYY-MM-DD
                           display = val ? val.slice(0, 10) : '';
-                        } else if (col.key === 'telegram_ok' || col.key === 'review_ok') {
-                          // 체크마크 또는 공백
-                          display = val ? '✓' : '';
                         } else if (typeof val === 'number') {
                           display = val.toLocaleString();
                         } else {

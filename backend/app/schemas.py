@@ -241,29 +241,9 @@ class AdminAttendanceAdjustResponse(BaseModel):
     expires_at: Optional[str]
 
 
-class AdminDepositUpdateRequest(BaseModel):
-    platinum_deposit_total: Optional[int] = None
-    platinum_deposit_count: Optional[int] = None
-    diamond_deposit_total: Optional[int] = None
-
-
-class AdminDepositUpdateResponse(BaseModel):
-    platinum_deposit_total: int
-    platinum_deposit_count: int
-    diamond_deposit_total: int
-    platinum_status: str
-    diamond_status: str
-    expires_at: Optional[str]
-
-
 class AdminBulkAttendanceUpdate(BaseModel):
     delta: Optional[int] = 0
     cap: Optional[int] = None
-
-
-class AdminBulkDepositUpdate(BaseModel):
-    delta: Optional[int] = 0
-    floor: Optional[int] = None
 
 
 class AdminBulkUpdateRequest(BaseModel):
@@ -271,7 +251,6 @@ class AdminBulkUpdateRequest(BaseModel):
     target: AdminExtendExpiryTarget
     status: Optional[AdminStatusUpdateRequest] = None
     attendance: Optional[AdminBulkAttendanceUpdate] = None
-    deposit: Optional[AdminBulkDepositUpdate] = None
 
 
 class AdminBulkUpdateResponse(BaseModel):

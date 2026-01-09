@@ -115,6 +115,8 @@ def compute_platinum_status(
     deposit_count: int,
     attendance_days: int,
     review_ok: bool,
+    m1: bool,
+    m2: bool,
     gold_status: str,
     current_status: str,
 ) -> str:
@@ -122,7 +124,7 @@ def compute_platinum_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If attendance >= 3 AND total >= PLATINUM_UNLOCK threshold AND count >= 3 AND review_ok, status is UNLOCKED
+    - If attendance >= 3 AND total >= PLATINUM_UNLOCK threshold AND count >= 3 AND review_ok AND missions done, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
@@ -132,6 +134,8 @@ def compute_platinum_status(
         and deposit_total >= PLATINUM_UNLOCK["deposit_total"]
         and deposit_count >= PLATINUM_UNLOCK["deposit_count"]
         and review_ok
+        and m1
+        and m2
     ):
         return "UNLOCKED"
     return current_status
@@ -140,6 +144,8 @@ def compute_platinum_status(
 def compute_diamond_status(
     deposit_total: int,
     attendance_days: int,
+    m1: bool,
+    m2: bool,
     platinum_status: str,
     current_status: str
 ) -> str:
@@ -147,12 +153,17 @@ def compute_diamond_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If platinum_status is CLAIMED and deposit_total >= DIAMOND_UNLOCK threshold, status is UNLOCKED
+    - If platinum_status is CLAIMED and deposit_total >= DIAMOND_UNLOCK threshold and missions done, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if platinum_status == "CLAIMED" and deposit_total >= DIAMOND_UNLOCK["deposit_total"]:
+    if (
+        platinum_status == "CLAIMED"
+        and deposit_total >= DIAMOND_UNLOCK["deposit_total"]
+        and m1
+        and m2
+    ):
         return "UNLOCKED"
     return current_status
 
@@ -280,13 +291,25 @@ def apply_bulk_updates_for_user(
         new_diamond_deposit_total = int(deposit_diamond_total)
 
     # Recompute unlock statuses
-    # Platinum no longer needs attendance
+    # Platinum no longer needs attendance (correction: it still needs m1, m2)
     new_platinum_status = compute_platinum_status(
-        new_platinum_deposit_total, new_platinum_deposit_count, review_ok, gold_status, platinum_status
+        new_platinum_deposit_total,
+        new_platinum_deposit_count,
+        3, # attendance dummy for now if unused or pass actual diamond_attendance if shared
+        review_ok,
+        bool(rest[4]), # plat_m1
+        bool(rest[5]), # plat_m2
+        gold_status,
+        platinum_status
     )
-    # Diamond now needs attendance and platinum status
+    # Diamond now needs attendance and platinum status and missions
     new_diamond_status = compute_diamond_status(
-        new_diamond_deposit_total, new_attendance_days, new_platinum_status, diamond_status
+        new_diamond_deposit_total,
+        new_attendance_days,
+        bool(rest[6]), # dia_m1
+        bool(rest[7]), # dia_m2
+        new_platinum_status,
+        diamond_status
     )
 
     # Apply explicit status overrides

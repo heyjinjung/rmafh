@@ -20,8 +20,6 @@ from app.schemas import (
     AdminDiamondMissionsUpdateResponse,
     AdminAttendanceAdjustRequest,
     AdminAttendanceAdjustResponse,
-    AdminDepositUpdateRequest,
-    AdminDepositUpdateResponse,
 )
 from app.routers.dependencies import verify_admin_password
 from app.utils.audit import _log_admin_action
@@ -227,16 +225,49 @@ async def admin_update_platinum_missions(
         new_m1 = updates.get("platinum_mission_1_done", bool(plat_m1))
         new_m2 = updates.get("platinum_mission_2_done", bool(plat_m2))
 
-        set_clauses = []
-        params: list[Any] = []
+        # Recompute status
+        # Note: We need some data from the row for computation
+        # (expires_at, gold_status, plat_status, dia_status, att, dep_tot, dep_cnt, dia_dep, ...)
+        # In admin_update_platinum_missions, we unpacked:
+        # (expires_at, _gold_status, platinum_status, _diamond_status, _att, _plat_dep_tot, _plat_dep_cnt, ...)
+        
+        # We need to re-fetch or use what we have. Let's look at the SELECT in get_or_create_vault_row:
+        # 0:expires, 1:gold, 2:plat, 3:dia, 4:plat_att, 5:plat_dep_tot, 6:plat_dep_cnt, 7:dia_dep_tot
+        
+        gold_status = row[1]
+        attendance_days = row[4]
+        plat_dep_tot = row[5]
+        plat_dep_cnt = row[6]
+
+        # Get review_ok from snapshot
+        cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
+        snap_row = cur.fetchone()
+        review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
+
+        new_platinum_status = compute_platinum_status(
+            deposit_total=int(plat_dep_tot or 0),
+            deposit_count=int(plat_dep_cnt or 0),
+            attendance_days=int(attendance_days or 0),
+            review_ok=review_ok,
+            m1=new_m1,
+            m2=new_m2,
+            gold_status=gold_status,
+            current_status=platinum_status,
+        )
+
+        set_clauses = ["updated_at=%s"]
+        params: list[Any] = [now]
         if "platinum_mission_1_done" in updates:
             set_clauses.append("platinum_mission_1_done=%s")
             params.append(new_m1)
         if "platinum_mission_2_done" in updates:
             set_clauses.append("platinum_mission_2_done=%s")
             params.append(new_m2)
-        set_clauses.append("updated_at=%s")
-        params.append(now)
+        
+        if new_platinum_status != platinum_status:
+            set_clauses.append("platinum_status=%s")
+            params.append(new_platinum_status)
+
         params.append(user_id)
 
         cur.execute(
@@ -266,7 +297,7 @@ async def admin_update_platinum_missions(
             "updated": True,
             "platinum_mission_1_done": new_m1,
             "platinum_mission_2_done": new_m2,
-            "platinum_status": platinum_status,
+            "platinum_status": new_platinum_status,
             "expires_at": expires_at.isoformat() if expires_at else None,
         }
 
@@ -337,16 +368,34 @@ async def admin_update_diamond_missions(
         new_m1 = updates.get("diamond_mission_1_done", bool(dia_m1))
         new_m2 = updates.get("diamond_mission_2_done", bool(dia_m2))
 
-        set_clauses = []
-        params: list[Any] = []
+        # Recompute status
+        # 0:expires, 1:gold, 2:plat, 3:dia, 4:att, 7:dia_dep_tot
+        platinum_status = row[2]
+        dia_dep_tot = row[7]
+        dia_att = row[11]
+
+        new_diamond_status = compute_diamond_status(
+            deposit_total=int(dia_dep_tot or 0),
+            attendance_days=int(dia_att or 0),
+            m1=new_m1,
+            m2=new_m2,
+            platinum_status=platinum_status,
+            current_status=diamond_status,
+        )
+
+        set_clauses = ["updated_at=%s"]
+        params: list[Any] = [now]
         if "diamond_mission_1_done" in updates:
             set_clauses.append("diamond_mission_1_done=%s")
             params.append(new_m1)
         if "diamond_mission_2_done" in updates:
             set_clauses.append("diamond_mission_2_done=%s")
             params.append(new_m2)
-        set_clauses.append("updated_at=%s")
-        params.append(now)
+        
+        if new_diamond_status != diamond_status:
+            set_clauses.append("diamond_status=%s")
+            params.append(new_diamond_status)
+
         params.append(user_id)
 
         cur.execute(
@@ -376,7 +425,7 @@ async def admin_update_diamond_missions(
             "updated": True,
             "diamond_mission_1_done": new_m1,
             "diamond_mission_2_done": new_m2,
-            "diamond_status": diamond_status,
+            "diamond_status": new_diamond_status,
             "expires_at": expires_at.isoformat() if expires_at else None,
         }
 
@@ -591,143 +640,3 @@ async def admin_adjust_attendance(
         conn.commit()
         response.headers["Idempotency-Status"] = "recorded"
         return AdminAttendanceAdjustResponse(**response_body)
-
-
-@router.post("/{user_id}/vault/deposit", response_model=AdminDepositUpdateResponse)
-async def admin_update_deposit(
-    user_id: int,
-    body: AdminDepositUpdateRequest,
-    request: Request,
-    response: Response,
-    _auth: str = Depends(verify_admin_password),
-):
-    """Update deposit status."""
-    if body.platinum_deposit_total is None and body.platinum_deposit_count is None and body.diamond_deposit_total is None:
-        raise HTTPException(status_code=400, detail="NO_FIELDS")
-
-    key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
-    scope = idempotency_scope(request)
-    endpoint = f"/api/vault/admin/users/{user_id}/vault/deposit"
-    request_hash = hash_request_body({"user_id": user_id, **body.dict()})
-
-    with db.get_conn() as conn:
-        cur = conn.cursor()
-        _apply_job_timeouts(cur)
-
-        cur.execute("SELECT review_ok FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
-        snap_row = cur.fetchone()
-        review_ok = bool(snap_row[0]) if snap_row and snap_row[0] is not None else False
-
-        idem = idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
-        if idem["status"] == "replayed":
-            response.headers["Idempotency-Status"] = "replayed"
-            return AdminDepositUpdateResponse(**idem["response_body"])
-        if idem["status"] == "in_progress":
-            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
-
-        row = get_or_create_vault_row(cur, user_id, now_utc())
-        if not row:
-            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
-
-        (
-            expires_at, gold_status, platinum_status, diamond_status,
-            attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total,
-            _m1, _m2, _m3, diamond_attendance_days, *_rest
-        ) = row
-        
-        new_platinum_deposit_total = (
-            int(body.platinum_deposit_total)
-            if body.platinum_deposit_total is not None
-            else int(platinum_deposit_total or 0)
-        )
-        new_platinum_deposit_count = (
-            int(body.platinum_deposit_count)
-            if body.platinum_deposit_count is not None
-            else int(platinum_deposit_count or 0)
-        )
-        new_diamond_deposit_total = (
-            int(body.diamond_deposit_total)
-            if body.diamond_deposit_total is not None
-            else int(diamond_deposit_total or 0)
-        )
-
-        new_platinum_status = compute_platinum_status(
-            deposit_total=new_platinum_deposit_total,
-            deposit_count=new_platinum_deposit_count,
-            attendance_days=int(attendance_days or 0),
-            review_ok=review_ok,
-            gold_status=gold_status,
-            current_status=platinum_status,
-        )
-        new_diamond_status = compute_diamond_status(
-            deposit_total=new_diamond_deposit_total,
-            attendance_days=int(diamond_attendance_days or 0),
-            platinum_status=new_platinum_status,
-            current_status=diamond_status,
-        )
-
-        now = now_utc()
-        set_clauses = []
-        params = []
-        
-        if body.platinum_deposit_total is not None:
-             set_clauses.append("platinum_deposit_total=%s")
-             params.append(new_platinum_deposit_total)
-        if body.platinum_deposit_count is not None:
-             set_clauses.append("platinum_deposit_count=%s")
-             params.append(new_platinum_deposit_count)
-        if body.diamond_deposit_total is not None:
-             set_clauses.append("diamond_deposit_total=%s")
-             params.append(new_diamond_deposit_total)
-        
-        set_clauses.append("platinum_status=%s")
-        params.append(new_platinum_status)
-        set_clauses.append("diamond_status=%s")
-        params.append(new_diamond_status)
-        set_clauses.append("updated_at=%s")
-        params.append(now)
-        params.append(user_id)
-
-        cur.execute(
-            f"UPDATE vault_status SET {', '.join(set_clauses)} WHERE user_id=%s",
-            params,
-        )
-
-        admin_user = request.client.host if request.client else "unknown"
-        _log_admin_action(
-            conn=conn,
-            admin_user=admin_user,
-            action="ADMIN_DEPOSIT_UPDATE",
-            endpoint=endpoint,
-            target_user_ids=[user_id],
-            request_id=key,
-            request_body={
-                "platinum_deposit_total": body.platinum_deposit_total,
-                "platinum_deposit_count": body.platinum_deposit_count,
-                "diamond_deposit_total": body.diamond_deposit_total,
-            },
-            response_status="SUCCESS",
-            response_summary={
-                "platinum_status": new_platinum_status,
-                "diamond_status": new_diamond_status,
-            },
-            idempotency_key=key,
-        )
-
-        response_body = {
-            "platinum_deposit_total": new_platinum_deposit_total,
-            "platinum_deposit_count": new_platinum_deposit_count,
-            "diamond_deposit_total": new_diamond_deposit_total,
-            "platinum_status": new_platinum_status,
-            "diamond_status": new_diamond_status,
-            "expires_at": expires_at.isoformat() if expires_at else None,
-        }
-
-        idempotency_finish(
-            cur, key=key, scope=scope, endpoint=endpoint,
-            response_status=200, response_body=response_body,
-        )
-
-        conn.commit()
-        response.headers["Idempotency-Status"] = "recorded"
-        return AdminDepositUpdateResponse(**response_body)
