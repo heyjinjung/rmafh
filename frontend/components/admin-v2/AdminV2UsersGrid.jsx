@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
+import { PLATINUM_UNLOCK, DIAMOND_UNLOCK } from '../../lib/vaultConfig';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 const columnDefs = [
   { key: 'external_user_id', label: '외부 사용자 ID' },
@@ -128,7 +129,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setForm(newForm);
     setExpiryExtendDays(1);
     setExpiryReason('OPS');
-    setPlatinumDepositDone(Boolean(row?.platinum_deposit_done) || Number(row?.deposit_total || 0) >= 150000);
+    setPlatinumDepositDone(Boolean(row?.platinum_deposit_done) || Number(row?.deposit_total || 0) >= PLATINUM_UNLOCK.depositTotal);
     setDiamondDepositCurrent(Number(row?.diamond_deposit_current || row?.deposit_total || 0));
     setGoldStatus(row?.gold_status || 'LOCKED');
     setGoldMission1(Boolean(row?.gold_mission_1_done));
@@ -242,9 +243,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       console.log('Update response:', response);
       pushToast({ ok: true, message: '저장 완료' });
       const depositAmount = Number(form.deposit_total || 0);
-      const platinumReached = depositAmount >= 150000;
-      const diamondReached = depositAmount >= 500000;
-      if ((platinumReached && !platinumDepositDone) || (diamondReached && diamondDepositCurrent < 500000)) {
+      const platinumReached = depositAmount >= PLATINUM_UNLOCK.depositTotal;
+      const diamondReached = depositAmount >= DIAMOND_UNLOCK.depositTotal;
+      if ((platinumReached && !platinumDepositDone) || (diamondReached && diamondDepositCurrent < DIAMOND_UNLOCK.depositTotal)) {
         try {
           await apiFetch(`/api/vault/admin/users/${selectedRow.user_id}/vault/deposit`, {
             method: 'POST',
@@ -352,7 +353,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       if (!silent) {
         const msgs = [];
         if (updates.platinum_deposit_done !== undefined) msgs.push(updates.platinum_deposit_done ? '플레티넘 해금' : '플레티넘 해제');
-        if (updates.diamond_deposit_current !== undefined) msgs.push(updates.diamond_deposit_current >= 500000 ? '다이아 해금' : '다이아 해제');
+        if (updates.diamond_deposit_current !== undefined) msgs.push(updates.diamond_deposit_current >= DIAMOND_UNLOCK.depositTotal ? '다이아 해금' : '다이아 해제');
         pushToast({ ok: true, message: msgs.join(' + ') || '입금 상태 업데이트', detail: `PT: ${data.platinum_status} / DM: ${data.diamond_status}` });
       }
       fetchUsers();
@@ -924,7 +925,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
                   <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/60 p-3 space-y-3">
                     <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">플레티넘 입금 (15만)</div>
+                      <div className="text-xs uppercase tracking-[0.16em] text-[var(--v2-muted)]">플레티넘 입금 ({(PLATINUM_UNLOCK.depositTotal / 10000).toLocaleString()}만)</div>
                       <div className="text-[10px] text-[var(--v2-muted)]">자동/수동 해금</div>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -947,20 +948,20 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <button
                         type="button"
                         onClick={() => {
-                          setForm((prev) => ({ ...prev, deposit_total: '150000' }));
+                          setForm((prev) => ({ ...prev, deposit_total: String(PLATINUM_UNLOCK.depositTotal) }));
                           submitDepositUpdate({ platinum_deposit_done: true });
                         }}
                         disabled={depositSaving || saving}
                         className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
                       >
-                        150,000 + 해금
+                        {PLATINUM_UNLOCK.depositTotal.toLocaleString()} + 해금
                       </button>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : 500000 })}
-                        disabled={depositSaving || saving || diamondDepositCurrent >= 500000}
+                        onClick={() => submitDepositUpdate({ diamond_deposit_current: diamondDepositCurrent > 0 ? diamondDepositCurrent : DIAMOND_UNLOCK.depositTotal })}
+                        disabled={depositSaving || saving || diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal}
                         className="rounded-lg border border-[var(--v2-accent)] bg-[var(--v2-accent)] px-3 py-2 text-sm font-semibold text-black hover:brightness-105 disabled:opacity-50"
                       >
                         다이아 해금
@@ -968,7 +969,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <button
                         type="button"
                         onClick={() => submitDepositUpdate({ diamond_deposit_current: 0 })}
-                        disabled={depositSaving || saving || diamondDepositCurrent < 500000}
+                        disabled={depositSaving || saving || diamondDepositCurrent < DIAMOND_UNLOCK.depositTotal}
                         className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-warning)]/50 disabled:opacity-50"
                       >
                         해금 해제
@@ -976,13 +977,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <button
                         type="button"
                         onClick={() => {
-                          setForm((prev) => ({ ...prev, deposit_total: '500000' }));
-                          submitDepositUpdate({ diamond_deposit_current: 500000 });
+                          setForm((prev) => ({ ...prev, deposit_total: String(DIAMOND_UNLOCK.depositTotal) }));
+                          submitDepositUpdate({ diamond_deposit_current: DIAMOND_UNLOCK.depositTotal });
                         }}
                         disabled={depositSaving || saving}
                         className="rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] hover:border-[var(--v2-accent)]/50 disabled:opacity-50"
                       >
-                        500,000 + 해금
+                        {DIAMOND_UNLOCK.depositTotal.toLocaleString()} + 해금
                       </button>
                     </div>
                   </div>
