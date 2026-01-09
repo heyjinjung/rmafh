@@ -17,6 +17,8 @@ export default function AdminV2Page() {
   const [didBoot, setDidBoot] = useState(false);
   const [usersTarget, setUsersTarget] = useState(null);
   const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED !== 'false';
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -64,14 +66,44 @@ export default function AdminV2Page() {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
+                setError(null);
+                setLoading(true);
                 const value = e.currentTarget.password.value.trim();
-                if (value) {
-                  if (typeof window !== 'undefined') {
-                    sessionStorage.setItem('adminPassword', value);
+
+                if (!value) {
+                  setLoading(false);
+                  return;
+                }
+
+                try {
+                  // 백엔드 검증 시도 (Admin Users 목록 조회로 권한 확인)
+                  const res = await fetch(`${basePath}/api/vault/admin/users?page_size=1`, {
+                    headers: {
+                      'x-admin-password': value,
+                      'x-idempotency-key': `login-check-${Date.now()}`
+                    }
+                  });
+
+                  if (res.ok) {
+                    if (typeof window !== 'undefined') {
+                      sessionStorage.setItem('adminPassword', value);
+                    }
+                    setAdminPassword(value);
+                  } else {
+                    if (res.status === 401) {
+                      throw new Error('비밀번호가 올바르지 않습니다.');
+                    } else if (res.status === 403) {
+                      throw new Error('접근 권한이 없습니다.');
+                    } else {
+                      throw new Error(`서버 오류 (${res.status})`);
+                    }
                   }
-                  setAdminPassword(value);
+                } catch (err) {
+                  setError(err.message || '로그인에 실패했습니다.');
+                } finally {
+                  setLoading(false);
                 }
               }}
             >
@@ -83,17 +115,25 @@ export default function AdminV2Page() {
                   id="password"
                   name="password"
                   type="password"
+                  disabled={loading}
                   placeholder="비밀번호 입력"
-                  className="w-full rounded-lg border border-[#2b3139] bg-[#1c2128] px-4 py-3 text-[#e9eef5] placeholder:text-[#8b9199] focus:outline-none focus:ring-2 focus:ring-[#b7f75a]/40"
+                  className="w-full rounded-lg border border-[#2b3139] bg-[#1c2128] px-4 py-3 text-[#e9eef5] placeholder:text-[#8b9199] focus:outline-none focus:ring-2 focus:ring-[#b7f75a]/40 disabled:opacity-50"
                   autoFocus
                 />
               </div>
 
+              {error && (
+                <div className="mb-4 text-sm text-[var(--v2-warning)] bg-[var(--v2-warning)]/10 p-3 rounded border border-[var(--v2-warning)]/20">
+                  {error}
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full rounded-lg border border-[#b7f75a] bg-[#b7f75a] px-4 py-2 text-sm font-semibold text-black hover:brightness-110 transition-all"
+                disabled={loading}
+                className="w-full rounded-lg border border-[#b7f75a] bg-[#b7f75a] px-4 py-2 text-sm font-semibold text-black hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                로그인
+                {loading ? '확인 중...' : '로그인'}
               </button>
             </form>
           </div>
@@ -142,7 +182,6 @@ export default function AdminV2Page() {
             basePath={basePath}
             onTargetChange={setUsersTarget}
           />
-          <AdminV2NotificationsPanel adminPassword={adminPassword} basePath={basePath} />
           <AdminV2ImportsFlow adminPassword={adminPassword} basePath={basePath} />
         </section>
       </AdminV2Layout>
