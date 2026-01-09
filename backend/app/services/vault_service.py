@@ -62,6 +62,7 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
                platinum_attendance_days,
                platinum_deposit_total,
                platinum_deposit_count,
+               diamond_deposit_total,
                gold_mission_1_done,
                gold_mission_2_done,
                gold_mission_3_done,
@@ -91,6 +92,7 @@ def compute_gold_status(m1: bool, m2: bool, m3: bool, current_status: str) -> st
 def compute_platinum_status(
     deposit_total: int,
     deposit_count: int,
+    attendance_days: int,
     review_ok: bool,
     gold_status: str,
     current_status: str,

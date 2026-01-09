@@ -141,7 +141,7 @@ def test_admin_user_bulk_updates_apply(client):
     for user_id, ext in users:
         deposit = client.post(
             f"/api/vault/admin/users/{user_id}/vault/deposit",
-            json={"platinum_deposit_done": True, "diamond_deposit_current": 600000},
+            json={"platinum_deposit_total": 100000, "platinum_deposit_count": 3, "diamond_deposit_total": 600000},
             headers=_idem_headers(f"deposit-{ext}"),
         )
         assert deposit.status_code == 200

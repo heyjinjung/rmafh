@@ -555,8 +555,8 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
                    gold_mission_1_done = v.telegram_ok,
                    gold_status = CASE
                        WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
-                       WHEN v.telegram_ok AND vs.gold_mission_2_done AND vs.gold_mission_3_done THEN 'UNLOCKED'
-                       ELSE 'LOCKED'
+                       WHEN v.telegram_ok THEN 'UNLOCKED'
+                       ELSE vs.gold_status
                    END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE

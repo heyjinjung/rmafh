@@ -94,7 +94,7 @@ async def admin_update_gold_missions(
         (
             expires_at, gold_status, _platinum_status, _diamond_status,
             _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
-            gold_mission_1_done, gold_mission_2_done, gold_mission_3_done,
+            gold_mission_1_done, gold_mission_2_done, gold_mission_3_done, _diamond_attendance_days,
         ) = row
 
         new_m1 = updates.get("gold_mission_1_done", bool(gold_mission_1_done))
@@ -315,7 +315,12 @@ async def admin_adjust_attendance(
             target_days = clamp_attendance_days(current_days + delta_days)
 
         new_platinum_status = compute_platinum_status(
-            target_days, int(platinum_deposit_total or 0), int(platinum_deposit_count or 0), review_ok, platinum_status
+            deposit_total=int(platinum_deposit_total or 0),
+            deposit_count=int(platinum_deposit_count or 0),
+            attendance_days=target_days,
+            review_ok=review_ok,
+            gold_status=gold_status,
+            current_status=platinum_status,
         )
 
         now = now_utc()
@@ -420,7 +425,12 @@ async def admin_update_deposit(
         )
 
         new_platinum_status = compute_platinum_status(
-            int(attendance_days or 0), new_platinum_deposit_total, new_platinum_deposit_count, review_ok, platinum_status
+            deposit_total=new_platinum_deposit_total,
+            deposit_count=new_platinum_deposit_count,
+            attendance_days=int(attendance_days or 0),
+            review_ok=review_ok,
+            gold_status=gold_status,
+            current_status=platinum_status,
         )
         new_diamond_status = compute_diamond_status(new_diamond_deposit_total, diamond_status)
 
