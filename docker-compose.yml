@@ -10,7 +10,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vault"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vault}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -23,7 +23,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://vault:vaultpass@db:5432/vault}
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-vault}:${POSTGRES_PASSWORD:-vaultpass}@db:5432/${POSTGRES_DB:-vault}}"
       APP_ENV: ${APP_ENV:-local}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       IDEMPOTENCY_TTL_HOURS: ${IDEMPOTENCY_TTL_HOURS:-24}
@@ -39,7 +39,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://vault:vaultpass@db:5432/vault}
+      DATABASE_URL: "${DATABASE_URL:-postgresql://${POSTGRES_USER:-vault}:${POSTGRES_PASSWORD:-vaultpass}@db:5432/${POSTGRES_DB:-vault}}"
       APP_ENV: ${APP_ENV:-local}
       IDEMPOTENCY_TTL_HOURS: ${IDEMPOTENCY_TTL_HOURS:-24}
     command: ["sh", "-c", "python -m app.worker"]

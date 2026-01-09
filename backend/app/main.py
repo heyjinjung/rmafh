@@ -1769,6 +1769,27 @@ def _ensure_schema():
         )
         cur.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_compensation_queue_req_ext ON compensation_queue (request_id, external_service)")
 
+        # Notification templates (used by /api/vault/notify when message_override is not provided)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notification_templates (
+              id BIGSERIAL PRIMARY KEY,
+              type VARCHAR(32) NOT NULL UNIQUE,
+              title VARCHAR(128) NOT NULL,
+              body TEXT NOT NULL,
+              cta_text VARCHAR(64),
+              icon_emoji VARCHAR(8),
+              category VARCHAR(32),
+              priority INT DEFAULT 0,
+              enabled BOOLEAN DEFAULT TRUE,
+              created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+              updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_notification_templates_enabled ON notification_templates (enabled)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_notification_templates_priority ON notification_templates (priority DESC)")
+
         conn.commit()
 
 @app.post("/api/vault/extend-expiry", response_model=ExtendExpiryResponse)
