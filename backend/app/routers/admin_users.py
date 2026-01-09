@@ -101,6 +101,7 @@ async def get_all_users(
                 vs.platinum_status,
                 vs.diamond_status,
                 vs.platinum_attendance_days,
+                vs.diamond_attendance_days,
                 vs.platinum_deposit_done,
                 vs.diamond_deposit_current,
                 uas.review_ok,
@@ -120,7 +121,7 @@ async def get_all_users(
 
         users = []
         for row in rows:
-            joined_date = row[17]
+            joined_date = row[18]
             max_attendance_days = 0
             if joined_date:
                 days_since_join = (today - joined_date).days
@@ -129,9 +130,9 @@ async def get_all_users(
             actual_attendance = row[10] or 0
             capped_attendance = min(actual_attendance, max_attendance_days) if joined_date else actual_attendance
 
-            deposit_total = int(row[14] or 0)
-            platinum_deposit_done = bool(row[11])
-            diamond_deposit_current = int(row[12] or 0) or deposit_total
+            deposit_total = int(row[15] or 0)
+            platinum_deposit_done = bool(row[12])
+            diamond_deposit_current = int(row[13] or 0) or deposit_total
 
             users.append({
                 "user_id": row[0],
@@ -147,12 +148,13 @@ async def get_all_users(
                 "platinum_attendance_days": capped_attendance,
                 "max_attendance_days": max_attendance_days,
                 "joined_date": joined_date.isoformat() if joined_date else None,
+                "diamond_attendance_days": row[11] or 0,
                 "platinum_deposit_done": platinum_deposit_done,
                 "diamond_deposit_current": diamond_deposit_current,
-                "review_ok": row[13] or False,
+                "review_ok": row[14] or False,
                 "deposit_total": deposit_total,
-                "nickname": row[15] or "",
-                "telegram_ok": row[16] or False,
+                "nickname": row[16] or "",
+                "telegram_ok": row[17] or False,
             })
 
         return {"users": users, "total": total, "page": page, "page_size": page_size}
@@ -179,7 +181,7 @@ async def admin_create_user(
     key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = idempotency_scope(request)
     endpoint = "/api/vault/admin/users"
-    request_hash = hash_request_body(body.dict())
+    request_hash = hash_request_body(body.model_dump())
 
     now = now_utc()
     with db.get_conn() as conn:
@@ -321,7 +323,7 @@ async def admin_update_user(
     key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}"
-    request_hash = hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = hash_request_body({"user_id": user_id, **body.model_dump()})
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -385,7 +387,7 @@ async def admin_update_user(
             endpoint=f"/api/vault/admin/users/{user_id}",
             target_user_ids=[user_id],
             request_id=key,
-            request_body=body.dict(),
+            request_body=body.model_dump(),
             response_status="SUCCESS",
             response_summary={"updated": True},
             idempotency_key=key,

@@ -499,11 +499,12 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
             last_deposit_at = _parse_iso_datetime(getattr(r, "last_deposit_at", None))
             telegram_ok = _parse_bool(getattr(r, "telegram_ok", False))
             review_ok = _parse_bool(getattr(r, "review_ok", False))
+            attendance_count = max(0, _parse_int(getattr(r, "cc_attendance_count", 0), default=0))
 
             import_date = _select_import_date(last_deposit_at)
 
             snapshot_values.append((user_id, nickname, joined_date, deposit_total, last_deposit_at, telegram_ok, review_ok))
-            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at))
+            vault_update_values.append((user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at, attendance_count))
 
         if not snapshot_values:
             raise HTTPException(status_code=400, detail="NO_VALID_ROWS")
@@ -544,14 +545,20 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
             """
             UPDATE vault_status AS vs
                SET diamond_deposit_total = v.deposit_total,
-                                     gold_status = CASE
-                                         WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
-                                         WHEN v.telegram_ok THEN 'UNLOCKED'
-                                         ELSE 'LOCKED'
-                                     END,
+                   diamond_attendance_days = GREATEST(COALESCE(vs.diamond_attendance_days, 0), v.attendance_count),
+                   gold_mission_1_done = v.telegram_ok,
+                   gold_status = CASE
+                       WHEN vs.gold_status='CLAIMED' THEN 'CLAIMED'
+                       WHEN v.telegram_ok AND vs.gold_mission_2_done AND vs.gold_mission_3_done THEN 'UNLOCKED'
+                       ELSE 'LOCKED'
+                   END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 2000000 THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE')
+                            AND v.deposit_total >= 2000000
+                            AND GREATEST(COALESCE(vs.diamond_attendance_days, 0), v.attendance_count) >= 2
+                            AND vs.platinum_status = 'CLAIMED'
+                       THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                    expires_at = CASE
@@ -559,11 +566,11 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
                        ELSE vs.expires_at
                    END,
                    updated_at = NOW()
-                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at)
+                            FROM (VALUES %s) AS v(user_id, deposit_total, telegram_ok, review_ok, import_date, last_deposit_at, attendance_count)
              WHERE vs.user_id = v.user_id
             """,
             vault_update_values,
-                        template="(%s::int,%s::bigint,%s::bool,%s::bool,%s::date,%s::timestamptz)",
+                        template="(%s::int,%s::bigint,%s::bool,%s::bool,%s::date,%s::timestamptz,%s::int)",
         )
         vault_rows_updated = int(cur.rowcount or 0)
 
@@ -1355,7 +1362,7 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
     key = _validate_idempotency_key(request_id)
     scope = _idempotency_scope(request)
     endpoint = "/api/vault/extend-expiry"
-    request_hash = _hash_request_body(body.dict())
+    request_hash = _hash_request_body(body.model_dump())
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -1840,7 +1847,7 @@ async def admin_create_job(
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = "/api/vault/admin/jobs"
-    request_hash = _hash_request_body(body.dict())
+    request_hash = _hash_request_body(body.model_dump())
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -2384,7 +2391,7 @@ async def admin_extend_expiry(body: AdminExtendExpiryRequest, request: Request, 
     key = _validate_idempotency_key(request_id)
     scope = _idempotency_scope(request)
     endpoint = "/api/vault/admin/operations/extend-expiry"
-    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.model_dump())
 
     target_mode = (body.target.mode or "").lower()
     target_dict: dict = {"mode": target_mode}
@@ -2680,7 +2687,7 @@ async def admin_bulk_update(body: AdminBulkUpdateRequest, request: Request, resp
     key = _validate_idempotency_key(request_id)
     scope = _idempotency_scope(request)
     endpoint = "/api/vault/admin/operations/bulk-update"
-    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.dict())
+    request_hash = _hash_request_body(body.model_dump() if hasattr(body, "model_dump") else body.model_dump())
 
     target_mode = (body.target.mode or "").lower()
     target_dict: dict = {"mode": target_mode}
@@ -2974,7 +2981,7 @@ async def admin_create_user(body: AdminUserCreateRequest, request: Request, resp
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = "/api/vault/admin/users"
-    request_hash = _hash_request_body(body.dict())
+    request_hash = _hash_request_body(body.model_dump())
 
     now = _now()
     with db.get_conn() as conn:
@@ -3109,7 +3116,7 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}"
-    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = _hash_request_body({"user_id": user_id, **body.model_dump()})
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -3182,7 +3189,7 @@ async def admin_update_user(user_id: int, body: AdminUserUpdateRequest, request:
             endpoint=f"/api/vault/admin/users/{user_id}",
             target_user_ids=[user_id],
             request_id=key,
-            request_body=body.dict(),
+            request_body=body.model_dump(),
             response_status="SUCCESS",
             response_summary={"updated": True},
             idempotency_key=key,
@@ -3306,7 +3313,7 @@ async def admin_update_gold_missions(user_id: int, body: AdminGoldMissionsUpdate
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}/vault/gold-missions"
-    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = _hash_request_body({"user_id": user_id, **body.model_dump()})
 
     now = _now()
     with db.get_conn() as conn:
@@ -3435,7 +3442,7 @@ async def admin_update_vault_status(user_id: int, body: AdminStatusUpdateRequest
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}/vault/status"
-    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = _hash_request_body({"user_id": user_id, **body.model_dump()})
 
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -3532,7 +3539,7 @@ async def admin_adjust_attendance(user_id: int, body: AdminAttendanceAdjustReque
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}/vault/attendance"
-    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = _hash_request_body({"user_id": user_id, **body.model_dump()})
 
     delta_days = int(body.delta_days or 0)
     with db.get_conn() as conn:
@@ -3624,7 +3631,7 @@ async def admin_update_deposit(user_id: int, body: AdminDepositUpdateRequest, re
     key = _validate_idempotency_key(request.headers.get("x-idempotency-key"))
     scope = _idempotency_scope(request)
     endpoint = f"/api/vault/admin/users/{user_id}/vault/deposit"
-    request_hash = _hash_request_body({"user_id": user_id, **body.dict()})
+    request_hash = _hash_request_body({"user_id": user_id, **body.model_dump()})
 
     with db.get_conn() as conn:
         cur = conn.cursor()
