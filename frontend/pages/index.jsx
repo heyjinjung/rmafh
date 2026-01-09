@@ -107,43 +107,6 @@ export default function Home() {
             </h1>
             <p style={styles.address} className="cc-address">평생주소 : 씨씨주소.COM</p>
           </div>
-
-          {/* Game Links */}
-          <div style={styles.offerings}>
-            <h3 style={styles.offeringsTitle} className="cc-offeringsTitle">게임 바로가기</h3>
-            <div style={styles.modules} className="modules">
-              <a href="https://ccc-001.com" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
-                <Image src={ICON_GAME} alt="CC Casino" width={26} height={27} style={styles.logoIcon} />
-                <div style={styles.navCardText} className="cc-navCardText">
-                  <span>CC카지노</span>
-                  <span>바로가기</span>
-                </div>
-              </a>
-              <a href="https://t.me/+IE0NYpuze_k1YWZk" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
-                <Image src={ICON_TELEGRAM} alt="" width={30} height={30} style={styles.navCardIcon} />
-                <div style={styles.navCardText} className="cc-navCardText">
-                  <span>CC카지노</span>
-                  <span>텔레공식채널</span>
-                </div>
-              </a>
-            </div>
-          </div>
-
-          {/* ─── 사이드바 안내 문구 (v3 고정) ─── */}
-          <div style={styles.sidebarNotice} className="sidebar-notice">
-            <div style={styles.noticeItem}>
-              <span style={styles.noticeLabel}>📋 현재 변경사항</span>
-              <span style={styles.noticeText}>금고조건 변경 후 진행예정입니다.</span>
-            </div>
-            <div style={styles.noticeItem}>
-              <span style={styles.noticeLabel}>⏰ 이벤트 종료일</span>
-              <span style={styles.noticeText}>다이아 금고 기준 {VAULT_EXPIRY_HOURS.DIAMOND / 24}일 ({VAULT_EXPIRY_HOURS.DIAMOND}시간)</span>
-            </div>
-            <div style={styles.noticeItem}>
-              <span style={styles.noticeLabel}>🎁 이사지원 혜택</span>
-              <span style={styles.noticeText}>최소 34만원 이사지원 혜택</span>
-            </div>
-          </div>
         </aside>
 
         {/* ─── Main Content ─── */}
@@ -681,11 +644,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
             <span className="text-[#07AF4D] font-medium">LIMITED EVENT</span>
           </div>
 
-          {status?.loss_total ? (
-            <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#F97935]/30">
-              <span className="text-[#F97935] font-medium">지금 포기하면 {formatCurrency(lossTotal)} 소멸</span>
-            </div>
-          ) : null}
+          <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-[#F97935]/30">
+            <span className="text-[#F97935] font-medium">최소 34만원 이사지원 혜택</span>
+          </div>
 
           {socialProofText ? (
             <div className="bg-black/50 backdrop-blur-md px-4 py-1.5 rounded-full border border-white/10">
@@ -822,7 +783,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                       />
                     </svg>
                     <span className="text-sm font-medium text-[#F97935]">
-                      {timeRemaining.hours}시간 {timeRemaining.minutes}분 후 소멸
+                      {timeRemaining.days > 0 
+                        ? `${timeRemaining.days}일 ${timeRemaining.hours}시간 ${timeRemaining.minutes}분 후 소멸`
+                        : `${timeRemaining.hours}시간 ${timeRemaining.minutes}분 후 소멸`}
                     </span>
                   </div>
                 </div>

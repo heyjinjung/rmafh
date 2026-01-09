@@ -849,26 +849,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       </div>
                     </div>
 
-                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-4 space-y-4">
-                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">인증 및 승인</h3>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">텔레그램 인증</span>
-                        <Switch
-                          checked={Boolean(form.telegram_ok)}
-                          onChange={(val) => setForm((prev) => ({ ...prev, telegram_ok: val }))}
-                          disabled={saving}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm">리뷰 승인</span>
-                        <Switch
-                          checked={Boolean(form.review_ok)}
-                          onChange={(val) => setForm((prev) => ({ ...prev, review_ok: val }))}
-                          disabled={saving}
-                        />
-                      </div>
-                    </div>
-
                     <div className="flex gap-2 pt-2">
                       <button
                         type="button"
@@ -961,25 +941,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         <div className="py-2 text-sm font-mono text-[var(--v2-text)]">
                           {selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}
                         </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3 pt-2">
-                      <div className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
-                        <span className="text-sm">텔레그램 인증</span>
-                        <Switch
-                          checked={Boolean(form.telegram_ok)}
-                          onChange={(val) => setForm((prev) => ({ ...prev, telegram_ok: val }))}
-                          disabled={saving}
-                        />
-                      </div>
-                      <div className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
-                        <span className="text-sm">리뷰 승인</span>
-                        <Switch
-                          checked={Boolean(form.review_ok)}
-                          onChange={(val) => setForm((prev) => ({ ...prev, review_ok: val }))}
-                          disabled={saving}
-                        />
                       </div>
                     </div>
                   </div>
@@ -1114,42 +1075,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         >
                           연장
                         </button>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-4">
-                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">고액권 관리</div>
-
-                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)] hover:bg-[var(--v2-surface-2)] transition-colors">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">플래티넘 하이엔드</span>
-                          <span className={`text-[10px] ${platinumDepositDone ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}>
-                            {platinumDepositDone ? '언락됨 (입금 조건 충족)' : '잠김 (미충족)'}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={platinumDepositDone}
-                          onChange={(val) => submitDepositUpdate({ platinum_deposit_done: val })}
-                          disabled={depositSaving}
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)] hover:bg-[var(--v2-surface-2)] transition-colors">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium">다이아몬드 하이엔드</span>
-                          <span className={`text-[10px] ${diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 'text-blue-400' : 'text-[var(--v2-muted)]'}`}>
-                            {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '언락됨 (입금 조건 충족)' : '잠김 (미충족)'}
-                          </span>
-                        </div>
-                        <Switch
-                          checked={diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal}
-                          activeColor="#60a5fa"
-                          onChange={(val) => {
-                            const target = val ? DIAMOND_UNLOCK.depositTotal : 0;
-                            submitDepositUpdate({ diamond_deposit_current: target });
-                          }}
-                          disabled={depositSaving}
-                        />
                       </div>
                     </div>
                   </div>

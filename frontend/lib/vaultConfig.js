@@ -111,11 +111,6 @@ export function createGoldMissions(api) {
       isDone: Boolean(api.gold_mission_3_done),  // 어드민 토글 (UI 표시용)
       source: 'admin',
     },
-    {
-      id: 'g4',
-      label: '수령 완료',
-      isDone: api.gold_status === 'CLAIMED',
-    },
   ];
 }
 
@@ -129,8 +124,6 @@ export function checkGoldUnlock(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createPlatinumMissions(api) {
-  const goldClaimed = api.gold_status === 'CLAIMED';
-
   return [
     {
       id: 'p1',
@@ -146,32 +139,6 @@ export function createPlatinumMissions(api) {
       isDone: Boolean(api.platinum_mission_2_done),
       source: 'admin',
     },
-    {
-      id: 'p3',
-      label: '출석 3일 달성',
-      hint: '매일 출석 체크!',
-      isDone: Boolean(api.platinum_mission_3_done),
-      source: 'admin',
-    },
-    {
-      id: 'p4',
-      label: '리뷰 작성 완료',
-      hint: '솔직한 리뷰 부탁드립니다!',
-      isDone: Boolean(api.platinum_mission_4_done),
-      source: 'admin',
-    },
-    {
-      id: 'p5',
-      label: '골드 금고 해금',
-      hint: '선행 조건',
-      isDone: goldClaimed,
-      source: 'auto',
-    },
-    {
-      id: 'p6',
-      label: '수령 완료',
-      isDone: api.platinum_status === 'CLAIMED',
-    },
   ];
 }
 
@@ -180,13 +147,10 @@ export function createPlatinumMissions(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createDiamondMissions(api) {
-  const platinumClaimed = api.platinum_status === 'CLAIMED';
-
   return [
     {
       id: 'd1',
       label: '누적 충전 200만원 달성',
-      hint: `현재 ${formatCurrency(api.diamond_deposit_total || 0)}`,
       isDone: Boolean(api.diamond_mission_1_done),
       source: 'admin',
     },
@@ -196,18 +160,6 @@ export function createDiamondMissions(api) {
       hint: 'CC카지노 출석부 체크 기준',
       isDone: Boolean(api.diamond_mission_2_done),
       source: 'admin',
-    },
-    {
-      id: 'd3',
-      label: '플래티넘 금고 해금',
-      hint: '선행 조건',
-      isDone: platinumClaimed,
-      source: 'auto',
-    },
-    {
-      id: 'd4',
-      label: '수령 완료',
-      isDone: api.diamond_status === 'CLAIMED',
     },
   ];
 }
