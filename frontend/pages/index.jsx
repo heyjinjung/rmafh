@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
@@ -68,7 +69,7 @@ export default function Home() {
           {/* Nav */}
           <nav style={styles.nav}>
             <div style={styles.logo}>
-              <img src={ICON_STAR} alt="CC Casino" style={styles.logoIcon} />
+              <Image src={ICON_STAR} alt="CC Casino" width={26} height={27} style={styles.logoIcon} priority />
               <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
@@ -111,14 +112,14 @@ export default function Home() {
             <h3 style={styles.offeringsTitle} className="cc-offeringsTitle">게임 바로가기</h3>
             <div style={styles.modules} className="modules">
               <a href="https://ccc-001.com" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
-                <img src={ICON_GAME} alt="CC Casino" style={styles.logoIcon} />
+                <Image src={ICON_GAME} alt="CC Casino" width={26} height={27} style={styles.logoIcon} />
                 <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>바로가기</span>
                 </div>
               </a>
               <a href="https://t.me/+IE0NYpuze_k1YWZk" target="_blank" rel="noreferrer" style={styles.navCard} className="nav-card">
-                <img src={ICON_TELEGRAM} alt="" style={styles.navCardIcon} />
+                <Image src={ICON_TELEGRAM} alt="" width={30} height={30} style={styles.navCardIcon} />
                 <div style={styles.navCardText} className="cc-navCardText">
                   <span>CC카지노</span>
                   <span>텔레공식채널</span>

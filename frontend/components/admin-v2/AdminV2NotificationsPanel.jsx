@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+/* eslint-disable @next/next/no-img-element */
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 
@@ -101,7 +102,7 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     setTemplatePreview(template);
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -115,11 +116,11 @@ export default function AdminV2NotificationsPanel({ adminPassword, basePath }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiFetch]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const submitNotification = async () => {
     try {

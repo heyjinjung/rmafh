@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Head from 'next/head';
 import Link from 'next/link';
 import { useMemo, useState, useEffect, useRef } from 'react';
@@ -59,9 +60,7 @@ export default function AdminPage() {
     }
   }, [authBootstrapDone, userLoggedIn, isAuthenticated, router]);
 
-  if (authBootstrapDone && userLoggedIn && !isAuthenticated) {
-    return null;
-  }
+  const shouldBlock = authBootstrapDone && userLoggedIn && !isAuthenticated;
 
   // 로그인 시 sessionStorage에 저장
   const handleLogin = () => {
@@ -392,35 +391,37 @@ export default function AdminPage() {
       ) : null}
 
       {!isAuthenticated ? (
-        <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6">
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-admin-green mb-2">어드민 로그인</h1>
-              <p className="text-admin-muted text-sm">비밀번호를 입력하세요</p>
-            </div>
-            <div className="rounded-lg border border-admin-border bg-admin-surface p-6 space-y-4">
-              <input
-                type="password"
-                placeholder="비밀번호"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && adminPassword) {
-                    handleLogin();
-                  }
-                }}
-                className={inputBase}
-              />
-              <button
-                onClick={handleLogin}
-                disabled={!adminPassword}
-                className={buttonBase + ' w-full justify-center'}
-              >
-                로그인
-              </button>
+        shouldBlock ? null : (
+          <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
+            <div className="w-full max-w-md space-y-6">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-admin-green mb-2">어드민 로그인</h1>
+                <p className="text-admin-muted text-sm">비밀번호를 입력하세요</p>
+              </div>
+              <div className="rounded-lg border border-admin-border bg-admin-surface p-6 space-y-4">
+                <input
+                  type="password"
+                  placeholder="비밀번호"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && adminPassword) {
+                      handleLogin();
+                    }
+                  }}
+                  className={inputBase}
+                />
+                <button
+                  onClick={handleLogin}
+                  disabled={!adminPassword}
+                  className={buttonBase + ' w-full justify-center'}
+                >
+                  로그인
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        )
       ) : (
       <div className="min-h-screen bg-black text-white overflow-x-hidden">
         <div className="mx-auto w-full max-w-none px-4 lg:px-0">

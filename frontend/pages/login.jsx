@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState } from 'react';
 
 const ICON_STAR = '/logo.png';
@@ -63,7 +64,7 @@ export default function LoginPage() {
           {/* 로고 */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
-              <img src={ICON_STAR} alt="CC Casino" className="h-16 w-16" />
+              <Image src={ICON_STAR} alt="CC Casino" width={64} height={64} className="h-16 w-16" priority />
             </div>
             <div>
               <h1 className="text-3xl font-bold">CC CASINO</h1>
