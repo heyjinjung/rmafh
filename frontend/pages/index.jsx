@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { VAULT_REWARDS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
+import { VAULT_REWARDS, VAULT_EXPIRY_HOURS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
@@ -126,6 +126,22 @@ export default function Home() {
                   <span>텔레공식채널</span>
                 </div>
               </a>
+            </div>
+          </div>
+
+          {/* ─── 사이드바 안내 문구 (v3 고정) ─── */}
+          <div style={styles.sidebarNotice} className="sidebar-notice">
+            <div style={styles.noticeItem}>
+              <span style={styles.noticeLabel}>📋 현재 변경사항</span>
+              <span style={styles.noticeText}>금고조건 변경 후 진행예정입니다.</span>
+            </div>
+            <div style={styles.noticeItem}>
+              <span style={styles.noticeLabel}>⏰ 이벤트 종료일</span>
+              <span style={styles.noticeText}>다이아 금고 기준 {VAULT_EXPIRY_HOURS.DIAMOND / 24}일 ({VAULT_EXPIRY_HOURS.DIAMOND}시간)</span>
+            </div>
+            <div style={styles.noticeItem}>
+              <span style={styles.noticeLabel}>🎁 이사지원 혜택</span>
+              <span style={styles.noticeText}>최소 34만원 이사지원 혜택</span>
             </div>
           </div>
         </aside>
@@ -1116,6 +1132,36 @@ const styles = {
     lineHeight: 1.15,
     color: TOKENS.textBlack,
     textAlign: 'center',
+  },
+
+  /* ─── 사이드바 안내 문구 (v3) ─── */
+  sidebarNotice: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+    padding: '16px',
+    background: 'linear-gradient(135deg, rgba(40,45,26,0.9), rgba(57,69,8,0.7))',
+    borderRadius: 8,
+    border: '1px solid rgba(210,253,156,0.3)',
+  },
+  noticeItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+  },
+  noticeLabel: {
+    fontFamily: "'Noto Sans KR', sans-serif",
+    fontWeight: 600,
+    fontSize: 12,
+    color: TOKENS.accent1,
+    letterSpacing: 0.5,
+  },
+  noticeText: {
+    fontFamily: "'Noto Sans KR', sans-serif",
+    fontWeight: 400,
+    fontSize: 13,
+    color: TOKENS.textSub,
+    lineHeight: 1.4,
   },
 
   /* ─── Footer ─── */
