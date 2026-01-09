@@ -95,7 +95,7 @@
 현재 확인 결과(중요):
 - SOT 파일 3종은 존재/생성 완료
 - ✅ Backend 코드에서 하드코딩된 상수가 SOT로 치환 완료 (Sprint 1 #4)
-- ⏳ Frontend 코드 치환은 Sprint 1 #5에서 진행 예정
+- ✅ Frontend 코드에서 하드코딩된 상수가 SOT로 치환 완료 (Sprint 1 #5)
 
 체크리스트:
 - [x] v3 규칙 변경이 생기면 **SOT → 문서 → 코드** 순으로 반영한다
@@ -113,12 +113,14 @@
 - [x] (2) SOT 파일 생성 (Frontend): `frontend/lib/vaultConfig.js`
 - [x] (3) SOT 문서화: `docs/VAULT_SOT.md`
 - [x] (4) Backend 상수 참조 변경: `backend/app/main.py`, `routers/*.py`, `services/*.py`에서 SOT로 치환
-- [ ] (5) Frontend 상수 참조 변경: `frontend/pages/index.jsx`에서 SOT로 치환
-- [ ] (6) 테스트 실행 및 검증: (4)(5) 완료 후 재실행
+- [x] (5) Frontend 상수 참조 변경: `frontend/pages/index.jsx`에서 SOT로 치환
+- [x] (6) 테스트 실행 및 검증: (4)(5) 완료 후 재실행
 
 메모(완료 기준 해석):
 - (6)은 "현재 기준으로 테스트/린트가 통과"하더라도, (4)(5)를 적용한 뒤 다시 통과해야 Sprint 1 완료로 간주
 - (4) 완료: 2026-01-09 - pytest 23 passed
+- (5) 완료: 2026-01-09 - lint ✔ No ESLint warnings or errors
+- (6) 완료: 2026-01-10 - pytest 23 passed, lint ✔ No ESLint warnings or errors
 
 ---
 
@@ -230,18 +232,24 @@
 대상: `docs/DB_MIGRATION_V3.sql`
 
 체크리스트:
-- [ ] Expand → Migrate → Contract 순서로 배포 가능하도록 설계했다
-- [ ] (Expand) 새 컬럼/테이블은 서비스 중단 없이 추가 가능하도록 설계했다(기본값/NULL 허용 여부 포함)
-- [ ] (Migrate) 운영 데이터 이행/백필이 필요하면 별도 단계로 분리했다(대량 업데이트로 인한 락/부하 주의)
-- [ ] (Contract) 안정화 후 NOT NULL/제약/인덱스 강화를 적용한다(필요시 후순위)
-- [ ] 컬럼 추가는 DEFAULT/NOT NULL 정책을 안전하게 잡았다
-- [ ] 인덱스/제약은 운영 부하를 고려했다(필요시 후순위)
-- [ ] 마이그레이션 적용 전후로 백업/롤백 경로가 준비되어 있다(최소: 실패 시 되돌릴 1줄 플랜)
-- [ ] 로컬/도커 환경에서 `docs/DB_MIGRATION_V3.sql` 적용 후, 핵심 API 스모크를 수행했다
-- [ ] v3 변경에 필요한 스키마(예: 골드 미션 필드/CSV 출석 칼럼 등)가 SQL에 반영되어 있는지 재확인했다
+- [x] Expand → Migrate → Contract 순서로 배포 가능하도록 설계했다
+- [x] (Expand) 새 컬럼/테이블은 서비스 중단 없이 추가 가능하도록 설계했다(기본값/NULL 허용 여부 포함)
+- [x] (Migrate) 운영 데이터 이행/백필이 필요하면 별도 단계로 분리했다(대량 업데이트로 인한 락/부하 주의)
+- [x] (Contract) 안정화 후 NOT NULL/제약/인덱스 강화를 적용한다(필요시 후순위)
+- [x] 컬럼 추가는 DEFAULT/NOT NULL 정책을 안전하게 잡았다
+- [x] 인덱스/제약은 운영 부하를 고려했다(필요시 후순위)
+- [x] 마이그레이션 적용 전후로 백업/롤백 경로가 준비되어 있다(최소: 실패 시 되돌릴 1줄 플랜)
+- [x] 로컬/도커 환경에서 `docs/DB_MIGRATION_V3.sql` 적용 후, 핵심 API 스모크를 수행했다
+- [x] v3 변경에 필요한 스키마(예: 골드 미션 필드/CSV 출석 칼럼 등)가 SQL에 반영되어 있는지 재확인했다
 
 완료 기준:
-- [ ] 로컬/도커 환경에서 마이그레이션 적용 후 API 스모크 OK
+- [x] 로컬/도커 환경에서 마이그레이션 적용 후 API 스모크 OK
+
+메모:
+- 2026-01-10: 마이그레이션 적용 완료 (Docker PostgreSQL)
+  - gold_mission_1_done, gold_mission_2_done, gold_mission_3_done 컬럼 추가
+  - platinum_deposit_total, platinum_deposit_count, diamond_attendance_days, diamond_expires_at 컬럼 추가
+  - pytest 23 passed 확인
 
 ---
 
