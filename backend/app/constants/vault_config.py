@@ -176,6 +176,11 @@ def get_expiry_hours(tier: str) -> int:
     return VAULT_EXPIRY_HOURS.get(tier.upper(), DEFAULT_EXPIRY_HOURS)
 
 
+def check_gold_unlock(telegram_ok: bool) -> bool:
+    """골드 금고 해금 조건 검증 - telegram_ok만 충족하면 해금"""
+    return telegram_ok
+
+
 def check_platinum_unlock(deposit_total: int, deposit_count: int, gold_claimed: bool) -> bool:
     """플래티넘 금고 해금 조건 검증"""
     return (
