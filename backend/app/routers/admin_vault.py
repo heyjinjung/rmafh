@@ -405,7 +405,8 @@ async def admin_update_deposit(
 
         (
             expires_at, gold_status, platinum_status, diamond_status,
-            attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total, *_rest
+            attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total,
+            _m1, _m2, _m3, diamond_attendance_days
         ) = row
         
         new_platinum_deposit_total = (
@@ -432,7 +433,12 @@ async def admin_update_deposit(
             gold_status=gold_status,
             current_status=platinum_status,
         )
-        new_diamond_status = compute_diamond_status(new_diamond_deposit_total, diamond_status)
+        new_diamond_status = compute_diamond_status(
+            deposit_total=new_diamond_deposit_total,
+            attendance_days=int(diamond_attendance_days or 0),
+            platinum_status=new_platinum_status,
+            current_status=diamond_status,
+        )
 
         now = now_utc()
         set_clauses = []

@@ -50,7 +50,7 @@ def test_claim_flow_after_daily_import_unlocks_and_updates_status(client):
         "rows": [
             {
                 "external_user_id": external_user_id,
-                "deposit_total": 500000,
+                "deposit_total": 2500000,  # 250만원 - 다이아몬드 해금 조건 충족
                 "telegram_ok": True,
                 "review_ok": True,
                 "last_deposit_at": "2025-12-21",
@@ -85,6 +85,24 @@ def test_claim_flow_after_daily_import_unlocks_and_updates_status(client):
 
 def test_claim_enforces_state_and_idempotency(client):
     external_user_id = "ext-claim-guard-1"
+
+    # First create user via import with telegram_ok=False, platinum conditions not met
+    setup_resp = client.post(
+        "/api/vault/user-daily-import",
+        json={
+            "rows": [
+                {
+                    "external_user_id": external_user_id,
+                    "deposit_total": 0,
+                    "telegram_ok": False,
+                    "review_ok": False,
+                    "last_deposit_at": "2025-12-20",
+                }
+            ]
+        },
+        headers=_idem_headers(),
+    )
+    assert setup_resp.status_code == 200
 
     # Platinum is locked by default, so claim should be forbidden.
     locked_resp = client.post(

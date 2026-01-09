@@ -3,6 +3,7 @@
 Endpoints for user login, status, claim, and attendance.
 """
 
+import os
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -140,8 +141,8 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
 
         review_row = get_user_snapshot(cur, user_id)
         
-        # 프로덕션/로컬에서만 CSV 업로드 필수
-        if not review_row and config.APP_ENV not in {"test"}:
+        # 프로덕션/로컬에서만 CSV 업로드 필수 (테스트에서는 스킵)
+        if not review_row and os.getenv("APP_ENV", "local") not in {"test"}:
             raise HTTPException(
                 status_code=403,
                 detail="CSV_UPLOAD_REQUIRED: 관리자가 회원 정보를 업로드해야 금고에 접근할 수 있습니다."

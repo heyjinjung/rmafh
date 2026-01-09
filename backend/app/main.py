@@ -551,6 +551,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
             f"""
             UPDATE vault_status AS vs
                SET diamond_deposit_total = v.deposit_total,
+                   diamond_deposit_current = v.deposit_total,
                    diamond_attendance_days = GREATEST(COALESCE(vs.diamond_attendance_days, 0), v.attendance_count),
                    gold_mission_1_done = v.telegram_ok,
                    gold_status = CASE

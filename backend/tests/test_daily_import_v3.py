@@ -87,19 +87,19 @@ def test_daily_import_v3_logic(client):
     assert resp.status_code == 200
     
     # Verify User 1 State
-    # Gold: LOCKED (m1=True, m2=False, m3=False)
-    # Platinum: LOCKED (Dep=1.9m > 200k, but Gold=LOCKED)
-    # Diamond: LOCKED (Dep<2m, Att<2)
+    # Gold: UNLOCKED (telegram_ok=True triggers gold unlock)
+    # Platinum: LOCKED (need review_ok + deposit conditions)
+    # Diamond: LOCKED (Dep<2m)
     stat1 = get_user_state(client, user1_ext)
     assert stat1 is not None
     print(f"DEBUG: stat1={stat1}")
-    assert stat1["gold_status"] == "LOCKED"
+    assert stat1["gold_status"] == "UNLOCKED"  # telegram_ok=True triggers gold unlock
     assert stat1["gold_mission_1_done"] is True
-    assert stat1["platinum_status"] == "LOCKED" # Prereq fail
+    assert stat1["platinum_status"] == "LOCKED"  # need more conditions
     assert stat1["diamond_attendance_days"] == 1
     
-    # 3. Enable Gold & Platinum Prerequisites for User 1
-    # Manually complete missions for User 1
+    # 3. Gold already UNLOCKED, test platinum unlock
+    # Manually complete missions for User 1 (informational only)
     client.post(f"/api/vault/admin/users/{u1_id}/vault/gold-missions", json={
         "gold_mission_2_done": True,
         "gold_mission_3_done": True
