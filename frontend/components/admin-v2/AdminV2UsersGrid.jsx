@@ -34,6 +34,23 @@ const statusLabel = (s) => {
 
 const sortableKeys = new Set(['created_at', 'expires_at', 'deposit_total', 'external_user_id', 'nickname']);
 
+const Switch = ({ checked, onChange, disabled, activeColor = 'var(--v2-accent)' }) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={() => !disabled && onChange(!checked)}
+    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${checked ? '' : 'bg-[var(--v2-border)]'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    style={{ backgroundColor: checked ? activeColor : undefined }}
+  >
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${checked ? 'translate-x-5' : 'translate-x-0'
+        }`}
+    />
+  </button>
+);
+
 export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChange }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -846,20 +863,18 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">인증 및 승인</h3>
                       <div className="flex items-center justify-between">
                         <span className="text-sm">텔레그램 인증</span>
-                        <input
-                          type="checkbox"
-                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                        <Switch
                           checked={Boolean(form.telegram_ok)}
-                          onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
+                          onChange={(val) => setForm((prev) => ({ ...prev, telegram_ok: val }))}
+                          disabled={saving}
                         />
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm">리뷰 승인</span>
-                        <input
-                          type="checkbox"
-                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                        <Switch
                           checked={Boolean(form.review_ok)}
-                          onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
+                          onChange={(val) => setForm((prev) => ({ ...prev, review_ok: val }))}
+                          disabled={saving}
                         />
                       </div>
                     </div>
@@ -960,24 +975,22 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </div>
 
                     <div className="space-y-3 pt-2">
-                      <label className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition cursor-pointer">
+                      <div className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
                         <span className="text-sm">텔레그램 인증</span>
-                        <input
-                          type="checkbox"
+                        <Switch
                           checked={Boolean(form.telegram_ok)}
-                          onChange={(e) => setForm((prev) => ({ ...prev, telegram_ok: e.target.checked }))}
-                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                          onChange={(val) => setForm((prev) => ({ ...prev, telegram_ok: val }))}
+                          disabled={saving}
                         />
-                      </label>
-                      <label className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition cursor-pointer">
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
                         <span className="text-sm">리뷰 승인</span>
-                        <input
-                          type="checkbox"
+                        <Switch
                           checked={Boolean(form.review_ok)}
-                          onChange={(e) => setForm((prev) => ({ ...prev, review_ok: e.target.checked }))}
-                          style={{ accentColor: 'var(--v2-accent)', transform: 'scale(1.2)' }}
+                          onChange={(val) => setForm((prev) => ({ ...prev, review_ok: val }))}
+                          disabled={saving}
                         />
-                      </label>
+                      </div>
                     </div>
                   </div>
 
@@ -986,8 +999,8 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <div className="flex items-center justify-between mb-4">
                         <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트 미션</div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${goldStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
-                            goldStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
-                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          goldStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                            'border-[var(--v2-muted)] text-[var(--v2-muted)]'
                           }`}>
                           {statusLabel(goldStatus)}
                         </div>
@@ -1020,8 +1033,8 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <div className="flex items-center justify-between mb-4">
                         <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">플래티넘 볼트 미션</div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${platinumStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
-                            platinumStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
-                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          platinumStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                            'border-[var(--v2-muted)] text-[var(--v2-muted)]'
                           }`}>
                           {statusLabel(platinumStatus)}
                         </div>
@@ -1055,8 +1068,8 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <div className="flex items-center justify-between mb-4">
                         <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트 미션</div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${diamondStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
-                            diamondStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
-                              'border-[var(--v2-muted)] text-[var(--v2-muted)]'
+                          diamondStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
+                            'border-[var(--v2-muted)] text-[var(--v2-muted)]'
                           }`}>
                           {statusLabel(diamondStatus)}
                         </div>
@@ -1116,43 +1129,36 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-4">
                       <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">고액권 관리</div>
 
-                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)]">
-                        <div className="text-sm">
-                          <span className="text-[var(--v2-muted)] mr-2">플레티넘</span>
-                          <span className={platinumDepositDone ? 'text-[var(--v2-accent)]' : ''}>
-                            {platinumDepositDone ? '해금됨' : '잠김'}
+                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)] hover:bg-[var(--v2-surface-2)] transition-colors">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">플래티넘 하이엔드</span>
+                          <span className={`text-[10px] ${platinumDepositDone ? 'text-[var(--v2-accent)]' : 'text-[var(--v2-muted)]'}`}>
+                            {platinumDepositDone ? '언락됨 (입금 조건 충족)' : '잠김 (미충족)'}
                           </span>
                         </div>
-                        <button
-                          onClick={() => submitDepositUpdate({ platinum_deposit_done: !platinumDepositDone })}
-                          className={`px-3 py-1 text-xs rounded border transition-colors ${platinumDepositDone
-                              ? 'border-[var(--v2-border)] hover:border-red-400 hover:text-red-400'
-                              : 'border-[var(--v2-accent)] text-[var(--v2-accent)] hover:bg-[var(--v2-accent)] hover:text-black'
-                            }`}
-                        >
-                          {platinumDepositDone ? '해제' : '해금'}
-                        </button>
+                        <Switch
+                          checked={platinumDepositDone}
+                          onChange={(val) => submitDepositUpdate({ platinum_deposit_done: val })}
+                          disabled={depositSaving}
+                        />
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)]">
-                        <div className="text-sm">
-                          <span className="text-[var(--v2-muted)] mr-2">다이아</span>
-                          <span className={diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 'text-blue-400' : ''}>
-                            {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '해금됨' : '잠김'}
+                      <div className="flex items-center justify-between p-3 rounded bg-[var(--v2-surface-2)]/50 border border-[var(--v2-border)] hover:bg-[var(--v2-surface-2)] transition-colors">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium">다이아몬드 하이엔드</span>
+                          <span className={`text-[10px] ${diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 'text-blue-400' : 'text-[var(--v2-muted)]'}`}>
+                            {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '언락됨 (입금 조건 충족)' : '잠김 (미충족)'}
                           </span>
                         </div>
-                        <button
-                          onClick={() => {
-                            const target = diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? 0 : DIAMOND_UNLOCK.depositTotal;
+                        <Switch
+                          checked={diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal}
+                          activeColor="#60a5fa"
+                          onChange={(val) => {
+                            const target = val ? DIAMOND_UNLOCK.depositTotal : 0;
                             submitDepositUpdate({ diamond_deposit_current: target });
                           }}
-                          className={`px-3 py-1 text-xs rounded border transition-colors ${diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal
-                              ? 'border-[var(--v2-border)] hover:border-red-400 hover:text-red-400'
-                              : 'border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-black'
-                            }`}
-                        >
-                          {diamondDepositCurrent >= DIAMOND_UNLOCK.depositTotal ? '해제' : '해금'}
-                        </button>
+                          disabled={depositSaving}
+                        />
                       </div>
                     </div>
                   </div>
