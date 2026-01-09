@@ -36,8 +36,6 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
                diamond_attendance_days,
                platinum_mission_1_done,
                platinum_mission_2_done,
-               platinum_mission_3_done,
-               platinum_mission_4_done,
                diamond_mission_1_done,
                diamond_mission_2_done
           FROM vault_status
@@ -75,8 +73,6 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
                diamond_attendance_days,
                platinum_mission_1_done,
                platinum_mission_2_done,
-               platinum_mission_3_done,
-               platinum_mission_4_done,
                diamond_mission_1_done,
                diamond_mission_2_done
           FROM vault_status

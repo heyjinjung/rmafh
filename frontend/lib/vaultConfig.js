@@ -301,6 +301,14 @@ export function createVaultsFromApi(api) {
     return 'locked';
   };
 
+  const goldMissions = createGoldMissions(api);
+  const goldProgress = Math.floor((goldMissions.filter(m => m.isDone).length / goldMissions.length) * 100);
+
+  const platinumProgress = Math.max(
+    0,
+    Math.min(100, Math.floor(((api.platinum_deposit_total || 0) / PLATINUM_UNLOCK.depositTotal) * 100))
+  );
+
   const diamondDepositTotal = api.diamond_deposit_total || api.diamond_deposit_current || 0;
   const diamondProgress = Math.max(
     0,
@@ -313,7 +321,8 @@ export function createVaultsFromApi(api) {
       tier: 'gold',
       rewardAmount: VAULT_REWARDS.GOLD,
       status: mapApiStatusToUi(api.gold_status),
-      missions: createGoldMissions(api),
+      progress: goldProgress,
+      missions: goldMissions,
       colorScheme: VAULT_COLORS.gold,
     },
     {
@@ -322,6 +331,7 @@ export function createVaultsFromApi(api) {
       rewardAmount: VAULT_REWARDS.PLATINUM,
       status: mapApiStatusToUi(api.platinum_status),
       expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
+      progress: platinumProgress,
       missions: createPlatinumMissions(api),
       meta: {
         depositTotal: api.platinum_deposit_total || 0,

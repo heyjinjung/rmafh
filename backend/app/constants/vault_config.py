@@ -116,7 +116,7 @@ GOLD_MISSIONS = [
 GOLD_UNLOCK_FIELD = "telegram_ok"
 
 # 플래티넘 미션 정의 (어드민 토글)
-# - Mission 1~4: 어드민 토글로 설정
+# - Mission 1~2: 어드민 토글로 설정
 # - 플래티넘 해금 조건: 모든 미션 완료 + gold_status = CLAIMED
 PLATINUM_MISSIONS = [
     {
@@ -131,20 +131,6 @@ PLATINUM_MISSIONS = [
         "label": "누적 입금 3회 달성",
         "hint": "최소 이용 금액 단돈 만원 이상!",
         "field": "platinum_mission_2_done",
-        "source": "admin",
-    },
-    {
-        "id": "p3",
-        "label": "출석 3일 달성",
-        "hint": "매일 출석 체크!",
-        "field": "platinum_mission_3_done",
-        "source": "admin",
-    },
-    {
-        "id": "p4",
-        "label": "리뷰 작성 완료",
-        "hint": "솔직한 리뷰 부탁드립니다!",
-        "field": "platinum_mission_4_done",
         "source": "admin",
     },
 ]

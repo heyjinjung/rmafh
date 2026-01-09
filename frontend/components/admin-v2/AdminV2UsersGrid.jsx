@@ -83,8 +83,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [platinumStatus, setPlatinumStatus] = useState('LOCKED');
   const [platinumMission1, setPlatinumMission1] = useState(false);
   const [platinumMission2, setPlatinumMission2] = useState(false);
-  const [platinumMission3, setPlatinumMission3] = useState(false);
-  const [platinumMission4, setPlatinumMission4] = useState(false);
   const [diamondStatus, setDiamondStatus] = useState('LOCKED');
   const [diamondMission1, setDiamondMission1] = useState(false);
   const [diamondMission2, setDiamondMission2] = useState(false);
@@ -163,8 +161,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     setPlatinumStatus(row?.platinum_status || 'LOCKED');
     setPlatinumMission1(Boolean(row?.platinum_mission_1_done));
     setPlatinumMission2(Boolean(row?.platinum_mission_2_done));
-    setPlatinumMission3(Boolean(row?.platinum_mission_3_done));
-    setPlatinumMission4(Boolean(row?.platinum_mission_4_done));
     setDiamondStatus(row?.diamond_status || 'LOCKED');
     setDiamondMission1(Boolean(row?.diamond_mission_1_done));
     setDiamondMission2(Boolean(row?.diamond_mission_2_done));
@@ -465,22 +461,16 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
 
       const newM1 = Boolean(data.platinum_mission_1_done ?? platinumMission1);
       const newM2 = Boolean(data.platinum_mission_2_done ?? platinumMission2);
-      const newM3 = Boolean(data.platinum_mission_3_done ?? platinumMission3);
-      const newM4 = Boolean(data.platinum_mission_4_done ?? platinumMission4);
       const newStatus = data.platinum_status ?? platinumStatus;
 
       setPlatinumMission1(newM1);
       setPlatinumMission2(newM2);
-      setPlatinumMission3(newM3);
-      setPlatinumMission4(newM4);
       setPlatinumStatus(newStatus);
 
       setSelectedRow((prev) => (prev ? {
         ...prev,
         platinum_mission_1_done: newM1,
         platinum_mission_2_done: newM2,
-        platinum_mission_3_done: newM3,
-        platinum_mission_4_done: newM4,
         platinum_status: newStatus,
         expires_at: data.expires_at || prev.expires_at,
       } : prev));
@@ -1044,8 +1034,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         {[
                           { label: '입금20만', done: platinumMission1, key: 'platinum_mission_1_done' },
                           { label: '입금3회', done: platinumMission2, key: 'platinum_mission_2_done' },
-                          { label: '출석3일', done: platinumMission3, key: 'platinum_mission_3_done' },
-                          { label: '리뷰', done: platinumMission4, key: 'platinum_mission_4_done' }
                         ].map((m, idx) => (
                           <button
                             key={idx}

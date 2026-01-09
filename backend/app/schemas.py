@@ -206,16 +206,12 @@ class AdminGoldMissionsUpdateResponse(BaseModel):
 class AdminPlatinumMissionsUpdateRequest(BaseModel):
     platinum_mission_1_done: Optional[bool] = None
     platinum_mission_2_done: Optional[bool] = None
-    platinum_mission_3_done: Optional[bool] = None
-    platinum_mission_4_done: Optional[bool] = None
 
 
 class AdminPlatinumMissionsUpdateResponse(BaseModel):
     updated: bool
     platinum_mission_1_done: bool
     platinum_mission_2_done: bool
-    platinum_mission_3_done: bool
-    platinum_mission_4_done: bool
     platinum_status: str
     expires_at: Optional[str] = None
 

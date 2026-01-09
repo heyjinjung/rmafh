@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { motion } from 'framer-motion';
-import { VAULT_REWARDS, VAULT_EXPIRY_HOURS, DIAMOND_UNLOCK } from '../lib/vaultConfig';
+import { VAULT_REWARDS, VAULT_EXPIRY_HOURS, DIAMOND_UNLOCK, createVaultsFromApi } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
 const ICON_STAR = '/logo.png';
@@ -209,7 +209,7 @@ export default function Home() {
   );
 }
 
-function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompletionBonus = true, basePath = '' }) {
+function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '' }) {
   const [selectedVault, setSelectedVault] = useState('gold-vault');
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -380,63 +380,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
   };
 
   const vaults = useMemo(() => {
-    const api = status || {};
-    const attendanceDays = Number(api.platinum_attendance_days || 0);
-    const reviewDone = Boolean(api.platinum_review_done);
-    const diamondDeposit = Number(api.diamond_deposit_total || api.diamond_deposit_current || 0);
-    const diamondTarget = DIAMOND_UNLOCK.depositTotal;  // SOT: 2,000,000
-    const diamondProgress = Math.max(0, Math.min(100, Math.floor((diamondDeposit / diamondTarget) * 100)));
-
-    return [
-      {
-        id: 'gold-vault',
-        tier: 'gold',
-        rewardAmount: VAULT_REWARDS.GOLD,
-        status: mapApiStatusToUi(api.gold_status),
-        missions: [
-          {
-            id: 'g1',
-            label: 'CC카지노 공식채널 입장',
-            isDone: Boolean(api.gold_mission_1_done ?? api.telegram_ok),  // CSV auto
-            hint: '각종 이벤트 및 보너스 드랍 진행',
-          },
-          {
-            id: 'g2',
-            label: '담당실장 공식채널 입장',
-            isDone: Boolean(api.gold_mission_2_done),  // Admin toggle
-            hint: '본사혜택 외 추가 이벤트 진행',
-          },
-          { id: 'g3', label: '간편 본인확인 -담당실장에게 본인 확인', isDone: Boolean(api.gold_mission_3_done) },  // Admin toggle
-          { id: 'g4', label: '수령 완료', isDone: api.gold_status === 'CLAIMED' },
-        ],
-      },
-      {
-        id: 'platinum-vault',
-        tier: 'platinum',
-        rewardAmount: VAULT_REWARDS.PLATINUM,
-        status: mapApiStatusToUi(api.platinum_status),
-        expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
-        missions: [
-          { id: 'p1', label: '누적 입금 20만원 달성', isDone: Boolean(api.platinum_deposit_done), hint: '신규 입플도 놓치지 마세요!' },
-          { id: 'p2', label: `리뷰 작성 ${reviewDone ? '1' : '0'}/1`, isDone: reviewDone, hint: '리뷰 1회 작성 확인이 필요해요' },
-          { id: 'p3', label: '플래티넘 금고 해금', isDone: api.platinum_status === 'UNLOCKED' || api.platinum_status === 'CLAIMED' },
-          { id: 'p4', label: '수령 완료', isDone: api.platinum_status === 'CLAIMED' },
-        ],
-        meta: { attendanceDays, reviewDone },
-      },
-      {
-        id: 'diamond-vault',
-        tier: 'diamond',
-        rewardAmount: VAULT_REWARDS.DIAMOND,
-        status: mapApiStatusToUi(api.diamond_status),
-        progress: Number.isFinite(diamondProgress) ? diamondProgress : 0,
-        missions: [
-          { id: 'd1', label: '누적 충전 500,000원 달성', isDone: diamondDeposit >= diamondTarget, hint: `현재 ${formatCurrency(diamondDeposit)}` },
-          { id: 'd2', label: '다이아 금고 해금', isDone: api.diamond_status === 'UNLOCKED' || api.diamond_status === 'CLAIMED' },
-          { id: 'd3', label: '수령 완료', isDone: api.diamond_status === 'CLAIMED' },
-        ],
-      },
-    ];
+    return createVaultsFromApi(status);
   }, [status]);
 
   const getCompletedVaults = useCallback(() => vaults.filter((v) => v.status === 'opened').length, [vaults]);
@@ -832,10 +776,10 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
 
                   <motion.div
                     className={`px-3 py-1 rounded-full flex items-center justify-center ${isLocked
-                        ? 'bg-gradient-to-r from-[#F97935] to-[#FF5500] border border-[#FF5500]/50'
-                        : isAvailable
-                          ? 'bg-gradient-to-r from-[#07AF4D] to-[#06C355] border border-[#06C355]/50'
-                          : 'bg-gradient-to-r from-[#5D5D5D] to-[#7D7D7D] border border-[#7D7D7D]/50'
+                      ? 'bg-gradient-to-r from-[#F97935] to-[#FF5500] border border-[#FF5500]/50'
+                      : isAvailable
+                        ? 'bg-gradient-to-r from-[#07AF4D] to-[#06C355] border border-[#06C355]/50'
+                        : 'bg-gradient-to-r from-[#5D5D5D] to-[#7D7D7D] border border-[#7D7D7D]/50'
                       }`}
                     initial={{ opacity: 0, scale: 0 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -867,7 +811,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
                 </div>
               )}
 
-              {vault.tier === 'platinum' && vault.expiresAt && showTimer && (
+              {(vault.tier === 'platinum' || vault.tier === 'diamond') && vault.expiresAt && showTimer && (
                 <div className="px-4 pb-2">
                   <div className="bg-[#F97935]/10 border border-[#F97935]/30 rounded-lg px-3 py-2 flex items-center mb-2">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2 text-[#F97935]" viewBox="0 0 20 20" fill="currentColor">
@@ -965,48 +909,6 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, showCompleti
         })}
       </div>
 
-      {showCompletionBonus && (
-        <motion.div
-          className="relative overflow-hidden rounded-2xl p-8 mt-8 max-w-3xl mx-auto"
-          style={{
-            background: 'linear-gradient(135deg, rgba(10,10,10,0.9) 0%, rgba(20,30,10,0.8) 100%)',
-            boxShadow: '0 20px 40px rgba(0,0,0,0.6), 0 0 30px rgba(210, 253, 156, 0.1)',
-            borderImage: 'linear-gradient(to right, rgba(7,175,77,0.4), rgba(210,253,156,0.5)) 1',
-            borderWidth: '1px',
-            borderStyle: 'solid',
-          }}
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.6 }}
-        >
-          <div className="flex justify-between text-sm mb-2 font-medium relative z-10">
-            <span className="text-white/80">진행도</span>
-            <span className="text-white">{getCompletedVaults()}/3</span>
-          </div>
-          <div className="w-full h-4 bg-black/40 rounded-full p-1 backdrop-blur-sm border border-gray-800/50 relative z-10">
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-[#F97935] to-[#07AF4D]"
-              style={{ width: `${(getCompletedVaults() / 3) * 100}%` }}
-              initial={{ width: 0 }}
-              animate={{ width: `${(getCompletedVaults() / 3) * 100}%` }}
-              transition={{ duration: 1 }}
-            />
-          </div>
-          <motion.button
-            whileHover={getCompletedVaults() === 3 ? { scale: 1.02 * animationIntensity } : {}}
-            whileTap={getCompletedVaults() === 3 ? { scale: 0.98 * animationIntensity } : {}}
-            className={`w-full py-4 rounded-xl font-bold text-white text-lg relative overflow-hidden mt-6 ${getCompletedVaults() === 3
-                ? 'bg-gradient-to-r from-[#07AF4D] to-[#0AA787] shadow-lg shadow-[#07AF4D]/20 border border-[#07AF4D]/50'
-                : 'bg-gray-800/80 border border-gray-700 backdrop-blur-sm'
-              }`}
-            disabled={getCompletedVaults() < 3}
-          >
-            <span className="relative z-10 flex items-center justify-center">
-              {getCompletedVaults() === 3 ? '보너스 받기' : '챌린지 진행 중...'}
-            </span>
-          </motion.button>
-        </motion.div>
-      )}
 
       <div className="text-center text-gray-600 text-xs mt-8">
         <p>© 2025 CC Casino - 이용 약관 적용</p>

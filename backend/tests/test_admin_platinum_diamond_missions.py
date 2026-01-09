@@ -37,26 +37,18 @@ class TestPlatinumMissions:
         d1 = r1.json()
         assert d1["platinum_mission_1_done"] is True
         assert d1["platinum_mission_2_done"] is False
-        assert d1["platinum_mission_3_done"] is False
-        assert d1["platinum_mission_4_done"] is False
         assert d1["updated"] is True
 
-        # Toggle missions 2-4
+        # Toggle mission 2
         r2 = client.post(
             f"/api/vault/admin/users/{user_id}/vault/platinum-missions",
-            json={
-                "platinum_mission_2_done": True,
-                "platinum_mission_3_done": True,
-                "platinum_mission_4_done": True,
-            },
-            headers=_idem_headers("pm234"),
+            json={"platinum_mission_2_done": True},
+            headers=_idem_headers("pm2"),
         )
         assert r2.status_code == 200
         d2 = r2.json()
         assert d2["platinum_mission_1_done"] is True
         assert d2["platinum_mission_2_done"] is True
-        assert d2["platinum_mission_3_done"] is True
-        assert d2["platinum_mission_4_done"] is True
 
     def test_platinum_missions_no_fields_error(self, client):
         """Test that empty request returns NO_FIELDS error."""

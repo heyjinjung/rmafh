@@ -203,7 +203,7 @@ ALTER TABLE vault_status ADD COLUMN diamond_expires_at TIMESTAMPTZ;
 
 | 금고 | 진행률 표시 | 소멸타임 표시 | 미션 표시 |
 |------|------------|--------------|----------|
-| 골드 | X | X | O |
+| 골드 | O | X | O |
 | 플래티넘 | O (누적입금) | O | O |
 | 다이아 | O (누적충전) | O | O |
 
