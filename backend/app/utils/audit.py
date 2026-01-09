@@ -34,7 +34,7 @@ def _log_admin_action(
             admin_user,
             action,
             endpoint,
-            Json(target_user_ids_array),
+            target_user_ids_array,  # PostgreSQL INTEGER[] - 직접 리스트 전달
             target_count,
             request_id,
             Json(request_body) if request_body else None,
