@@ -14,6 +14,10 @@ from app.schemas import (
     AdminStatusUpdateResponse,
     AdminGoldMissionsUpdateRequest,
     AdminGoldMissionsUpdateResponse,
+    AdminPlatinumMissionsUpdateRequest,
+    AdminPlatinumMissionsUpdateResponse,
+    AdminDiamondMissionsUpdateRequest,
+    AdminDiamondMissionsUpdateResponse,
     AdminAttendanceAdjustRequest,
     AdminAttendanceAdjustResponse,
     AdminDepositUpdateRequest,
@@ -95,6 +99,7 @@ async def admin_update_gold_missions(
             expires_at, gold_status, _platinum_status, _diamond_status,
             _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
             gold_mission_1_done, gold_mission_2_done, gold_mission_3_done, _diamond_attendance_days,
+            _plat_m1, _plat_m2, _plat_m3, _plat_m4, _dia_m1, _dia_m2,
         ) = row
 
         new_m1 = updates.get("gold_mission_1_done", bool(gold_mission_1_done))
@@ -162,6 +167,242 @@ async def admin_update_gold_missions(
         conn.commit()
         response.headers["Idempotency-Status"] = "recorded"
         return AdminGoldMissionsUpdateResponse(**response_body)
+
+
+@router.post("/{user_id}/vault/platinum-missions", response_model=AdminPlatinumMissionsUpdateResponse)
+async def admin_update_platinum_missions(
+    user_id: int,
+    body: AdminPlatinumMissionsUpdateRequest,
+    request: Request,
+    response: Response,
+    _auth: str = Depends(verify_admin_password),
+):
+    """Update platinum mission completion status."""
+    if all(
+        getattr(body, field) is None
+        for field in ("platinum_mission_1_done", "platinum_mission_2_done", "platinum_mission_3_done", "platinum_mission_4_done")
+    ):
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    updates: dict[str, bool] = {}
+    if body.platinum_mission_1_done is not None:
+        updates["platinum_mission_1_done"] = bool(body.platinum_mission_1_done)
+    if body.platinum_mission_2_done is not None:
+        updates["platinum_mission_2_done"] = bool(body.platinum_mission_2_done)
+    if body.platinum_mission_3_done is not None:
+        updates["platinum_mission_3_done"] = bool(body.platinum_mission_3_done)
+    if body.platinum_mission_4_done is not None:
+        updates["platinum_mission_4_done"] = bool(body.platinum_mission_4_done)
+
+    key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/platinum-missions"
+    request_hash = hash_request_body({"user_id": user_id, **body.dict()})
+
+    now = now_utc()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+
+        cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+
+        idem = idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminPlatinumMissionsUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        row = get_or_create_vault_row(cur, user_id, now)
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        (
+            expires_at, _gold_status, platinum_status, _diamond_status,
+            _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
+            _gold_m1, _gold_m2, _gold_m3, _diamond_attendance_days,
+            plat_m1, plat_m2, plat_m3, plat_m4,
+            _dia_m1, _dia_m2,
+        ) = row
+
+        new_m1 = updates.get("platinum_mission_1_done", bool(plat_m1))
+        new_m2 = updates.get("platinum_mission_2_done", bool(plat_m2))
+        new_m3 = updates.get("platinum_mission_3_done", bool(plat_m3))
+        new_m4 = updates.get("platinum_mission_4_done", bool(plat_m4))
+
+        set_clauses = []
+        params: list[Any] = []
+        if "platinum_mission_1_done" in updates:
+            set_clauses.append("platinum_mission_1_done=%s")
+            params.append(new_m1)
+        if "platinum_mission_2_done" in updates:
+            set_clauses.append("platinum_mission_2_done=%s")
+            params.append(new_m2)
+        if "platinum_mission_3_done" in updates:
+            set_clauses.append("platinum_mission_3_done=%s")
+            params.append(new_m3)
+        if "platinum_mission_4_done" in updates:
+            set_clauses.append("platinum_mission_4_done=%s")
+            params.append(new_m4)
+        set_clauses.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"UPDATE vault_status SET {', '.join(set_clauses)} WHERE user_id=%s",
+            params,
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_PLATINUM_MISSIONS_UPDATE",
+            endpoint=endpoint,
+            target_user_ids=[user_id],
+            request_id=key,
+            request_body=updates,
+            response_status="SUCCESS",
+            response_summary={
+                "platinum_mission_1_done": new_m1,
+                "platinum_mission_2_done": new_m2,
+                "platinum_mission_3_done": new_m3,
+                "platinum_mission_4_done": new_m4,
+                "platinum_status": platinum_status,
+            },
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "updated": True,
+            "platinum_mission_1_done": new_m1,
+            "platinum_mission_2_done": new_m2,
+            "platinum_mission_3_done": new_m3,
+            "platinum_mission_4_done": new_m4,
+            "platinum_status": platinum_status,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        idempotency_finish(
+            cur, key=key, scope=scope, endpoint=endpoint,
+            response_status=200, response_body=response_body,
+        )
+
+        conn.commit()
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminPlatinumMissionsUpdateResponse(**response_body)
+
+
+@router.post("/{user_id}/vault/diamond-missions", response_model=AdminDiamondMissionsUpdateResponse)
+async def admin_update_diamond_missions(
+    user_id: int,
+    body: AdminDiamondMissionsUpdateRequest,
+    request: Request,
+    response: Response,
+    _auth: str = Depends(verify_admin_password),
+):
+    """Update diamond mission completion status."""
+    if all(
+        getattr(body, field) is None
+        for field in ("diamond_mission_1_done", "diamond_mission_2_done")
+    ):
+        raise HTTPException(status_code=400, detail="NO_FIELDS")
+
+    updates: dict[str, bool] = {}
+    if body.diamond_mission_1_done is not None:
+        updates["diamond_mission_1_done"] = bool(body.diamond_mission_1_done)
+    if body.diamond_mission_2_done is not None:
+        updates["diamond_mission_2_done"] = bool(body.diamond_mission_2_done)
+
+    key = validate_idempotency_key(request.headers.get("x-idempotency-key"))
+    scope = idempotency_scope(request)
+    endpoint = f"/api/vault/admin/users/{user_id}/vault/diamond-missions"
+    request_hash = hash_request_body({"user_id": user_id, **body.dict()})
+
+    now = now_utc()
+    with db.get_conn() as conn:
+        cur = conn.cursor()
+        _apply_job_timeouts(cur)
+
+        cur.execute("SELECT 1 FROM user_identity WHERE user_id=%s", (user_id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="USER_NOT_FOUND")
+
+        idem = idempotency_start(cur, key=key, scope=scope, endpoint=endpoint, request_hash=request_hash)
+        if idem["status"] == "replayed":
+            response.headers["Idempotency-Status"] = "replayed"
+            return AdminDiamondMissionsUpdateResponse(**idem["response_body"])
+        if idem["status"] == "in_progress":
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
+
+        row = get_or_create_vault_row(cur, user_id, now)
+        if not row:
+            raise HTTPException(status_code=404, detail="VAULT_NOT_FOUND")
+
+        (
+            expires_at, _gold_status, _platinum_status, diamond_status,
+            _attendance_days, _platinum_deposit_total, _platinum_deposit_count, _diamond_deposit_total,
+            _gold_m1, _gold_m2, _gold_m3, _diamond_attendance_days,
+            _plat_m1, _plat_m2, _plat_m3, _plat_m4,
+            dia_m1, dia_m2,
+        ) = row
+
+        new_m1 = updates.get("diamond_mission_1_done", bool(dia_m1))
+        new_m2 = updates.get("diamond_mission_2_done", bool(dia_m2))
+
+        set_clauses = []
+        params: list[Any] = []
+        if "diamond_mission_1_done" in updates:
+            set_clauses.append("diamond_mission_1_done=%s")
+            params.append(new_m1)
+        if "diamond_mission_2_done" in updates:
+            set_clauses.append("diamond_mission_2_done=%s")
+            params.append(new_m2)
+        set_clauses.append("updated_at=%s")
+        params.append(now)
+        params.append(user_id)
+
+        cur.execute(
+            f"UPDATE vault_status SET {', '.join(set_clauses)} WHERE user_id=%s",
+            params,
+        )
+
+        admin_user = request.client.host if request.client else "unknown"
+        _log_admin_action(
+            conn=conn,
+            admin_user=admin_user,
+            action="ADMIN_DIAMOND_MISSIONS_UPDATE",
+            endpoint=endpoint,
+            target_user_ids=[user_id],
+            request_id=key,
+            request_body=updates,
+            response_status="SUCCESS",
+            response_summary={
+                "diamond_mission_1_done": new_m1,
+                "diamond_mission_2_done": new_m2,
+                "diamond_status": diamond_status,
+            },
+            idempotency_key=key,
+        )
+
+        response_body = {
+            "updated": True,
+            "diamond_mission_1_done": new_m1,
+            "diamond_mission_2_done": new_m2,
+            "diamond_status": diamond_status,
+            "expires_at": expires_at.isoformat() if expires_at else None,
+        }
+
+        idempotency_finish(
+            cur, key=key, scope=scope, endpoint=endpoint,
+            response_status=200, response_body=response_body,
+        )
+
+        conn.commit()
+        response.headers["Idempotency-Status"] = "recorded"
+        return AdminDiamondMissionsUpdateResponse(**response_body)
 
 
 @router.post("/{user_id}/vault/status", response_model=AdminStatusUpdateResponse)
@@ -406,7 +647,7 @@ async def admin_update_deposit(
         (
             expires_at, gold_status, platinum_status, diamond_status,
             attendance_days, platinum_deposit_total, platinum_deposit_count, diamond_deposit_total,
-            _m1, _m2, _m3, diamond_attendance_days
+            _m1, _m2, _m3, diamond_attendance_days, *_rest
         ) = row
         
         new_platinum_deposit_total = (

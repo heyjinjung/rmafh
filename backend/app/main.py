@@ -153,7 +153,7 @@ def _parse_bool(value) -> bool:
     s = str(value).strip().lower()
     if not s:
         return False
-    return s in {"1", "true", "t", "yes", "y", "ok", "o", "?�ㅇ", "?�인", "?�료"}
+    return s in {"1", "true", "t", "yes", "y", "ok", "o", "응", "확인", "완료"}
 
 
 def _parse_int(value, default: int = 0) -> int:
