@@ -41,8 +41,10 @@ export async function proxyToUpstream(req, res, { upstreamPath, allowedMethods, 
     });
   }
 
+  const base = getBaseUrl();
+  const upstreamUrl = `${base}${upstreamPath}${buildQuery(req)}`;
+
   try {
-    const base = getBaseUrl();
     const headers = pickForwardHeaders(req);
 
     const hasBody = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
@@ -52,7 +54,7 @@ export async function proxyToUpstream(req, res, { upstreamPath, allowedMethods, 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-    const upstream = await fetch(`${base}${upstreamPath}${buildQuery(req)}`, {
+    const upstream = await fetch(upstreamUrl, {
       method,
       headers,
       body: hasBody ? (isJsonBody ? JSON.stringify(req.body || {}) : req.body) : undefined,
@@ -80,10 +82,20 @@ export async function proxyToUpstream(req, res, { upstreamPath, allowedMethods, 
     return res.send(Buffer.from(ab));
   } catch (e) {
     if (e?.name === 'AbortError') {
-      return res.status(504).json({ error: { code: 'UPSTREAM_TIMEOUT', message: 'Request timeout' } });
+      return res.status(504).json({
+        error: {
+          code: 'UPSTREAM_TIMEOUT',
+          message: 'Request timeout',
+          upstream: { base, path: upstreamPath, url: upstreamUrl, method },
+        },
+      });
     }
     return res.status(502).json({
-      error: { code: 'UPSTREAM_ERROR', message: e?.message || 'Upstream request failed' },
+      error: {
+        code: 'UPSTREAM_ERROR',
+        message: e?.message || 'Upstream request failed',
+        upstream: { base, path: upstreamPath, url: upstreamUrl, method },
+      },
     });
   }
 }
