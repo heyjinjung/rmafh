@@ -67,6 +67,12 @@ from app.schemas import (
 from app.utils.auth import verify_admin_password
 from app.utils.audit import _log_admin_action
 from app.utils.sql_builders import _apply_job_timeouts, _build_user_target_sql
+from app.constants.vault_config import (
+    VAULT_EXPIRY_HOURS,
+    DEFAULT_EXPIRY_HOURS,
+    PLATINUM_UNLOCK,
+    DIAMOND_UNLOCK,
+)
 
 # Phase 2/3: Import routers and services
 from app.routers import health as health_router
@@ -225,7 +231,7 @@ def _get_or_create_vault_row(cur, user_id: int, now: datetime):
     if row:
         return row
 
-    expires_at = now + timedelta(hours=72)
+    expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
     cur.execute(
         """
         INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
@@ -480,7 +486,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
             raise HTTPException(status_code=409, detail="IDEMPOTENCY_IN_PROGRESS")
 
         now = _now()
-        default_expires = now + timedelta(hours=72)
+        default_expires = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
 
         mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
         identity_created = int(mapping.pop("__created_count__", 0))
@@ -542,7 +548,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
 
         execute_values(
             cur,
-            """
+            f"""
             UPDATE vault_status AS vs
                SET diamond_deposit_total = v.deposit_total,
                    diamond_attendance_days = GREATEST(COALESCE(vs.diamond_attendance_days, 0), v.attendance_count),
@@ -554,11 +560,7 @@ async def user_daily_import(body: DailyUserImportRequest, request: Request, resp
                    END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE')
-                            AND v.deposit_total >= 2000000
-                            AND GREATEST(COALESCE(vs.diamond_attendance_days, 0), v.attendance_count) >= 2
-                            AND vs.platinum_status = 'CLAIMED'
-                       THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                    expires_at = CASE
@@ -642,7 +644,7 @@ def _bump_platinum_progress(cur, user_ids: list[int]):
     if not user_ids:
         return
     cur.execute(
-        """
+        f"""
         UPDATE vault_status AS vs
            SET platinum_attendance_days = LEAST(3, vs.platinum_attendance_days + 1),
                last_attended_at = COALESCE(vs.last_attended_at, NOW()),
@@ -650,7 +652,7 @@ def _bump_platinum_progress(cur, user_ids: list[int]):
                platinum_status = CASE
                    WHEN vs.platinum_status IN ('LOCKED','ACTIVE')
                         AND uas.review_ok
-                        AND (GREATEST(COALESCE(vs.platinum_deposit_total, 0), uas.deposit_total) >= 200000)
+                        AND (GREATEST(COALESCE(vs.platinum_deposit_total, 0), uas.deposit_total) >= {PLATINUM_UNLOCK['deposit_total']})
                         AND LEAST(3, vs.platinum_attendance_days + 1) >= 3
                    THEN 'UNLOCKED'
                    ELSE vs.platinum_status
@@ -669,7 +671,7 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
         return {"processed": 0, "identity_created": 0, "vault_rows_updated": 0, "target_user_ids": []}
 
     now = _now()
-    default_expires = now + timedelta(hours=72)
+    default_expires = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
 
     external_ids = [ext for (_, _, ext) in cleaned_rows]
     mapping = _bulk_get_or_create_user_ids_by_external_user_ids(cur, external_ids)
@@ -725,7 +727,7 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
 
     execute_values(
         cur,
-        """
+        f"""
         UPDATE vault_status AS vs
            SET diamond_deposit_total = v.deposit_total,
                                  gold_status = CASE
@@ -735,7 +737,7 @@ def _apply_import_chunk(cur, cleaned_rows: list[tuple[int, Any, str]], request) 
                                  END,
                    platinum_deposit_total = GREATEST(COALESCE(vs.platinum_deposit_total, 0), v.deposit_total),
                    diamond_status = CASE
-                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= 2000000 THEN 'UNLOCKED'
+                       WHEN vs.diamond_status IN ('LOCKED','ACTIVE') AND v.deposit_total >= {DIAMOND_UNLOCK['deposit_total']} THEN 'UNLOCKED'
                        ELSE vs.diamond_status
                    END,
                expires_at = CASE
@@ -1356,7 +1358,7 @@ async def extend_expiry(body: ExtendExpiryRequest, request: Request, response: R
     external_user_ids = _dedupe_str_list(list(body.external_user_ids) if body.external_user_ids else None, max_items=10000)
     if body.scope == "USER_IDS" and not (user_ids or external_user_ids):
         raise HTTPException(status_code=400, detail="USER_IDS_REQUIRED")
-    if not (1 <= body.extend_hours <= 72):
+    if not (1 <= body.extend_hours <= DEFAULT_EXPIRY_HOURS):
         raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
 
     key = _validate_idempotency_key(request_id)
@@ -2385,7 +2387,7 @@ async def admin_extend_expiry(body: AdminExtendExpiryRequest, request: Request, 
     request_id = _validate_request_id(getattr(body, "request_id", None))
     if body.reason not in {"OPS", "PROMO", "ADMIN"}:
         raise HTTPException(status_code=400, detail="INVALID_REASON")
-    if not (1 <= body.extend_hours <= 72):
+    if not (1 <= body.extend_hours <= DEFAULT_EXPIRY_HOURS):
         raise HTTPException(status_code=400, detail="INVALID_EXTEND_HOURS")
 
     key = _validate_idempotency_key(request_id)

@@ -61,6 +61,27 @@
 
 ---
 
+🔴 다음 진행 순서 (P0 우선)
+순서	체크리스트 섹션	작업 내용	우선순위
+1	§4.1 Sprint 1 #4	Backend 상수 → SOT 치환 (main.py, routers/*, services/*)	🔴 P0
+2	§4.1 Sprint 1 #5	Frontend 상수 → SOT 치환 (index.jsx 등)	🔴 P0
+3	§4.1 Sprint 1 #6	테스트/린트 재검증	🔴 P0
+4	§9 Phase 5	DB 마이그레이션 (골드 미션 컬럼 3개 추가)	🔴 P0
+5	§10 골드 미션 O/X	BE API + FE 토글 UI + 프록시	🔴 P0
+6	§13 CSV 업로드	cc_attendance_count 칼럼 파싱/저장	🔴 P0
+7	§11 플래티넘/다이아 조건	새 조건(20만/3회/200만/출석2회) 로직 반영	🔴 P0
+8	§14 신규 테스트	v3 조건/만료 회귀 테스트 추가	🔴 P0
+🟡 후순위 (P1 / 선택)
+순서	체크리스트 섹션	작업 내용	우선순위
+9	§8 Phase 4 나머지	Admin v2 최소 변경, 프록시 정비	🟡 P1
+10	Sprint 3 나머지	미분리 라우터들 (admin_imports, admin_jobs 등)	🟡 P1
+11	§14.2 SOT 정합성 테스트	BE/FE SOT 값 일치 검증	🟡 P1
+
+
+
+
+
+
 ## 4. Phase 0: SOT 고정(이미 생성됨 — 유지보수 체크)
 대상 파일:
 - `backend/app/constants/vault_config.py`

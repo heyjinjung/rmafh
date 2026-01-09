@@ -25,6 +25,10 @@ from app.services.vault_service import (
     validate_claim_request,
     compute_platinum_status,
 )
+from app.constants.vault_config import (
+    VAULT_REWARDS,
+    DEFAULT_EXPIRY_HOURS,
+)
 
 router = APIRouter(prefix="/api/vault", tags=["vault"])
 
@@ -85,7 +89,7 @@ async def user_login(body: UserLoginRequest):
         telegram_ok = bool(snapshot_row[1]) if snapshot_row[1] is not None else False
 
         now = now_utc()
-        expires_at = now + timedelta(hours=72)
+        expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
         initial_gold_status = "UNLOCKED" if telegram_ok else "LOCKED"
         cur.execute(
             """
@@ -146,7 +150,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     # Fallback defaults
     last_deposit_at = row[7] if row and row[7] else None
     base_time = last_deposit_at if last_deposit_at else now
-    expires_at = row[0] if row else base_time + timedelta(hours=72)
+    expires_at = row[0] if row else base_time + timedelta(hours=DEFAULT_EXPIRY_HOURS)
     gold_status = row[1] if row else "LOCKED"
     platinum_status = row[2] if row else "LOCKED"
     diamond_status = row[3] if row else "LOCKED"
@@ -161,7 +165,7 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     remaining_ms = int((expires_at - now).total_seconds() * 1000)
     ms_countdown = {"enabled": remaining_ms < 3600_000, "remaining_ms": max(0, remaining_ms)}
 
-    reward_amounts = {"GOLD": 10000, "PLATINUM": 30000, "DIAMOND": 70000, "BONUS": 0}
+    reward_amounts = VAULT_REWARDS
     status_by_type = {"GOLD": gold_status, "PLATINUM": platinum_status, "DIAMOND": diamond_status}
     loss_breakdown = {
         k: (0 if status_by_type[k] in {"CLAIMED", "EXPIRED"} else reward_amounts[k])

@@ -11,6 +11,11 @@ from fastapi import HTTPException
 from app import config, db
 from app.services.common import now_utc, validate_status, clamp_attendance_days
 from app.services.user_identity_service import resolve_user_id
+from app.constants.vault_config import (
+    DEFAULT_EXPIRY_HOURS,
+    PLATINUM_UNLOCK,
+    DIAMOND_UNLOCK,
+)
 
 
 def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
@@ -39,7 +44,7 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
     if row:
         return row
 
-    expires_at = now + timedelta(hours=72)
+    expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
     cur.execute(
         """
         INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
@@ -94,12 +99,17 @@ def compute_platinum_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If gold_status is CLAIMED AND total >= 200,000 AND count >= 3 AND review_ok, status is UNLOCKED
+    - If attendance >= 3 AND total >= PLATINUM_UNLOCK threshold AND count >= 3 AND review_ok, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if gold_status == "CLAIMED" and deposit_total >= 200000 and deposit_count >= 3 and review_ok:
+    if (
+        attendance_days >= 3
+        and deposit_total >= PLATINUM_UNLOCK["deposit_total"]
+        and deposit_count >= PLATINUM_UNLOCK["deposit_count"]
+        and review_ok
+    ):
         return "UNLOCKED"
     return current_status
 
@@ -114,12 +124,12 @@ def compute_diamond_status(
     
     Rules:
     - If current status is CLAIMED or EXPIRED, don't change
-    - If platinum_status is CLAIMED AND deposit_total >= 2,000,000 AND attendance >= 2, status is UNLOCKED
+    - If deposit_total >= DIAMOND_UNLOCK threshold, status is UNLOCKED
     - Otherwise, keep current status
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if platinum_status == "CLAIMED" and deposit_total >= 2000000 and attendance_days >= 2:
+    if deposit_total >= DIAMOND_UNLOCK["deposit_total"]:
         return "UNLOCKED"
     return current_status
 
