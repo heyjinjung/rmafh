@@ -12,8 +12,6 @@ const columnDefs = [
   { key: 'diamond_status', label: '다이아 상태' },
   { key: 'platinum_attendance_days', label: '출석(일)' },
   { key: 'deposit_total', label: '누적 입금' },
-  { key: 'telegram_ok', label: '텔레그램' },
-  { key: 'review_ok', label: '리뷰' },
   { key: 'expires_at', label: '만료일' },
 ];
 
@@ -73,8 +71,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     nickname: '',
     joined_date: '',
     deposit_total: '0',
-    telegram_ok: false,
-    review_ok: false,
   });
   const [goldStatus, setGoldStatus] = useState('LOCKED');
   const [goldMission1, setGoldMission1] = useState(false);
@@ -133,8 +129,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       nickname: '',
       joined_date: '',
       deposit_total: '0',
-      telegram_ok: false,
-      review_ok: false,
     });
   };
 
@@ -145,8 +139,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       nickname: row?.nickname || '',
       joined_date: row?.joined_date || '',
       deposit_total: String(row?.deposit_total ?? 0),
-      telegram_ok: Boolean(row?.telegram_ok),
-      review_ok: Boolean(row?.review_ok),
     };
     console.log('setFormFromRow new form state:', newForm);
     setForm(newForm);
@@ -201,8 +193,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       nickname: form.nickname?.trim() || null,
       joined_date: form.joined_date?.trim() || null,
       deposit_total: Number(form.deposit_total || 0),
-      telegram_ok: Boolean(form.telegram_ok),
-      review_ok: Boolean(form.review_ok),
     };
 
     try {
@@ -236,18 +226,12 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     const baseNickname = selectedRow?.nickname || '';
     const baseJoined = selectedRow?.joined_date || '';
     const baseDeposit = Number(selectedRow?.deposit_total ?? 0);
-    const baseTelegram = Boolean(selectedRow?.telegram_ok);
-    const baseReview = Boolean(selectedRow?.review_ok);
 
     const nextNickname = form.nickname ?? '';
     const nextJoined = (form.joined_date ?? '').trim();
     const nextDeposit = Number(form.deposit_total || 0);
-    const nextTelegram = Boolean(form.telegram_ok);
-    const nextReview = Boolean(form.review_ok);
 
     console.log('submitUpdate comparison:', {
-      telegram: { base: baseTelegram, next: nextTelegram, changed: nextTelegram !== baseTelegram },
-      review: { base: baseReview, next: nextReview, changed: nextReview !== baseReview },
       nickname: { base: baseNickname, next: nextNickname, changed: nextNickname !== baseNickname },
       joined: { base: baseJoined, next: nextJoined, changed: nextJoined !== baseJoined },
       deposit: { base: baseDeposit, next: nextDeposit, changed: Number.isFinite(nextDeposit) && nextDeposit !== baseDeposit },
@@ -256,8 +240,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
     if (nextNickname !== baseNickname) payload.nickname = nextNickname;
     if (nextJoined !== baseJoined) payload.joined_date = nextJoined;
     if (Number.isFinite(nextDeposit) && nextDeposit !== baseDeposit) payload.deposit_total = nextDeposit;
-    if (nextTelegram !== baseTelegram) payload.telegram_ok = nextTelegram;
-    if (nextReview !== baseReview) payload.review_ok = nextReview;
 
     console.log('submitUpdate payload:', payload, 'has keys:', Object.keys(payload).length);
 

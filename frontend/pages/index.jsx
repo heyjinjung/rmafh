@@ -98,6 +98,52 @@ export default function Home() {
             </div>
           </nav>
 
+          {/* Quick Links */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
+            <a
+              href="https://ccc-001.com"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                background: 'linear-gradient(135deg, rgba(183,247,90,0.15), rgba(183,247,90,0.05))',
+                border: '1px solid rgba(183,247,90,0.4)',
+                borderRadius: '12px',
+                color: TOKENS.accent1,
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+              }}
+            >
+              🎰 씨씨카지노 바로가기
+            </a>
+            <a
+              href="https://t.me/+IE0NYpuze_k1YWZk"
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 16px',
+                background: 'linear-gradient(135deg, rgba(0,136,204,0.15), rgba(0,136,204,0.05))',
+                border: '1px solid rgba(0,136,204,0.4)',
+                borderRadius: '12px',
+                color: '#0088CC',
+                fontSize: '14px',
+                fontWeight: '600',
+                transition: 'all 0.2s',
+              }}
+            >
+              📢 씨씨공지채널 바로가기
+            </a>
+          </div>
+
           {/* Header */}
           <div style={styles.header}>
             <h1 style={styles.title} className="title cc-title">

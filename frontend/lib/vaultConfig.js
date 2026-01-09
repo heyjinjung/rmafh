@@ -124,7 +124,16 @@ export function checkGoldUnlock(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createPlatinumMissions(api) {
+  const goldClaimed = api.gold_status === 'CLAIMED';
+
   return [
+    {
+      id: 'p0',
+      label: '골드 금고 해제하기',
+      hint: '선행 조건',
+      isDone: goldClaimed,
+      source: 'auto',
+    },
     {
       id: 'p1',
       label: '누적 입금 20만원 달성',
@@ -147,7 +156,16 @@ export function createPlatinumMissions(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createDiamondMissions(api) {
+  const platinumClaimed = api.platinum_status === 'CLAIMED';
+
   return [
+    {
+      id: 'd0',
+      label: '플래티넘 금고 해제하기',
+      hint: '선행 조건',
+      isDone: platinumClaimed,
+      source: 'auto',
+    },
     {
       id: 'd1',
       label: '누적 충전 200만원 달성',
