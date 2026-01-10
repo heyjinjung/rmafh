@@ -3,7 +3,7 @@ import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 const statusOptions = ['LOCKED', 'UNLOCKED', 'CLAIMED', 'EXPIRED'];
 const columnDefs = [
-  { key: 'external_user_id', label: '외부 사용자 ID' },
+  { key: 'external_user_id', label: 'CC ID' },
   { key: 'nickname', label: '닉네임' },
   { key: 'created_at', label: '생성일' },
   { key: 'gold_status', label: '골드 상태' },
@@ -27,7 +27,7 @@ const statusLabel = (s) => {
   }
 };
 
-const sortableKeys = new Set(['created_at', 'expires_at', 'external_user_id', 'nickname']);
+const sortableKeys = new Set(['created_at', 'expires_at', 'external_user_id', 'nickname', 'gold_status', 'platinum_status', 'diamond_status']);
 
 const Switch = ({ checked, onChange, disabled, activeColor = 'var(--v2-accent)' }) => (
   <button
@@ -731,7 +731,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-4 space-y-4">
                       <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">기본 정보</h3>
                       <div>
-                        <div className="text-xs text-[var(--v2-muted)] mb-1">외부 사용자 ID (필수)</div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">CC ID (필수)</div>
                         <input
                           value={form.external_user_id}
                           onChange={(e) => setForm((prev) => ({ ...prev, external_user_id: e.target.value }))}
@@ -841,7 +841,71 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </div>
                   </div>
 
-                  {/* Status & Permissions Block Removed */}
+
+
+                  {/* Status & Permissions Block Restored */}
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 space-y-4 shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[var(--v2-border)] pb-3 mb-2">
+                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">상태 및 권한</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">누적 입금액</div>
+                        <div className="relative">
+                          <input
+                            inputMode="numeric"
+                            value={form.deposit_total}
+                            onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
+                            className="w-full rounded bg-[var(--v2-surface-2)] border border-[var(--v2-border)] py-2 pl-3 pr-8 text-sm font-mono focus:outline-none focus:border-[var(--v2-accent)]"
+                          />
+                          <span className="absolute right-3 top-2 text-xs text-[var(--v2-muted)]">원</span>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-[var(--v2-muted)] mb-1">만료일</div>
+                        <div className="py-2 text-sm font-mono text-[var(--v2-text)]">
+                          {selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expiry Extension */}
+                    <div className="pt-2 border-t border-[var(--v2-border)]">
+                      <div className="flex items-end gap-2">
+                        <div className="flex-1">
+                          <div className="text-[10px] text-[var(--v2-muted)] mb-1">연장 (일)</div>
+                          <input
+                            type="number"
+                            min="1"
+                            max="3"
+                            value={expiryExtendDays}
+                            onChange={(e) => setExpiryExtendDays(e.target.value)}
+                            className="w-full rounded bg-[var(--v2-surface-2)] border border-[var(--v2-border)] px-2 py-1.5 text-xs text-[var(--v2-text)]"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-[10px] text-[var(--v2-muted)] mb-1">사유</div>
+                          <select
+                            value={expiryReason}
+                            onChange={(e) => setExpiryReason(e.target.value)}
+                            className="w-full rounded bg-[var(--v2-surface-2)] border border-[var(--v2-border)] px-2 py-1.5 text-xs text-[var(--v2-text)]"
+                          >
+                            <option value="OPS">운영</option>
+                            <option value="PROMO">프로모션</option>
+                            <option value="ADMIN">관리자</option>
+                          </select>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={submitExtendExpiry}
+                          disabled={extending}
+                          className="rounded border border-[var(--v2-accent)] bg-[var(--v2-accent)]/10 px-3 py-1.5 text-xs text-[var(--v2-accent)] hover:bg-[var(--v2-accent)] hover:text-black font-semibold disabled:opacity-50 h-[30px]"
+                        >
+                          연장
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
                   <div className="gap-4 flex flex-col">
                     {/* 골드 볼트 미션 */}
@@ -1001,7 +1065,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             </div>
           </aside>
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
