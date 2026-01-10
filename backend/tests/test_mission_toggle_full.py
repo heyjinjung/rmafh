@@ -166,6 +166,34 @@ class TestPlatinumMissionToggle:
         assert "platinum_mission_2_done" in user
         assert user["platinum_mission_1_done"] is True
 
+    def test_platinum_mission_toggle_off_relocks(self, client, db_conn):
+        """Toggle platinum mission off should relock the vault."""
+        ext_id = f"plat-relock-{uuid.uuid4().hex[:8]}"
+        resp = client.post(
+            "/api/vault/admin/users",
+            json={"external_user_id": ext_id, "nickname": "PlatRelockTest"},
+            headers={**AUTH, **idem()},
+        )
+        user_id = resp.json()["user_id"]
+
+        # Set both missions true → UNLOCKED
+        resp = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/platinum-missions",
+            json={"platinum_mission_1_done": True, "platinum_mission_2_done": True},
+            headers={**AUTH, **idem()},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["platinum_status"] == "UNLOCKED"
+
+        # Toggle off mission 1 → LOCKED
+        resp = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/platinum-missions",
+            json={"platinum_mission_1_done": False},
+            headers={**AUTH, **idem()},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["platinum_status"] == "LOCKED"
+
 
 class TestDiamondMissionToggle:
     """Diamond mission toggle tests."""
@@ -222,6 +250,34 @@ class TestDiamondMissionToggle:
         assert "diamond_mission_1_done" in user
         assert "diamond_mission_2_done" in user
         assert user["diamond_mission_1_done"] is True
+
+    def test_diamond_mission_toggle_off_relocks(self, client, db_conn):
+        """Toggle diamond mission off should relock the vault."""
+        ext_id = f"dia-relock-{uuid.uuid4().hex[:8]}"
+        resp = client.post(
+            "/api/vault/admin/users",
+            json={"external_user_id": ext_id, "nickname": "DiaRelockTest"},
+            headers={**AUTH, **idem()},
+        )
+        user_id = resp.json()["user_id"]
+
+        # Set both missions true → UNLOCKED
+        resp = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/diamond-missions",
+            json={"diamond_mission_1_done": True, "diamond_mission_2_done": True},
+            headers={**AUTH, **idem()},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["diamond_status"] == "UNLOCKED"
+
+        # Toggle off mission 2 → LOCKED
+        resp = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/diamond-missions",
+            json={"diamond_mission_2_done": False},
+            headers={**AUTH, **idem()},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["diamond_status"] == "LOCKED"
 
 
 class TestUserStatusAPI:

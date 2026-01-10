@@ -478,21 +478,21 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
         };
       case 'diamond':
         return {
-          bgActive: 'bg-gradient-to-b from-[#008F8F] to-[#006666]',
+          bgActive: 'bg-gradient-to-b from-[#00E0FF] to-[#009090]', // Very bright/vibrant Cyan
           bgHeader: 'bg-[#00181a]',
           bgInactive: 'bg-[#00181a]',
-          border: 'border-[#22d3ee]/30', // Added thin border
-          textPrimary: 'text-[#22d3ee]', // Lightened from #00E0FF (Cyan-400) for better contrast
-          textSecondary: 'text-[#22d3ee]/80',
-          iconColor: '#22d3ee',
-          iconGlow: 'none',
-          buttonBg: 'bg-gradient-to-r from-[#008F8F] to-[#00E0FF]',
-          buttonHover: 'hover:from-[#00E0FF] hover:to-[#33Eaff]',
+          border: 'border-[#00E0FF]/50', // Stronger border
+          textPrimary: 'text-white', // White text for max contrast on bright bg
+          textSecondary: 'text-[#E0FFFF]',
+          iconColor: '#FFFFFF', // White icon
+          iconGlow: '0 0 25px rgba(0, 224, 255, 0.8)', // Strong glow
+          buttonBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
+          buttonHover: 'hover:from-[#33EAFF] hover:to-[#66F0FF]',
           buttonDisabled: 'bg-[#003333]/50',
-          gradientFrom: 'from-[#008F8F]',
+          gradientFrom: 'from-[#00E0FF]',
           gradientTo: 'to-[#22d3ee]/30',
-          shimmer: 'before:hidden',
-          progressBg: 'bg-gradient-to-r from-[#22d3ee]/80 to-[#008F8F]',
+          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent', // Active shimmer
+          progressBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
         };
       default:
         return {
@@ -516,13 +516,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
   };
 
   /* ─── Vault Icon ─── */
-  const VaultIcon = ({ tier, colorScheme }) => {
+  const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
     const iconStyle = {
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      width: '72px',
-      height: '72px',
+      width: size,
+      height: size,
     };
 
     // 3D Asset Paths
@@ -700,49 +700,64 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                 </motion.div>
               )}
 
-              <div className={`${colorScheme.bgHeader} px-4 pt-6 pb-8 flex flex-col items-center relative`}>
-                <div className="mb-2 w-full flex justify-center">
-                  <div
-                    className={`${colorScheme.bgActive} px-4 py-1 rounded-full border ${colorScheme.border} text-xs uppercase tracking-wider font-bold ${colorScheme.textPrimary} inline-block shadow-md`}
-                  >
-                    {vault.tier === 'gold' ? 'GOLD' : vault.tier === 'platinum' ? 'PLATINUM' : 'DIAMOND'}
+              <div className={`${colorScheme.bgHeader} p-4 pb-6 flex flex-col items-center relative overflow-hidden`}>
+                {/* Subtle Background Logo */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.15]">
+                  <div className="relative w-40 h-40"> {/* Slightly reduced bg logo size */}
+                    <Image
+                      src={ICON_LOGO}
+                      alt=""
+                      fill
+                      className="object-contain"
+                    />
                   </div>
                 </div>
 
-                <div className="flex items-center mb-5">
-                  <h3 className={`text-xl font-bold text-center ${colorScheme.textPrimary}`}>
-                    {vault.tier === 'gold' ? '골드' : vault.tier === 'platinum' ? '플래티넘' : '다이아'} 금고
-                  </h3>
+                {/* Tier Badge & Title Group - Tighter */}
+                <div className="flex flex-col items-center mb-2 relative z-10 w-full">
+                  <div
+                    className={`${colorScheme.bgActive} px-3 py-0.5 rounded-full border ${colorScheme.border} text-[10px] uppercase tracking-widest font-bold ${colorScheme.textPrimary} shadow-sm mb-1`}
+                  >
+                    {vault.tier === 'gold' ? 'GOLD' : vault.tier === 'platinum' ? 'PLATINUM' : 'DIAMOND'}
+                  </div>
+                  <div className="flex items-center">
+                    <h3 className={`text-xl font-bold text-center ${colorScheme.textPrimary} drop-shadow-sm`}>
+                      {vault.tier === 'gold' ? '골드' : vault.tier === 'platinum' ? '플래티넘' : '다이아'} 금고
+                    </h3>
+                  </div>
                 </div>
 
-                <div className="mb-6 flex items-center justify-center gap-3">
+                {/* Icon & Status Group - Compact Row */}
+                <div className="mb-4 flex items-center justify-center gap-4 relative z-10 w-full">
                   <motion.div
                     initial={{ y: 0 }}
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ y: { duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' } }}
-                    style={{ willChange: 'transform', transform: 'translateZ(0)' }} // Fix for mobile jitter
+                    animate={{ y: [0, -3, 0] }} // Reduced bounce height for tighter feel
+                    transition={{ y: { duration: 2.5, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' } }} // Slower, heavier feel
+                    style={{ willChange: 'transform', transform: 'translateZ(0)' }}
                   >
-                    <VaultIcon tier={vault.tier} colorScheme={colorScheme} />
+                    <VaultIcon tier={vault.tier} colorScheme={colorScheme} size="60px" /> {/* 60px Icon */}
                   </motion.div>
 
                   <motion.div
-                    className={`px-3 py-1 rounded-full flex items-center justify-center ${isLocked
-                      ? 'bg-gradient-to-r from-[#F97935] to-[#FF5500] border border-[#FF5500]/50'
+                    className={`px-3 py-1 rounded-full flex items-center justify-center border backdrop-blur-md shadow-sm ${isLocked
+                      ? 'bg-[#F97935]/10 border-[#FF5500]/50'
                       : isAvailable
-                        ? 'bg-gradient-to-r from-[#07AF4D] to-[#06C355] border border-[#06C355]/50'
-                        : 'bg-gradient-to-r from-[#5D5D5D] to-[#7D7D7D] border border-[#7D7D7D]/50'
+                        ? 'bg-[#07AF4D]/10 border-[#06C355]/50'
+                        : 'bg-white/5 border-white/20'
                       }`}
-                    initial={{ opacity: 0, scale: 0 }}
+                    initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 + 0.2 * index, duration: 0.2, type: 'spring' }}
+                    style={{ minWidth: '60px' }}
                   >
-                    <span className="text-xs font-bold text-white whitespace-nowrap">
-                      {isLocked ? '잠금 상태' : isAvailable ? '해제됨' : isExpired ? '만료됨' : '수령완료'}
+                    <span className={`text-xs font-bold whitespace-nowrap ${isLocked ? 'text-[#FF5500]' : isAvailable ? 'text-[#06C355]' : 'text-gray-400'}`}>
+                      {isLocked ? '잠금' : isAvailable ? '해제됨' : isExpired ? '만료' : '수령'}
                     </span>
                   </motion.div>
                 </div>
 
-                <RewardBadge amount={vault.rewardAmount} colorScheme={colorScheme} />
+                <div className="relative z-10 w-full mt-1">
+                  <RewardBadge amount={vault.rewardAmount} colorScheme={colorScheme} />
+                </div>
               </div>
 
               {vault.progress !== undefined && (

@@ -114,16 +114,13 @@ def compute_platinum_status(
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
-    - 선행 조건(골드 CLAIMED)은 어드민 강제 토글이므로 체크 안 함
+    - 미션 토글 OFF 시 LOCKED로 되돌림 (되돌리기 기능)
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
     
-    # 미션 토글이 모두 ON이면 UNLOCKED (어드민 강제 토글)
-    if m1 and m2:
-        return "UNLOCKED"
-    
-    return current_status
+    # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
+    return "UNLOCKED" if (m1 and m2) else "LOCKED"
 
 
 def compute_diamond_status(
@@ -139,16 +136,13 @@ def compute_diamond_status(
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
-    - 선행 조건(플래티넘 CLAIMED)은 어드민 강제 토글이므로 체크 안 함
+    - 미션 토글 OFF 시 LOCKED로 되돌림 (되돌리기 기능)
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
     
-    # 미션 토글이 모두 ON이면 UNLOCKED (어드민 강제 토글)
-    if m1 and m2:
-        return "UNLOCKED"
-    
-    return current_status
+    # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
+    return "UNLOCKED" if (m1 and m2) else "LOCKED"
 
 
 def check_user_csv_uploaded(cur, user_id: int) -> bool:
