@@ -130,7 +130,11 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
                    vs.platinum_attendance_days,
                    vs.platinum_deposit_done,
                    vs.diamond_deposit_current,
-                   uas.last_deposit_at
+                   uas.last_deposit_at,
+                   vs.platinum_mission_1_done,
+                   vs.platinum_mission_2_done,
+                   vs.diamond_mission_1_done,
+                   vs.diamond_mission_2_done
               FROM vault_status vs
               LEFT JOIN user_admin_snapshot uas ON vs.user_id = uas.user_id
              WHERE vs.user_id=%s
@@ -160,6 +164,12 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     platinum_deposit_done = bool(row[5]) if row and row[5] is not None else False
     diamond_deposit_current = int(row[6]) if row and row[6] is not None else 0
 
+    # 미션 토글 필드 (어드민 설정값)
+    platinum_mission_1_done = bool(row[8]) if row and row[8] is not None else False
+    platinum_mission_2_done = bool(row[9]) if row and row[9] is not None else False
+    diamond_mission_1_done = bool(row[10]) if row and row[10] is not None else False
+    diamond_mission_2_done = bool(row[11]) if row and row[11] is not None else False
+
     telegram_ok = review_row["telegram_ok"] if review_row else False
     platinum_review_done = review_row["review_ok"] if review_row else False
 
@@ -184,6 +194,10 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "platinum_review_done": platinum_review_done,
         "telegram_ok": telegram_ok,
         "diamond_deposit_current": diamond_deposit_current,
+        "platinum_mission_1_done": platinum_mission_1_done,
+        "platinum_mission_2_done": platinum_mission_2_done,
+        "diamond_mission_1_done": diamond_mission_1_done,
+        "diamond_mission_2_done": diamond_mission_2_done,
         "expires_at": expires_at.isoformat(),
         "now": now.isoformat(),
         "loss_total": loss_total,

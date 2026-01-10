@@ -73,85 +73,94 @@ export default function Home() {
               <Image src={ICON_STAR} alt="CC Casino" width={26} height={27} style={styles.logoIcon} priority />
               <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'stretch' }}>
-              {userNickname && (
-                <span style={{ fontSize: '12px', color: TOKENS.textSub, textAlign: 'center' }}>
-                  {userNickname}님
-                </span>
-              )}
-              <button
-                onClick={handleLogout}
-                style={{
-                  ...styles.navButton,
-                  background: 'linear-gradient(120deg, rgba(210,253,156,0.2), rgba(210,253,156,0.05))',
-                  border: '1px solid rgba(210,253,156,0.6)',
-                  color: TOKENS.accent1,
-                  boxShadow: '0 10px 24px rgba(0,0,0,0.35)',
-                  cursor: 'pointer',
-                  width: '100%'
-                }}
-                className="cc-navButton"
-              >
-                로그아웃
-              </button>
-              <Link href="/guide" style={{ ...styles.navButton, width: '100%' }} className="cc-navButton">금고 가이드</Link>
-            </div>
           </nav>
-
-          {/* Quick Links */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-            <a
-              href="https://ccc-001.com"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                background: 'linear-gradient(135deg, rgba(183,247,90,0.15), rgba(183,247,90,0.05))',
-                border: '1px solid rgba(183,247,90,0.4)',
-                borderRadius: '12px',
-                color: TOKENS.accent1,
-                fontSize: '14px',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-              }}
-            >
-              🎰 씨씨카지노 바로가기
-            </a>
-            <a
-              href="https://t.me/+IE0NYpuze_k1YWZk"
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 16px',
-                background: 'linear-gradient(135deg, rgba(0,136,204,0.15), rgba(0,136,204,0.05))',
-                border: '1px solid rgba(0,136,204,0.4)',
-                borderRadius: '12px',
-                color: '#0088CC',
-                fontSize: '14px',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-              }}
-            >
-              📢 씨씨공지채널 바로가기
-            </a>
-          </div>
 
           {/* Header */}
           <div style={styles.header}>
             <h1 style={styles.title} className="title cc-title">
-              <span style={{ color: TOKENS.textWhite }}>씨씨카지노</span>
+              <span style={{ color: '#D2FD9C' }}>씨씨카지노</span>
               <br />
-              <span style={{ color: TOKENS.accent1 }}>신규회원 전용금고</span>
+              <span style={{ color: '#FFFFFF' }}>신규회원 전용금고</span>
             </h1>
             <p style={styles.address} className="cc-address">평생주소 : 씨씨주소.COM</p>
+          </div>
+
+          {/* CTA Buttons (Square & Stylish) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', width: '100%', marginTop: '20px' }}>
+            {/* CC Casino CTA */}
+            <a
+              href="https://ccc-001.com"
+              target="_blank"
+              rel="noreferrer"
+              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] hover:border-[#D2FD9C] transition-all duration-300 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <motion.div
+                whileHover={{ scale: 1.1, rotate: 5 }}
+                className="mb-3 text-3xl"
+              >
+                🎰
+              </motion.div>
+              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors">
+                CASINO
+              </span>
+              <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
+                Go to Game
+              </span>
+              {/* Corner Accent */}
+              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
+            </a>
+
+            {/* Telegram CTA */}
+            <a
+              href="https://t.me/+IE0NYpuze_k1YWZk"
+              target="_blank"
+              rel="noreferrer"
+              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] hover:border-[#D2FD9C] transition-all duration-300 overflow-hidden"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <motion.div
+                whileHover={{ scale: 1.1, y: -2 }}
+                className="mb-3 text-3xl"
+              >
+                📢
+              </motion.div>
+              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors">
+                NOTICE
+              </span>
+              <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
+                Channel
+              </span>
+              {/* Corner Accent */}
+              <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
+            </a>
+          </div>
+
+          {/* User Info & Logout */}
+          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#D2FD9C]/20 to-transparent mb-2" />
+            <div className="flex items-center justify-between px-2">
+              {userNickname && (
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-[#D2FD9C]/60 uppercase tracking-widest">Player</span>
+                  <span className="text-sm text-white font-medium">{userNickname}</span>
+                </div>
+              )}
+              <button
+                onClick={handleLogout}
+                className="text-[11px] text-[#ff5555] hover:text-[#ff8888] border border-[#ff5555]/30 hover:border-[#ff5555] px-3 py-1 rounded-sm transition-all uppercase tracking-wider"
+              >
+                Logout
+              </button>
+            </div>
+            <Link
+              href="/guide"
+              className="w-full text-center py-3 border border-[#D2FD9C]/20 hover:border-[#D2FD9C]/60 bg-[#D2FD9C]/5 hover:bg-[#D2FD9C]/10 text-[#D2FD9C] text-xs font-bold tracking-widest transition-all uppercase"
+            >
+              Vault Guide Book
+            </Link>
           </div>
         </aside>
 
@@ -829,7 +838,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                       />
                     </svg>
                     <span className="text-sm font-medium text-[#F97935]">
-                      {timeRemaining.days > 0 
+                      {timeRemaining.days > 0
                         ? `${timeRemaining.days}일 ${timeRemaining.hours}시간 ${timeRemaining.minutes}분 후 소멸`
                         : `${timeRemaining.hours}시간 ${timeRemaining.minutes}분 후 소멸`}
                     </span>
@@ -942,8 +951,8 @@ const styles = {
     width: 345,
     display: 'flex',
     flexDirection: 'column',
-    gap: 49,
-    padding: '20px 5px',
+    gap: 24,
+    padding: '24px 12px 24px 20px',
   },
   nav: {
     display: 'flex',
