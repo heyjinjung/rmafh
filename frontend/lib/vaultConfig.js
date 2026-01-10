@@ -130,7 +130,7 @@ export function createPlatinumMissions(api) {
     {
       id: 'p0',
       label: '골드 금고 해제하기',
-      hint: '선행 조건',
+
       isDone: goldUnlockedOrClaimed,
       source: 'auto',
     },
@@ -163,7 +163,7 @@ export function createDiamondMissions(api) {
     {
       id: 'd0',
       label: '플래티넘 금고 해제하기',
-      hint: '선행 조건',
+
       isDone: platinumUnlockedOrClaimed,
       source: 'auto',
     },
