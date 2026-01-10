@@ -49,3 +49,49 @@ if __name__ == "__main__":
         print("Platinum Service Logic: OK")
     except AssertionError as e:
         print(f"Platinum Service Logic: FAILED - {e}")
+
+def test_strict_dependency():
+    """Verify that Platinum locks if Gold is LOCKED, even if all Platinum missions are done."""
+    # Scenario: User has done all Platinum missions
+    # BUT Gold was reverted to LOCKED
+    current_status = "CLAIMED"
+    gold_status = "LOCKED" # Prerequisite NOT Met
+    
+    new_status = compute_platinum_status(
+        deposit_total=1000000, deposit_count=10, attendance_days=10, review_ok=True,
+        m1=True, m2=True, # Missions DONE
+        gold_status=gold_status, 
+        current_status=current_status
+    )
+    print(f"Dependency Test: Gold={gold_status}, PlatMissions=Done -> PlatStatus={new_status}")
+    assert new_status == "LOCKED", f"Strict Dependency Failed! Platinum should be LOCKED but got {new_status}"
+
+    # Scenario: Diamond locks if Platinum is LOCKED
+    plat_status = "LOCKED"
+    new_dia_status = compute_diamond_status(
+        deposit_total=2000000, attendance_days=5,
+        m1=True, m2=True,
+        platinum_status=plat_status,
+        current_status="CLAIMED"
+    )
+    print(f"Dependency Test: Platinum={plat_status}, DiaMissions=Done -> DiaStatus={new_dia_status}")
+    assert new_dia_status == "LOCKED", f"Strict Dependency Failed! Diamond should be LOCKED but got {new_dia_status}"
+
+if __name__ == "__main__":
+    try:
+        test_reproduce_gold_revert_issue()
+        print("Gold Service Logic: OK")
+    except AssertionError as e:
+        print(f"Gold Service Logic: FAILED - {e}")
+
+    try:
+        test_reproduce_platinum_revert_issue() # This tests Mission Revert
+        print("Platinum Mission Revert Logic: OK")
+    except AssertionError as e:
+        print(f"Platinum Mission Revert Logic: FAILED - {e}")
+
+    try:
+        test_strict_dependency() # This tests Prerequisite Revert
+        print("Strict Dependency Logic: OK")
+    except AssertionError as e:
+        print(f"Strict Dependency Logic: FAILED - {e}")

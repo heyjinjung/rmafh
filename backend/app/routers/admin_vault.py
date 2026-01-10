@@ -106,6 +106,22 @@ async def admin_update_gold_missions(
         new_m3 = updates.get("gold_mission_3_done", bool(gold_mission_3_done))
 
         new_gold_status = compute_gold_status(new_m1, new_m2, new_m3, gold_status)
+        
+        # [CASCADE] Recompute Platinum Status (using new Gold Status)
+        new_platinum_status = compute_platinum_status(
+            deposit_total=0, deposit_count=0, attendance_days=0, review_ok=False, # Dummies
+            m1=bool(plat_m1), m2=bool(plat_m2),
+            gold_status=new_gold_status,
+            current_status=platinum_status
+        )
+
+        # [CASCADE] Recompute Diamond Status (using new Platinum Status)
+        new_diamond_status = compute_diamond_status(
+            deposit_total=0, attendance_days=0, # Dummies
+            m1=bool(dia_m1), m2=bool(dia_m2),
+            platinum_status=new_platinum_status,
+            current_status=diamond_status
+        )
 
         set_clauses = []
         params: list[Any] = []
@@ -118,9 +134,18 @@ async def admin_update_gold_missions(
         if "gold_mission_3_done" in updates:
             set_clauses.append("gold_mission_3_done=%s")
             params.append(new_m3)
+        
         # Always update status based on current mission flags (Allow revert from CLAIMED)
         set_clauses.append("gold_status=%s")
         params.append(new_gold_status)
+        
+        # [CASCADE] Update Platinum/Diamond
+        if new_platinum_status != platinum_status:
+            set_clauses.append("platinum_status=%s")
+            params.append(new_platinum_status)
+        if new_diamond_status != diamond_status:
+            set_clauses.append("diamond_status=%s")
+            params.append(new_diamond_status)
         set_clauses.append("updated_at=%s")
         params.append(now)
         params.append(user_id)
@@ -255,6 +280,19 @@ async def admin_update_platinum_missions(
             current_status=platinum_status,
         )
 
+        # [CASCADE] Recompute Diamond Status (using new Platinum Status)
+        # We need diamond data: dia_m1, dia_m2, diamond_status (unpacked as _diamond_status)
+        dia_m1 = row[14]
+        dia_m2 = row[15]
+        diamond_status = row[3]
+
+        new_diamond_status = compute_diamond_status(
+            deposit_total=0, attendance_days=0, # Dummies
+            m1=bool(dia_m1), m2=bool(dia_m2),
+            platinum_status=new_platinum_status,
+            current_status=diamond_status
+        )
+
         set_clauses = ["updated_at=%s"]
         params: list[Any] = [now]
         if "platinum_mission_1_done" in updates:
@@ -267,6 +305,10 @@ async def admin_update_platinum_missions(
         if new_platinum_status != platinum_status:
             set_clauses.append("platinum_status=%s")
             params.append(new_platinum_status)
+            
+        if new_diamond_status != diamond_status:
+            set_clauses.append("diamond_status=%s")
+            params.append(new_diamond_status)
 
         params.append(user_id)
 

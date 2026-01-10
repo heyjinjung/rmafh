@@ -897,18 +897,21 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       </div>
                       <div className="space-y-2">
                         {[
+                          { label: '골드 금고 해제 (선행 조건)', done: (goldStatus === 'UNLOCKED' || goldStatus === 'CLAIMED'), key: 'p0', readOnly: true },
                           { label: '누적 입금 20만원 달성', done: platinumMission1, key: 'platinum_mission_1_done' },
                           { label: '누적 입금 3회 달성', done: platinumMission2, key: 'platinum_mission_2_done' },
                         ].map((m, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
+                          <div key={idx} className={`flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition ${m.readOnly ? 'opacity-80' : ''}`}>
                             <div className="flex items-center gap-3">
-                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-xs text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${m.readOnly ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-500' : 'bg-[var(--v2-surface-2)] border-[var(--v2-border)] text-[var(--v2-muted)]'}`}>
+                                {m.readOnly ? '★' : idx}
+                              </span>
                               <span className="text-base">{m.label}</span>
                             </div>
                             <Switch
                               checked={m.done}
-                              onChange={() => submitPlatinumMissions({ [m.key]: !m.done })}
-                              disabled={saving}
+                              onChange={() => !m.readOnly && submitPlatinumMissions({ [m.key]: !m.done })}
+                              disabled={saving || m.readOnly}
                             />
                           </div>
                         ))}
@@ -931,18 +934,21 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       </div>
                       <div className="space-y-2">
                         {[
+                          { label: '플래티넘 금고 해제 (선행 조건)', done: (platinumStatus === 'UNLOCKED' || platinumStatus === 'CLAIMED'), key: 'd0', readOnly: true },
                           { label: '누적 충전 200만원 달성', done: diamondMission1, key: 'diamond_mission_1_done' },
                           { label: 'CC카지노 2회 출석', done: diamondMission2, key: 'diamond_mission_2_done' }
                         ].map((m, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
+                          <div key={idx} className={`flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition ${m.readOnly ? 'opacity-80' : ''}`}>
                             <div className="flex items-center gap-3">
-                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-sm text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-xs ${m.readOnly ? 'bg-slate-400/20 border-slate-400/50 text-slate-400' : 'bg-[var(--v2-surface-2)] border-[var(--v2-border)] text-sm text-[var(--v2-muted)]'}`}>
+                                {m.readOnly ? '★' : idx}
+                              </span>
                               <span className="text-base">{m.label}</span>
                             </div>
                             <Switch
                               checked={m.done}
-                              onChange={() => submitDiamondMissions({ [m.key]: !m.done })}
-                              disabled={saving}
+                              onChange={() => !m.readOnly && submitDiamondMissions({ [m.key]: !m.done })}
+                              disabled={saving || m.readOnly}
                             />
                           </div>
                         ))}
