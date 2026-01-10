@@ -57,6 +57,9 @@ async def get_all_users(
         "deposit_total": "uas.deposit_total",
         "external_user_id": "ui.external_user_id",
         "nickname": "uas.nickname",
+        "gold_status": "vs.gold_status",
+        "platinum_status": "vs.platinum_status",
+        "diamond_status": "vs.diamond_status",
     }
     order_col = sort_map.get(sort_by, "ui.created_at")
     order_dir = "ASC" if sort_dir == "asc" else "DESC"

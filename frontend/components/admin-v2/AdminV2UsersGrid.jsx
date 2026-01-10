@@ -828,42 +828,17 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         />
                       </div>
                       <div>
-                        <div className="text-xs text-[var(--v2-muted)] mb-1">가입일</div>
+                        <div className="text-sm text-[var(--v2-muted)] mb-1">가입일</div>
                         <input
                           value={form.joined_date}
                           onChange={(e) => setForm((prev) => ({ ...prev, joined_date: e.target.value }))}
-                          className="w-full bg-transparent border-b border-[var(--v2-border)] py-1 text-sm focus:outline-none focus:border-[var(--v2-accent)] transition-colors"
+                          className="w-full bg-transparent border-b border-[var(--v2-border)] py-1 text-base focus:outline-none focus:border-[var(--v2-accent)] transition-colors"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 space-y-4 shadow-sm">
-                    <div className="flex items-center justify-between border-b border-[var(--v2-border)] pb-3 mb-2">
-                      <h3 className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">상태 및 권한</h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-[var(--v2-muted)] mb-1">누적 입금액</div>
-                        <div className="relative">
-                          <input
-                            inputMode="numeric"
-                            value={form.deposit_total}
-                            onChange={(e) => setForm((prev) => ({ ...prev, deposit_total: e.target.value }))}
-                            className="w-full rounded bg-[var(--v2-surface-2)] border border-[var(--v2-border)] py-2 pl-3 pr-8 text-sm font-mono focus:outline-none focus:border-[var(--v2-accent)]"
-                          />
-                          <span className="absolute right-3 top-2 text-xs text-[var(--v2-muted)]">원</span>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-[var(--v2-muted)] mb-1">만료일</div>
-                        <div className="py-2 text-sm font-mono text-[var(--v2-text)]">
-                          {selectedRow.expires_at ? selectedRow.expires_at.slice(0, 10) : '-'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Status & Permissions Block Removed */}
 
                   <div className="gap-4 flex flex-col">
                     {/* 골드 볼트 미션 */}
@@ -871,7 +846,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                          <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트</div>
+                          <div className="text-sm uppercase tracking-wider text-[var(--v2-muted)] font-semibold">골드 볼트</div>
                         </div>
                         <div className={`text-[10px] px-2 py-0.5 rounded border ${goldStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
                           goldStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
@@ -888,13 +863,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         ].map((m, idx) => (
                           <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
                             <div className="flex items-center gap-3">
-                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
-                              <span className="text-sm">{m.label}</span>
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-xs text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-base">{m.label}</span>
                             </div>
                             <Switch
                               checked={m.done}
                               onChange={() => submitGoldMissions({ [m.key]: !m.done })}
-                              disabled={saving || goldStatus === 'CLAIMED' || goldStatus === 'EXPIRED'}
+                              disabled={saving || goldStatus === 'EXPIRED'}
                             />
                           </div>
                         ))}
@@ -922,13 +897,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         ].map((m, idx) => (
                           <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
                             <div className="flex items-center gap-3">
-                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
-                              <span className="text-sm">{m.label}</span>
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-xs text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-base">{m.label}</span>
                             </div>
                             <Switch
                               checked={m.done}
                               onChange={() => submitPlatinumMissions({ [m.key]: !m.done })}
-                              disabled={saving || platinumStatus === 'CLAIMED' || platinumStatus === 'EXPIRED'}
+                              disabled={saving || platinumStatus === 'EXPIRED'}
                             />
                           </div>
                         ))}
@@ -940,9 +915,9 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
-                          <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트</div>
+                          <div className="text-sm uppercase tracking-wider text-[var(--v2-muted)] font-semibold">다이아 볼트</div>
                         </div>
-                        <div className={`text-[10px] px-2 py-0.5 rounded border ${diamondStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
+                        <div className={`text-xs px-2 py-0.5 rounded border ${diamondStatus === 'UNLOCKED' ? 'border-[var(--v2-accent)] text-[var(--v2-accent)]' :
                           diamondStatus === 'CLAIMED' ? 'border-blue-400 text-blue-400' :
                             'border-[var(--v2-muted)] text-[var(--v2-muted)]'
                           }`}>
@@ -956,13 +931,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         ].map((m, idx) => (
                           <div key={idx} className="flex items-center justify-between p-2 rounded hover:bg-[var(--v2-surface-2)] transition">
                             <div className="flex items-center gap-3">
-                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-[10px] text-[var(--v2-muted)]">{idx + 1}</span>
-                              <span className="text-sm">{m.label}</span>
+                              <span className="w-5 h-5 rounded-full bg-[var(--v2-surface-2)] border border-[var(--v2-border)] flex items-center justify-center text-sm text-[var(--v2-muted)]">{idx + 1}</span>
+                              <span className="text-base">{m.label}</span>
                             </div>
                             <Switch
                               checked={m.done}
                               onChange={() => submitDiamondMissions({ [m.key]: !m.done })}
-                              disabled={saving || diamondStatus === 'CLAIMED' || diamondStatus === 'EXPIRED'}
+                              disabled={saving || diamondStatus === 'EXPIRED'}
                             />
                           </div>
                         ))}
@@ -970,19 +945,19 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </div>
 
                     <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-3">
-                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">만료일 연장</div>
+                      <div className="text-sm uppercase tracking-wider text-[var(--v2-muted)] font-semibold">만료일 연장</div>
                       <div className="flex gap-2">
                         <input
                           type="number"
                           min="1" max="3"
                           value={expiryExtendDays}
                           onChange={(e) => setExpiryExtendDays(Number(e.target.value))}
-                          className="w-16 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] text-center py-2 text-sm focus:border-[var(--v2-accent)] focus:outline-none"
+                          className="w-16 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] text-center py-2 text-base focus:border-[var(--v2-accent)] focus:outline-none"
                         />
                         <select
                           value={expiryReason}
                           onChange={(e) => setExpiryReason(e.target.value)}
-                          className="flex-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 text-sm focus:border-[var(--v2-accent)] focus:outline-none"
+                          className="flex-1 rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 text-base focus:border-[var(--v2-accent)] focus:outline-none"
                         >
                           <option value="OPS">운영</option>
                           <option value="PROMO">프로모션</option>
@@ -991,7 +966,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         <button
                           onClick={submitExtendExpiry}
                           disabled={extending || saving}
-                          className="rounded bg-[var(--v2-surface-3)] px-3 py-2 text-sm font-medium hover:bg-[var(--v2-accent)] hover:text-black transition-colors disabled:opacity-50"
+                          className="rounded bg-[var(--v2-surface-3)] px-3 py-2 text-base font-medium hover:bg-[var(--v2-accent)] hover:text-black transition-colors disabled:opacity-50"
                         >
                           연장
                         </button>
@@ -1004,7 +979,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       type="button"
                       onClick={submitDelete}
                       disabled={saving}
-                      className="flex-1 rounded-lg border border-red-900/30 bg-red-900/10 py-3 text-sm font-medium text-red-500 hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                      className="flex-1 rounded-lg border border-red-900/30 bg-red-900/10 py-3 text-base font-medium text-red-500 hover:bg-red-900/20 transition-colors disabled:opacity-50"
                     >
                       삭제
                     </button>
@@ -1012,7 +987,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       type="button"
                       onClick={submitUpdate}
                       disabled={saving}
-                      className="flex-[2] rounded-lg bg-[var(--v2-accent)] py-3 text-sm font-bold text-black hover:brightness-110 shadow-[0_0_15px_rgba(183,247,90,0.2)] transition-all disabled:opacity-50"
+                      className="flex-[2] rounded-lg bg-[var(--v2-accent)] py-3 text-base font-bold text-black hover:brightness-110 shadow-[0_0_15px_rgba(183,247,90,0.2)] transition-all disabled:opacity-50"
                     >
                       {saving ? '저장 중...' : '변경사항 저장'}
                     </button>

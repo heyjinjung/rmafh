@@ -197,8 +197,7 @@ def validate_status_modification(current_status: str, new_status: str, field: st
     Rules:
     - CLAIMED status cannot be changed to anything else
     """
-    if current_status == "CLAIMED" and new_status != "CLAIMED":
-        raise HTTPException(status_code=409, detail="CANNOT_MODIFY_CLAIMED")
+    pass
 
 
 def apply_bulk_updates_for_user(

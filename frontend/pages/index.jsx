@@ -420,10 +420,93 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
   const getCompletedVaults = useCallback(() => vaults.filter((v) => v.status === 'opened').length, [vaults]);
 
-  const handleVaultSelect = (vaultId) => {
-    setSelectedVault(vaultId);
-    setNotice('');
+  /* ─── Vault Result Modal ─── */
+  const VaultResultModal = ({ isOpen, onClose, tier }) => {
+    if (!isOpen || !tier) return null;
+
+    const colorScheme = getVaultColorScheme(tier);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+        {/* Backdrop */}
+        <motion.div
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+        />
+
+        {/* Modal Content */}
+        <motion.div
+          className={`relative w-full max-w-sm rounded-2xl overflow-hidden border ${colorScheme.border} ${colorScheme.bgHeader} shadow-2xl`}
+          initial={{ opacity: 0, scale: 0.9, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 20 }}
+          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        >
+          {/* Confetti / Glow Effect */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-[conic-gradient(from_0deg,transparent_0_340deg,${colorScheme.iconColor}_360deg)] opacity-20 blur-3xl`} />
+          </div>
+
+          <div className="relative z-10 p-8 flex flex-col items-center text-center">
+            {/* Animated Icon */}
+            <motion.div
+              className="mb-6 relative"
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: 'spring', delay: 0.2, damping: 15 }}
+            >
+              <div className="animate-float">
+                <VaultIcon tier={tier} colorScheme={colorScheme} size="96px" />
+              </div>
+            </motion.div>
+
+            {/* Title */}
+            <h2 className={`text-2xl font-bold mb-2 ${colorScheme.textPrimary}`}>
+              {tier === 'gold' ? '골드' : tier === 'platinum' ? '플래티넘' : '다이아'} 금고 오픈 완료!
+            </h2>
+            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+              보상이 지급되었습니다.<br />
+              지금 바로 게임에서 확인해보세요!
+            </p>
+
+            {/* CTA Button */}
+            <motion.a
+              href="https://ccc-001.com"
+              target="_blank"
+              rel="noreferrer"
+              className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg ${colorScheme.buttonBg} ${colorScheme.buttonHover} flex items-center justify-center gap-2 group transition-all duration-200`}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <span className="relative z-10">게임하러 가기</span>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </motion.a>
+
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="mt-4 text-sm text-gray-500 hover:text-white transition-colors py-2"
+            >
+              닫기
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
   };
+
+  /* ─── State for Result Modal ─── */
+  const [resultModal, setResultModal] = useState({
+    isOpen: false,
+    tier: null,
+  });
+
+  const closeResultModal = () => setResultModal(prev => ({ ...prev, isOpen: false }));
 
   const claimVault = useCallback(
     async (tier) => {
@@ -444,11 +527,15 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           method: 'POST',
           body: JSON.stringify({ vault_type: vaultType }),
         });
-        if (res?.claimed) {
-          setNotice(`${vaultType} 금고 수령 완료`);
+
+        // Success: Open Modal instead of Notice
+        if (res?.claimed || res?.message) {
+          setResultModal({ isOpen: true, tier: tier });
         } else {
+          // Fallback for unexpected success structure
           setNotice('요청이 처리되었습니다.');
         }
+
         await refreshStatus();
       } catch (e) {
         setError(e?.message || '수령 처리에 실패했습니다.');
@@ -456,6 +543,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     },
     [apiFetch, refreshStatus, basePath]
   );
+
 
   // NOTE: 플래티넘 연속일수는 어드민 업로드(입금 데이터)로 자동 반영됩니다.
   // 유저가 버튼을 눌러 “출석 체크”를 찍는 플로우는 사용하지 않습니다.
@@ -590,6 +678,18 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           플래티넘 금고가 열렸어요! 미션을 확인해보세요.
         </div>
       )}
+
+      {/* Vault Result Modal */}
+      <AnimatePresence>
+        {resultModal.isOpen && (
+          <VaultResultModal
+            isOpen={resultModal.isOpen}
+            onClose={closeResultModal}
+            tier={resultModal.tier}
+          />
+        )}
+      </AnimatePresence>
+
       {(error || notice) && (
         <div className="max-w-5xl mx-auto mb-6">
           {error && (

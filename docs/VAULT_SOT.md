@@ -225,3 +225,7 @@ ALTER TABLE vault_status ADD COLUMN diamond_expires_at TIMESTAMPTZ;
 - Frontend SOT: `frontend/lib/vaultConfig.js`
 - DB 마이그레이션: `docs/DB_MIGRATION_V3.sql`
 - API 스펙: `docs/API_SPEC_VAULT_V2.md` (업데이트 필요)
+
+## 9. 어드민 권한 (Admin Privileges)
+- **무제한 상태 변경**: 어드민은 현재 상태가 `CLAIMED`여도 `LOCKED` 또는 `UNLOCKED`로 강제 변경할 수 있습니다. (오입력 수정 목적)
+
