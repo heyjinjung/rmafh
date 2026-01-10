@@ -1,4 +1,8 @@
 import pytest
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from app.services.vault_service import compute_gold_status, compute_platinum_status, compute_diamond_status
 
 def test_reproduce_gold_revert_issue():

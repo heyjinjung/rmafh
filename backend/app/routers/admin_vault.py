@@ -118,9 +118,9 @@ async def admin_update_gold_missions(
         if "gold_mission_3_done" in updates:
             set_clauses.append("gold_mission_3_done=%s")
             params.append(new_m3)
-        if gold_status not in {"CLAIMED", "EXPIRED"}:
-            set_clauses.append("gold_status=%s")
-            params.append(new_gold_status)
+        # Always update status based on current mission flags (Allow revert from CLAIMED)
+        set_clauses.append("gold_status=%s")
+        params.append(new_gold_status)
         set_clauses.append("updated_at=%s")
         params.append(now)
         params.append(user_id)
