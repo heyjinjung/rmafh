@@ -102,9 +102,14 @@ class TestVaultServiceComputeStatus:
         result = compute_gold_status(True, True, False, "LOCKED")
         assert result == "LOCKED"
     
-    def test_gold_status_claimed_not_changed(self):
+    def test_gold_status_claimed_can_be_reverted(self):
+        """CLAIMED 상태도 미션 토글 OFF시 LOCKED로 되돌리기 가능"""
+        # 미션 모두 ON이면 UNLOCKED
         result = compute_gold_status(True, True, True, "CLAIMED")
-        assert result == "CLAIMED"
+        assert result == "UNLOCKED"
+        # 미션 OFF시 LOCKED로 되돌림
+        result = compute_gold_status(True, True, False, "CLAIMED")
+        assert result == "LOCKED"
     
     def test_gold_status_expired_not_changed(self):
         result = compute_gold_status(True, True, True, "EXPIRED")
@@ -140,7 +145,9 @@ class TestVaultServiceComputeStatus:
         )
         assert result == "LOCKED"
     
-    def test_platinum_claimed_not_changed(self):
+    def test_platinum_claimed_can_be_reverted(self):
+        """오수령 복구: CLAIMED 상태도 미션 토글 OFF시 LOCKED로 되돌리기 가능"""
+        # 미션 모두 ON이면 UNLOCKED
         result = compute_platinum_status(
             deposit_total=200_000,
             deposit_count=3,
@@ -151,7 +158,19 @@ class TestVaultServiceComputeStatus:
             gold_status="CLAIMED",
             current_status="CLAIMED",
         )
-        assert result == "CLAIMED"
+        assert result == "UNLOCKED"
+        # 미션 OFF시 LOCKED로 되돌림
+        result = compute_platinum_status(
+            deposit_total=200_000,
+            deposit_count=3,
+            attendance_days=3,
+            review_ok=True,
+            m1=False,
+            m2=True,
+            gold_status="CLAIMED",
+            current_status="CLAIMED",
+        )
+        assert result == "LOCKED"
     
     # Diamond status - compute_diamond_status(deposit_total, attendance_days, m1, m2, platinum_status, current_status)
     # 어드민 미션 토글은 선행 조건 없이 m1+m2만으로 UNLOCKED됨
@@ -179,7 +198,9 @@ class TestVaultServiceComputeStatus:
         )
         assert result == "LOCKED"
     
-    def test_diamond_claimed_not_changed(self):
+    def test_diamond_claimed_can_be_reverted(self):
+        """오수령 복구: CLAIMED 상태도 미션 토글 OFF시 LOCKED로 되돌리기 가능"""
+        # 미션 모두 ON이면 UNLOCKED
         result = compute_diamond_status(
             deposit_total=2_000_000,
             attendance_days=2,
@@ -188,7 +209,17 @@ class TestVaultServiceComputeStatus:
             platinum_status="CLAIMED",
             current_status="CLAIMED",
         )
-        assert result == "CLAIMED"
+        assert result == "UNLOCKED"
+        # 미션 OFF시 LOCKED로 되돌림
+        result = compute_diamond_status(
+            deposit_total=2_000_000,
+            attendance_days=2,
+            m1=True,
+            m2=False,
+            platinum_status="CLAIMED",
+            current_status="CLAIMED",
+        )
+        assert result == "LOCKED"
 
 
 class TestVaultServiceValidation:

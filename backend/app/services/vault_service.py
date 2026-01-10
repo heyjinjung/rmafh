@@ -90,11 +90,12 @@ def compute_gold_status(m1: bool, m2: bool, m3: bool, current_status: str) -> st
     """Compute gold status based on missions and current status.
     
     Rules:
-    - If current status is CLAIMED or EXPIRED, don't change
+    - If current status is EXPIRED, don't change (period expired)
+    - CLAIMED can be reverted by admin toggle (for mis-claims)
     - If all 3 missions are done, status is UNLOCKED
     - Otherwise, status is LOCKED
     """
-    if current_status in {"CLAIMED", "EXPIRED"}:
+    if current_status == "EXPIRED":
         return current_status
     return "UNLOCKED" if (m1 and m2 and m3) else "LOCKED"
 
@@ -112,11 +113,12 @@ def compute_platinum_status(
     """Compute platinum status based on conditions.
     
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
-    - If current status is CLAIMED or EXPIRED, don't change
+    - If current status is EXPIRED, don't change (period expired)
+    - CLAIMED can be reverted by admin toggle (for mis-claims)
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
     - 미션 토글 OFF 시 LOCKED로 되돌림 (되돌리기 기능)
     """
-    if current_status in {"CLAIMED", "EXPIRED"}:
+    if current_status == "EXPIRED":
         return current_status
     
     # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
@@ -134,11 +136,12 @@ def compute_diamond_status(
     """Compute diamond status based on conditions.
     
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
-    - If current status is CLAIMED or EXPIRED, don't change
+    - If current status is EXPIRED, don't change (period expired)
+    - CLAIMED can be reverted by admin toggle (for mis-claims)
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
     - 미션 토글 OFF 시 LOCKED로 되돌림 (되돌리기 기능)
     """
-    if current_status in {"CLAIMED", "EXPIRED"}:
+    if current_status == "EXPIRED":
         return current_status
     
     # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
