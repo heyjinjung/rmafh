@@ -244,3 +244,52 @@ gold_missions = client.post(
 
 ### 결과
 - ✅ Frontend lint 통과
+---
+
+## 9. 엄격한 금고 의존성 및 어드민 연동 구현 (2026-01-10)
+
+### 배경
+사용자가 'CLAIMED' 상태인 금고를 어드민에서 미션을 취소해도 상태가 'LOCKED'로 돌아가지 않는 문제와, 하위 금고 잠금 시 상위 금고가 자동으로 잠기지 않는 문제 발생.
+
+### 수정 내용
+1.  **Strict Source of Truth (SOT) 적용**: `vault_service.py`에서 상위 금고(Platinum, Diamond) 계산 시 하위 금고의 상태(`UNLOCKED` or `CLAIMED`)를 **필수 조건**으로 검사하도록 변경.
+2.  **Cascade Update 구현**: `admin_vault.py`에서 골드 미션 수정 시 플래티넘/다이아 상태도 즉시 재계산하여 DB에 반영.
+3.  **Admin UI 개선**: `AdminV2UsersGrid.jsx`에 '골드 금고 해제', '플래티넘 금고 해제' 선행 조건을 읽기 전용 미션으로 표시하여 의존성 시각화.
+
+### 결과
+- 어드민에서 하위 금고 미션 해제 시 즉시 상위 금고까지 모두 `LOCKED`로 전환됨 확인.
+
+---
+
+## 10. 금고 수령 무한 루프 수정 (2026-01-10)
+
+### 문제
+사용자가 금고 수령 버튼 클릭 시 네트워크 요청이 무한 반복되며 모달이 계속 깜빡이는 현상.
+
+### 원인
+1.  `frontend/pages/index.jsx`의 `claimVault` 함수에 **중복 실행 방지 가드(Running Guard)**가 없었음.
+2.  `handleVaultSelect` 함수가 정의되지 않아 렌더링 사이클 중 에러 유발 가능성.
+3.  상태 갱신과 모달 오픈 로직이 맞물려 리렌더링 루프 발생.
+
+### 해결책
+1.  `isClaiming` 상태 변수를 추가하여 `claimVault` 실행 중 중복 호출 방지.
+2.  누락된 `handleVaultSelect` 함수 정의.
+
+### 결과
+- 금고 수령 버튼 클릭 시 정확히 한 번만 API 요청이 발생하며 모달이 안정적으로 뜸.
+
+---
+
+## 11. 애니메이션 성능 최적화 (2026-01-10)
+
+### 문제
+각 금고의 3D 아이콘과 보상 배지 애니메이션이 페이지 타이머(1초)마다 버벅거림(Stuttering).
+
+### 원인
+`VaultIcon`, `RewardBadge`, `VaultResultModal` 등의 컴포넌트가 `VaultChallenge` 컴포넌트 **내부**에 정의되어 있어, 1초마다 상위 컴포넌트가 리렌더링될 때마다 이들 하위 컴포넌트도 **매번 새로 생성(Unmount -> Mount)**됨. 이로 인해 브라우저가 이미지를 다시 로드하고 DOM을 재생성함.
+
+### 해결책
+- 내부 정의된 컴포넌트(`VaultIcon`, `RewardBadge`, `VaultResultModal`)와 헬퍼 함수(`getVaultColorScheme`, `formatCurrency`)를 모두 `VaultChallenge` **외부(모듈 스코프)**로 이동.
+
+### 결과
+- 타이머가 갱신되어도 하위 컴포넌트가 재생성되지 않으므로 애니메이션이 끊김 없이 부드럽게 작동함.

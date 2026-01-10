@@ -241,6 +241,231 @@ export default function Home() {
   );
 }
 
+// Moved outside to prevent re-creation on every render
+function formatCurrency(amount) {
+  return new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+const getVaultColorScheme = (tier) => {
+  switch (tier) {
+    case 'gold':
+      return {
+        bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
+        bgHeader: 'bg-[#1a1400]',
+        bgInactive: 'bg-[#1a1400]',
+        border: 'border-[#D2FD9C]/30',
+        textPrimary: 'text-[#D2FD9C]',
+        textSecondary: 'text-[#D2FD9C]/80',
+        iconColor: '#D2FD9C',
+        iconGlow: 'none',
+        buttonBg: 'bg-gradient-to-r from-[#394508] to-[#4A5A0A]',
+        buttonHover: 'hover:from-[#4A5A0A] hover:to-[#5A6A1A]',
+        buttonDisabled: 'bg-[#282D1A]/50',
+        gradientFrom: 'from-[#394508]',
+        gradientTo: 'to-[#D2FD9C]/30',
+        shimmer: 'before:hidden',
+        progressBg: 'bg-gradient-to-r from-[#D2FD9C]/80 to-[#394508]',
+      };
+    case 'platinum':
+      return {
+        bgActive: 'bg-gradient-to-b from-[#075a28] to-[#053d1b]',
+        bgHeader: 'bg-gradient-to-b from-[#053d1b] to-[#032210]',
+        bgInactive: 'bg-[#032210]',
+        border: 'border-[#4ADE80]/30',
+        textPrimary: 'text-[#4ADE80]',
+        textSecondary: 'text-[#4ADE80]/80',
+        iconColor: '#4ADE80',
+        iconGlow: '0 0 20px rgba(7, 175, 77, 0.6)',
+        buttonBg: 'bg-gradient-to-r from-[#075a28] to-[#07AF4D]',
+        buttonHover: 'hover:from-[#07AF4D] hover:to-[#06C355]',
+        buttonDisabled: 'bg-[#032210]/50',
+        gradientFrom: 'from-[#075a28]',
+        gradientTo: 'to-[#4ADE80]/30',
+        shimmer: 'before:hidden',
+        progressBg: 'bg-gradient-to-r from-[#4ADE80]/80 to-[#075a28]',
+      };
+    case 'diamond':
+      return {
+        bgActive: 'bg-gradient-to-b from-[#00E0FF] to-[#009090]',
+        bgHeader: 'bg-[#00181a]',
+        bgInactive: 'bg-[#00181a]',
+        border: 'border-[#00E0FF]/50',
+        textPrimary: 'text-white',
+        textSecondary: 'text-[#E0FFFF]',
+        iconColor: '#FFFFFF',
+        iconGlow: '0 0 25px rgba(0, 224, 255, 0.8)',
+        buttonBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
+        buttonHover: 'hover:from-[#33EAFF] hover:to-[#66F0FF]',
+        buttonDisabled: 'bg-[#003333]/50',
+        gradientFrom: 'from-[#00E0FF]',
+        gradientTo: 'to-[#22d3ee]/30',
+        shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent',
+        progressBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
+      };
+    default:
+      return {
+        bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
+        bgHeader: 'bg-gradient-to-b from-[#212b01] to-[#161c01]',
+        bgInactive: 'bg-[#161c01]',
+        border: 'border-[#D2FD9C]/30',
+        textPrimary: 'text-[#D2FD9C]',
+        textSecondary: 'text-[#D2FD9C]/80',
+        iconColor: '#D2FD9C',
+        iconGlow: '0 0 20px rgba(210, 253, 156, 0.6)',
+        buttonBg: 'bg-gradient-to-r from-[#394508] to-[#4A5A0A]',
+        buttonHover: 'hover:from-[#4A5A0A] hover:to-[#5A6A1A]',
+        buttonDisabled: 'bg-[#282D1A]/50',
+        gradientFrom: 'from-[#394508]',
+        gradientTo: 'to-[#D2FD9C]/30',
+        shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-[#D2FD9C]/10 before:to-transparent',
+        progressBg: 'bg-gradient-to-r from-[#D2FD9C]/80 to-[#394508]',
+      };
+  }
+};
+
+const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
+  const iconStyle = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: size,
+    height: size,
+  };
+
+  // 3D Asset Paths
+  const assetMap = {
+    gold: '/assets/images/icon_3d_gold.png',
+    platinum: '/assets/images/icon_3d_platinum.png',
+    diamond: '/assets/images/icon_3d_diamond_cyan.png',
+  };
+
+  const imgSrc = assetMap[tier];
+
+  if (imgSrc) {
+    return (
+      <div style={iconStyle}>
+        <img
+          src={imgSrc}
+          alt={`${tier} vault icon`}
+          className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+        />
+      </div>
+    );
+  }
+  return null;
+};
+
+function RewardBadge({ amount, colorScheme }) {
+  return (
+    <div className="relative flex justify-center w-full -mt-4 z-10">
+      <div
+        className={`px-6 py-1.5 rounded-full border ${colorScheme.border} ${colorScheme.bgActive} flex items-center
+          shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
+          before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
+        aria-label={`보상 금액 ${formatCurrency(amount)}`}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="mr-2 flex-shrink-0"
+          style={{ filter: `drop-shadow(0 0 2px ${colorScheme.iconColor})` }}
+        >
+          <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
+          {formatCurrency(amount)}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const VaultResultModal = ({ isOpen, onClose, tier }) => {
+  if (!isOpen || !tier) return null;
+
+  const colorScheme = getVaultColorScheme(tier);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      />
+
+      {/* Modal Content */}
+      <motion.div
+        className={`relative w-full max-w-sm rounded-2xl overflow-hidden border ${colorScheme.border} ${colorScheme.bgHeader} shadow-2xl`}
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+      >
+        {/* Confetti / Glow Effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-[conic-gradient(from_0deg,transparent_0_340deg,${colorScheme.iconColor}_360deg)] opacity-20 blur-3xl`} />
+        </div>
+
+        <div className="relative z-10 p-8 flex flex-col items-center text-center">
+          {/* Animated Icon */}
+          <motion.div
+            className="mb-6 relative"
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: 'spring', delay: 0.2, damping: 15 }}
+          >
+            <div className="animate-float">
+              <VaultIcon tier={tier} colorScheme={colorScheme} size="96px" />
+            </div>
+          </motion.div>
+
+          {/* Title */}
+          <h2 className={`text-2xl font-bold mb-2 ${colorScheme.textPrimary}`}>
+            {tier === 'gold' ? '골드' : tier === 'platinum' ? '플래티넘' : '다이아'} 금고 오픈 완료!
+          </h2>
+          <p className="text-gray-400 text-sm mb-8 leading-relaxed">
+            보상이 지급되었습니다.<br />
+            지금 바로 게임에서 확인해보세요!
+          </p>
+
+          {/* CTA Button */}
+          <motion.a
+            href="https://ccc-001.com"
+            target="_blank"
+            rel="noreferrer"
+            className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg ${colorScheme.buttonBg} ${colorScheme.buttonHover} flex items-center justify-center gap-2 group transition-all duration-200`}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <span className="relative z-10">게임하러 가기</span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </motion.a>
+
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="mt-4 text-sm text-gray-500 hover:text-white transition-colors py-2"
+          >
+            닫기
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
 function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '' }) {
   const [selectedVault, setSelectedVault] = useState('gold-vault');
   const [status, setStatus] = useState(null);
@@ -371,43 +596,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     return () => clearInterval(t);
   }, [serverClock.expiresAtMs]);
 
-  // Moved outside to prevent re-creation on every render
-  function formatCurrency(amount) {
-    return new Intl.NumberFormat('ko-KR', {
-      style: 'currency',
-      currency: 'KRW',
-      maximumFractionDigits: 0,
-    }).format(amount);
-  }
 
-  // Moved outside
-  function RewardBadge({ amount, colorScheme }) {
-    return (
-      <div className="relative flex justify-center w-full -mt-4 z-10">
-        <div
-          className={`px-6 py-1.5 rounded-full border ${colorScheme.border} ${colorScheme.bgActive} flex items-center
-          shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
-          before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
-          aria-label={`보상 금액 ${formatCurrency(amount)}`}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="mr-2 flex-shrink-0"
-            style={{ filter: `drop-shadow(0 0 2px ${colorScheme.iconColor})` }}
-          >
-            <path d="M12 6v12M6 12h12" stroke={colorScheme.iconColor} strokeWidth="2" strokeLinecap="round" />
-          </svg>
-          <span className={`text-base font-bold ${colorScheme.textPrimary} drop-shadow-[0_0_4px_rgba(255,255,255,0.6)]`}>
-            {formatCurrency(amount)}
-          </span>
-        </div>
-      </div>
-    );
-  }
+
+
 
   const mapApiStatusToUi = (apiStatus) => {
     switch (apiStatus) {
@@ -429,85 +620,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
   const getCompletedVaults = useCallback(() => vaults.filter((v) => v.status === 'opened').length, [vaults]);
 
-  // Moved outside
-  const VaultResultModal = ({ isOpen, onClose, tier }) => {
-    if (!isOpen || !tier) return null;
 
-    const colorScheme = getVaultColorScheme(tier);
-
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        {/* Backdrop */}
-        <motion.div
-          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-        />
-
-        {/* Modal Content */}
-        <motion.div
-          className={`relative w-full max-w-sm rounded-2xl overflow-hidden border ${colorScheme.border} ${colorScheme.bgHeader} shadow-2xl`}
-          initial={{ opacity: 0, scale: 0.9, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.9, y: 20 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        >
-          {/* Confetti / Glow Effect */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-[conic-gradient(from_0deg,transparent_0_340deg,${colorScheme.iconColor}_360deg)] opacity-20 blur-3xl`} />
-          </div>
-
-          <div className="relative z-10 p-8 flex flex-col items-center text-center">
-            {/* Animated Icon */}
-            <motion.div
-              className="mb-6 relative"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: 'spring', delay: 0.2, damping: 15 }}
-            >
-              <div className="animate-float">
-                <VaultIcon tier={tier} colorScheme={colorScheme} size="96px" />
-              </div>
-            </motion.div>
-
-            {/* Title */}
-            <h2 className={`text-2xl font-bold mb-2 ${colorScheme.textPrimary}`}>
-              {tier === 'gold' ? '골드' : tier === 'platinum' ? '플래티넘' : '다이아'} 금고 오픈 완료!
-            </h2>
-            <p className="text-gray-400 text-sm mb-8 leading-relaxed">
-              보상이 지급되었습니다.<br />
-              지금 바로 게임에서 확인해보세요!
-            </p>
-
-            {/* CTA Button */}
-            <motion.a
-              href="https://ccc-001.com"
-              target="_blank"
-              rel="noreferrer"
-              className={`w-full py-4 rounded-xl font-bold text-white text-lg shadow-lg ${colorScheme.buttonBg} ${colorScheme.buttonHover} flex items-center justify-center gap-2 group transition-all duration-200`}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-            >
-              <span className="relative z-10">게임하러 가기</span>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 transition-transform group-hover:translate-x-1" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </motion.a>
-
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="mt-4 text-sm text-gray-500 hover:text-white transition-colors py-2"
-            >
-              닫기
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  };
 
   /* ─── State for Result Modal ─── */
   const [resultModal, setResultModal] = useState({
@@ -561,116 +674,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
   // NOTE: 플래티넘 연속일수는 어드민 업로드(입금 데이터)로 자동 반영됩니다.
   // 유저가 버튼을 눌러 “출석 체크”를 찍는 플로우는 사용하지 않습니다.
 
-  // Moved outside
-  const getVaultColorScheme = (tier) => {
-    switch (tier) {
-      case 'gold':
-        return {
-          bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
-          bgHeader: 'bg-[#1a1400]',
-          bgInactive: 'bg-[#1a1400]',
-          border: 'border-[#D2FD9C]/30',
-          textPrimary: 'text-[#D2FD9C]',
-          textSecondary: 'text-[#D2FD9C]/80',
-          iconColor: '#D2FD9C',
-          iconGlow: 'none',
-          buttonBg: 'bg-gradient-to-r from-[#394508] to-[#4A5A0A]',
-          buttonHover: 'hover:from-[#4A5A0A] hover:to-[#5A6A1A]',
-          buttonDisabled: 'bg-[#282D1A]/50',
-          gradientFrom: 'from-[#394508]',
-          gradientTo: 'to-[#D2FD9C]/30',
-          shimmer: 'before:hidden',
-          progressBg: 'bg-gradient-to-r from-[#D2FD9C]/80 to-[#394508]',
-        };
-      case 'platinum':
-        return {
-          bgActive: 'bg-gradient-to-b from-[#075a28] to-[#053d1b]',
-          bgHeader: 'bg-gradient-to-b from-[#053d1b] to-[#032210]',
-          bgInactive: 'bg-[#032210]',
-          border: 'border-[#4ADE80]/30',
-          textPrimary: 'text-[#4ADE80]',
-          textSecondary: 'text-[#4ADE80]/80',
-          iconColor: '#4ADE80',
-          iconGlow: '0 0 20px rgba(7, 175, 77, 0.6)',
-          buttonBg: 'bg-gradient-to-r from-[#075a28] to-[#07AF4D]',
-          buttonHover: 'hover:from-[#07AF4D] hover:to-[#06C355]',
-          buttonDisabled: 'bg-[#032210]/50',
-          gradientFrom: 'from-[#075a28]',
-          gradientTo: 'to-[#4ADE80]/30',
-          shimmer: 'before:hidden',
-          progressBg: 'bg-gradient-to-r from-[#4ADE80]/80 to-[#075a28]',
-        };
-      case 'diamond':
-        return {
-          bgActive: 'bg-gradient-to-b from-[#00E0FF] to-[#009090]',
-          bgHeader: 'bg-[#00181a]',
-          bgInactive: 'bg-[#00181a]',
-          border: 'border-[#00E0FF]/50',
-          textPrimary: 'text-white',
-          textSecondary: 'text-[#E0FFFF]',
-          iconColor: '#FFFFFF',
-          iconGlow: '0 0 25px rgba(0, 224, 255, 0.8)',
-          buttonBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
-          buttonHover: 'hover:from-[#33EAFF] hover:to-[#66F0FF]',
-          buttonDisabled: 'bg-[#003333]/50',
-          gradientFrom: 'from-[#00E0FF]',
-          gradientTo: 'to-[#22d3ee]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent',
-          progressBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
-        };
-      default:
-        return {
-          bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
-          bgHeader: 'bg-gradient-to-b from-[#212b01] to-[#161c01]',
-          bgInactive: 'bg-[#161c01]',
-          border: 'border-[#D2FD9C]/30',
-          textPrimary: 'text-[#D2FD9C]',
-          textSecondary: 'text-[#D2FD9C]/80',
-          iconColor: '#D2FD9C',
-          iconGlow: '0 0 20px rgba(210, 253, 156, 0.6)',
-          buttonBg: 'bg-gradient-to-r from-[#394508] to-[#4A5A0A]',
-          buttonHover: 'hover:from-[#4A5A0A] hover:to-[#5A6A1A]',
-          buttonDisabled: 'bg-[#282D1A]/50',
-          gradientFrom: 'from-[#394508]',
-          gradientTo: 'to-[#D2FD9C]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-[#D2FD9C]/10 before:to-transparent',
-          progressBg: 'bg-gradient-to-r from-[#D2FD9C]/80 to-[#394508]',
-        };
-    }
-  };
 
-  // Moved outside
-  const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
-    const iconStyle = {
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      width: size,
-      height: size,
-    };
 
-    // 3D Asset Paths
-    const assetMap = {
-      gold: '/assets/images/icon_3d_gold.png',
-      platinum: '/assets/images/icon_3d_platinum.png',
-      diamond: '/assets/images/icon_3d_diamond_cyan.png',
-    };
 
-    const imgSrc = assetMap[tier];
-
-    if (imgSrc) {
-      return (
-        <div style={iconStyle}>
-          <img
-            src={imgSrc}
-            alt={`${tier} vault icon`}
-            className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
-          />
-        </div>
-      );
-    }
-    return null;
-  };
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
 
