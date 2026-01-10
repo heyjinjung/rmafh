@@ -121,6 +121,11 @@ def compute_platinum_status(
     if current_status == "EXPIRED":
         return current_status
     
+    
+    # [STRICT SOT] Prerequisite: Gold Vault must be UNLOCKED or CLAIMED
+    if gold_status not in ("UNLOCKED", "CLAIMED"):
+        return "LOCKED"
+
     # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
     return "UNLOCKED" if (m1 and m2) else "LOCKED"
 
@@ -143,6 +148,11 @@ def compute_diamond_status(
     """
     if current_status == "EXPIRED":
         return current_status
+    
+
+    # [STRICT SOT] Prerequisite: Platinum Vault must be UNLOCKED or CLAIMED
+    if platinum_status not in ("UNLOCKED", "CLAIMED"):
+        return "LOCKED"
     
     # 미션 토글이 모두 ON이면 UNLOCKED, 아니면 LOCKED
     return "UNLOCKED" if (m1 and m2) else "LOCKED"
