@@ -371,20 +371,23 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     return () => clearInterval(t);
   }, [serverClock.expiresAtMs]);
 
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('ko-KR', {
+  // Moved outside to prevent re-creation on every render
+  function formatCurrency(amount) {
+    return new Intl.NumberFormat('ko-KR', {
       style: 'currency',
       currency: 'KRW',
       maximumFractionDigits: 0,
     }).format(amount);
+  }
 
+  // Moved outside
   function RewardBadge({ amount, colorScheme }) {
     return (
       <div className="relative flex justify-center w-full -mt-4 z-10">
         <div
           className={`px-6 py-1.5 rounded-full border ${colorScheme.border} ${colorScheme.bgActive} flex items-center
-            shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
-            before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
+          shadow-[0_4px_12px_rgba(0,0,0,0.6)] backdrop-blur-sm relative overflow-hidden
+          before:absolute before:inset-0 before:w-[200%] before:h-full before:animate-shimmer ${colorScheme.shimmer}`}
           aria-label={`보상 금액 ${formatCurrency(amount)}`}
         >
           <svg
@@ -426,7 +429,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
   const getCompletedVaults = useCallback(() => vaults.filter((v) => v.status === 'opened').length, [vaults]);
 
-  /* ─── Vault Result Modal ─── */
+  // Moved outside
   const VaultResultModal = ({ isOpen, onClose, tier }) => {
     if (!isOpen || !tier) return null;
 
@@ -558,6 +561,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
   // NOTE: 플래티넘 연속일수는 어드민 업로드(입금 데이터)로 자동 반영됩니다.
   // 유저가 버튼을 눌러 “출석 체크”를 찍는 플로우는 사용하지 않습니다.
 
+  // Moved outside
   const getVaultColorScheme = (tier) => {
     switch (tier) {
       case 'gold':
@@ -565,8 +569,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
           bgHeader: 'bg-[#1a1400]',
           bgInactive: 'bg-[#1a1400]',
-          border: 'border-[#D2FD9C]/30', // Added thin border
-          textPrimary: 'text-[#D2FD9C]', // High contrast
+          border: 'border-[#D2FD9C]/30',
+          textPrimary: 'text-[#D2FD9C]',
           textSecondary: 'text-[#D2FD9C]/80',
           iconColor: '#D2FD9C',
           iconGlow: 'none',
@@ -583,8 +587,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           bgActive: 'bg-gradient-to-b from-[#075a28] to-[#053d1b]',
           bgHeader: 'bg-gradient-to-b from-[#053d1b] to-[#032210]',
           bgInactive: 'bg-[#032210]',
-          border: 'border-[#4ADE80]/30', // Added thin border
-          textPrimary: 'text-[#4ADE80]', // Lightened from #07AF4D for >4.5:1 contrast
+          border: 'border-[#4ADE80]/30',
+          textPrimary: 'text-[#4ADE80]',
           textSecondary: 'text-[#4ADE80]/80',
           iconColor: '#4ADE80',
           iconGlow: '0 0 20px rgba(7, 175, 77, 0.6)',
@@ -598,20 +602,20 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
         };
       case 'diamond':
         return {
-          bgActive: 'bg-gradient-to-b from-[#00E0FF] to-[#009090]', // Very bright/vibrant Cyan
+          bgActive: 'bg-gradient-to-b from-[#00E0FF] to-[#009090]',
           bgHeader: 'bg-[#00181a]',
           bgInactive: 'bg-[#00181a]',
-          border: 'border-[#00E0FF]/50', // Stronger border
-          textPrimary: 'text-white', // White text for max contrast on bright bg
+          border: 'border-[#00E0FF]/50',
+          textPrimary: 'text-white',
           textSecondary: 'text-[#E0FFFF]',
-          iconColor: '#FFFFFF', // White icon
-          iconGlow: '0 0 25px rgba(0, 224, 255, 0.8)', // Strong glow
+          iconColor: '#FFFFFF',
+          iconGlow: '0 0 25px rgba(0, 224, 255, 0.8)',
           buttonBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
           buttonHover: 'hover:from-[#33EAFF] hover:to-[#66F0FF]',
           buttonDisabled: 'bg-[#003333]/50',
           gradientFrom: 'from-[#00E0FF]',
           gradientTo: 'to-[#22d3ee]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent', // Active shimmer
+          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-white/30 before:to-transparent',
           progressBg: 'bg-gradient-to-r from-[#00E0FF] to-[#33EAFF]',
         };
       default:
@@ -635,7 +639,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     }
   };
 
-  /* ─── Vault Icon ─── */
+  // Moved outside
   const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
     const iconStyle = {
       display: 'flex',
