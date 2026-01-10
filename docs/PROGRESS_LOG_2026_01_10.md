@@ -1,0 +1,130 @@
+# 개발 진행 로그 - 2026-01-10
+
+## 🔧 완료된 작업
+
+### 1. SOT 만료일 72시간 → 120시간(5일) 통일
+
+**문제**: 새 유저 생성 시 만료일이 3일(72시간)로 설정되어 SOT(5일)와 불일치
+
+**원인**: 백엔드 코드에 72시간 하드코딩 발견
+- `vault.py` Line 266, 341: `timedelta(hours=72)`
+- `admin_users.py` Line 246: `timedelta(hours=72)`
+
+**해결**:
+- `vault.py`: `timedelta(hours=DEFAULT_EXPIRY_HOURS)` 로 수정 (2곳)
+- `admin_users.py`: `DEFAULT_EXPIRY_HOURS` import 추가 및 사용
+
+**검증**: SOT 테스트 13개 통과 (`test_sot_consistency.py`)
+
+---
+
+### 2. 테스트 DB 분리 (데이터 보존)
+
+**문제**: `pytest` 실행마다 실제 DB(`vault`)가 초기화되어 개발 데이터 손실
+
+**원인**: `conftest.py`의 `_reset_db_state` fixture가 `APP_ENV=test`일 때 모든 테이블 DELETE
+
+**해결**: 테스트용 별도 DB `vault_test` 사용
+```python
+# conftest.py db_url fixture
+if env_url.endswith("/vault"):
+    env_url = env_url[:-6] + "/vault_test"
+```
+
+**결과**:
+- `vault` DB: 개발/프로덕션 데이터 (유지됨)
+- `vault_test` DB: 테스트 데이터 (매 테스트 초기화)
+
+---
+
+### 3. 프론트엔드 상태 매핑 수정
+
+**문제**: 유저 페이지에서 UNLOCKED 상태가 "수령완료"로 표시
+
+**원인**: `vaultConfig.js`의 `mapApiStatusToUi`가 `'unlocked'` 반환, `index.jsx`는 `'available'` 기대
+
+**해결**: `vaultConfig.js` 수정
+```javascript
+if (apiStatus === 'UNLOCKED') return 'available'; // 'unlocked' → 'available'
+```
+
+---
+
+### 4. 유저 페이지 아이콘 렌더링 오류 수정
+
+**문제**: `ReferenceError: getVaultIcon is not defined`
+
+**원인**: 존재하지 않는 함수 `getVaultIcon()` 호출
+
+**해결**: `index.jsx`에서 `VaultIcon` 컴포넌트 사용
+```jsx
+// Before: {getVaultIcon(vault.tier)}
+// After:
+<VaultIcon tier={vault.tier} colorScheme={colorScheme} />
+```
+
+---
+
+### 5. 선행조건 및 진행률 로직 수정
+
+**문제**: 
+1. 플래티넘/다이아 선행조건이 `CLAIMED`만 체크 → `UNLOCKED`도 "해제됨"으로 인정 필요
+2. 진행률이 deposit 기반 → 미션 기반으로 변경 필요
+
+**해결**: `vaultConfig.js` 수정
+```javascript
+// 플래티넘 선행조건: CLAIMED 또는 UNLOCKED
+const goldUnlockedOrClaimed = api.gold_status === 'CLAIMED' || api.gold_status === 'UNLOCKED';
+
+// 다이아 선행조건: CLAIMED 또는 UNLOCKED  
+const platinumUnlockedOrClaimed = api.platinum_status === 'CLAIMED' || api.platinum_status === 'UNLOCKED';
+
+// 진행률: 미션 기반 계산
+const platinumProgress = Math.floor((platinumMissions.filter(m => m.isDone).length / platinumMissions.length) * 100);
+const diamondProgress = Math.floor((diamondMissions.filter(m => m.isDone).length / diamondMissions.length) * 100);
+```
+
+---
+
+## 📁 수정된 파일 목록
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `backend/app/routers/vault.py` | 72시간 → DEFAULT_EXPIRY_HOURS (2곳) |
+| `backend/app/routers/admin_users.py` | 72시간 → DEFAULT_EXPIRY_HOURS + import |
+| `backend/tests/conftest.py` | vault → vault_test DB 분리 |
+| `frontend/lib/vaultConfig.js` | 상태 매핑, 선행조건, 진행률 로직 수정 |
+| `frontend/pages/index.jsx` | getVaultIcon → VaultIcon 컴포넌트 |
+
+---
+
+## ✅ 테스트 결과
+
+- **전체 테스트**: 109개 통과, 6개 스킵
+- **SOT 일관성 테스트**: 13개 통과
+- **미션 토글 테스트**: 10개 통과
+
+---
+
+## 📋 현재 상태
+
+### 백엔드 SOT (`vault_config.py`)
+- `DEFAULT_EXPIRY_HOURS = 120` (5일)
+- `VAULT_EXPIRY_HOURS = {GOLD: 120, PLATINUM: 120, DIAMOND: 120}`
+
+### 프론트엔드 SOT (`vaultConfig.js`)
+- `DEFAULT_EXPIRY_HOURS = 120`
+- 상태 매핑: UNLOCKED → 'available', CLAIMED → 'opened'
+
+### DB 구조
+- `vault`: 실제 개발/프로덕션 데이터
+- `vault_test`: 테스트 전용 (매 실행 초기화)
+
+---
+
+## 🔜 다음 단계
+
+1. ~~선행조건 로직 수정~~ ✅ 완료
+2. ~~진행률 미션 기반 계산~~ ✅ 완료
+3. 전체 통합 테스트
+4. 프로덕션 배포 준비
