@@ -60,6 +60,9 @@ DATABASE_URL=postgresql://rmarh_user:rmarh_password@db:5432/rmarh_db
 SECRET_KEY=your_secret_key
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=1440
+# Figma Integration (Optional - for development)
+FIGMA_PERSONAL_ACCESS_TOKEN=your_figma_personal_access_token_here
+FIGMA_FILE_KEY=your_figma_file_key_here
 ADMIN_PASSWORD=your_admin_password
 # ... 기타 필요한 환경변수
 ```

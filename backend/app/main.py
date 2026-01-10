@@ -1114,7 +1114,11 @@ def _ensure_schema():
                 gold_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE,
                 gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE,
                 platinum_status TEXT NOT NULL DEFAULT 'LOCKED',
+                platinum_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE,
+                platinum_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE,
                 diamond_status TEXT NOT NULL DEFAULT 'LOCKED',
+                diamond_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE,
+                diamond_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE,
                 expiry_extend_count INTEGER NOT NULL DEFAULT 0,
                 last_extension_reason TEXT,
                 last_extension_at TIMESTAMPTZ,
@@ -1122,8 +1126,12 @@ def _ensure_schema():
                 platinum_claimed_at TIMESTAMPTZ,
                 diamond_claimed_at TIMESTAMPTZ,
                 platinum_attendance_days INTEGER NOT NULL DEFAULT 0,
+                diamond_attendance_days INTEGER NOT NULL DEFAULT 0,
                 platinum_deposit_done BOOLEAN NOT NULL DEFAULT FALSE,
+                platinum_deposit_total BIGINT NOT NULL DEFAULT 0,
+                platinum_deposit_count INTEGER NOT NULL DEFAULT 0,
                 platinum_deposit_total_last BIGINT NOT NULL DEFAULT 0,
+                diamond_deposit_total BIGINT NOT NULL DEFAULT 0,
                 diamond_deposit_current INTEGER NOT NULL DEFAULT 0,
                 last_attended_at TIMESTAMPTZ,
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -1257,9 +1265,14 @@ def _ensure_schema():
 
         # Backward compatible adds if the table already exists with older schema.
         cur.execute("ALTER TABLE vault_status ALTER COLUMN gold_status SET DEFAULT 'LOCKED'")
-        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE")
-        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE")
-        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS gold_mission_3_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_mission_1_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_mission_2_done BOOLEAN NOT NULL DEFAULT FALSE")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_attendance_days INTEGER NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_deposit_total BIGINT NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS platinum_deposit_count INTEGER NOT NULL DEFAULT 0")
+        cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS diamond_deposit_total BIGINT NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS expiry_extend_count INTEGER NOT NULL DEFAULT 0")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_reason TEXT")
         cur.execute("ALTER TABLE vault_status ADD COLUMN IF NOT EXISTS last_extension_at TIMESTAMPTZ")
