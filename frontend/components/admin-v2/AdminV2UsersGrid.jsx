@@ -557,7 +557,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="외부 사용자 ID 또는 닉네임"
+            placeholder="CC ID 또는 닉네임"
             className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] placeholder:text-[var(--v2-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
           />
         </div>
@@ -584,10 +584,13 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
               onChange={(e) => setSortBy(e.target.value)}
               className="mt-2 w-full rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2 text-sm text-[var(--v2-text)] focus:outline-none focus:ring-2 focus:ring-[var(--v2-accent)]/40"
             >
+              <option value="created_at">생성일</option>
               <option value="expires_at">만료일</option>
-              <option value="deposit_total">누적 입금</option>
-              <option value="external_user_id">외부 사용자 ID</option>
+              <option value="gold_status">골드 상태</option>
+              <option value="platinum_status">플래티넘 상태</option>
+              <option value="diamond_status">다이아 상태</option>
               <option value="nickname">닉네임</option>
+              <option value="external_user_id">CC ID</option>
             </select>
           </div>
           <div>
