@@ -443,10 +443,10 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
       case 'gold':
         return {
           bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
-          bgHeader: 'bg-[#1a1400]', // Distinct Gold Tint
+          bgHeader: 'bg-[#1a1400]',
           bgInactive: 'bg-[#1a1400]',
-          border: 'border-transparent',
-          textPrimary: 'text-[#D2FD9C]',
+          border: 'border-[#D2FD9C]/30', // Added thin border
+          textPrimary: 'text-[#D2FD9C]', // High contrast
           textSecondary: 'text-[#D2FD9C]/80',
           iconColor: '#D2FD9C',
           iconGlow: 'none',
@@ -463,43 +463,43 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           bgActive: 'bg-gradient-to-b from-[#075a28] to-[#053d1b]',
           bgHeader: 'bg-gradient-to-b from-[#053d1b] to-[#032210]',
           bgInactive: 'bg-[#032210]',
-          border: 'border-[#07AF4D]',
-          textPrimary: 'text-[#07AF4D]',
-          textSecondary: 'text-[#07AF4D]/80',
-          iconColor: '#07AF4D',
+          border: 'border-[#4ADE80]/30', // Added thin border
+          textPrimary: 'text-[#4ADE80]', // Lightened from #07AF4D for >4.5:1 contrast
+          textSecondary: 'text-[#4ADE80]/80',
+          iconColor: '#4ADE80',
           iconGlow: '0 0 20px rgba(7, 175, 77, 0.6)',
           buttonBg: 'bg-gradient-to-r from-[#075a28] to-[#07AF4D]',
           buttonHover: 'hover:from-[#07AF4D] hover:to-[#06C355]',
           buttonDisabled: 'bg-[#032210]/50',
           gradientFrom: 'from-[#075a28]',
-          gradientTo: 'to-[#07AF4D]/30',
+          gradientTo: 'to-[#4ADE80]/30',
           shimmer: 'before:hidden',
-          progressBg: 'bg-gradient-to-r from-[#07AF4D]/80 to-[#075a28]',
+          progressBg: 'bg-gradient-to-r from-[#4ADE80]/80 to-[#075a28]',
         };
       case 'diamond':
         return {
           bgActive: 'bg-gradient-to-b from-[#008F8F] to-[#006666]',
-          bgHeader: 'bg-[#00181a]', // Distinct Diamond Tint
+          bgHeader: 'bg-[#00181a]',
           bgInactive: 'bg-[#00181a]',
-          border: 'border-transparent',
-          textPrimary: 'text-[#00E0FF]',
-          textSecondary: 'text-[#00E0FF]/80',
-          iconColor: '#00E0FF',
+          border: 'border-[#22d3ee]/30', // Added thin border
+          textPrimary: 'text-[#22d3ee]', // Lightened from #00E0FF (Cyan-400) for better contrast
+          textSecondary: 'text-[#22d3ee]/80',
+          iconColor: '#22d3ee',
           iconGlow: 'none',
           buttonBg: 'bg-gradient-to-r from-[#008F8F] to-[#00E0FF]',
           buttonHover: 'hover:from-[#00E0FF] hover:to-[#33Eaff]',
           buttonDisabled: 'bg-[#003333]/50',
           gradientFrom: 'from-[#008F8F]',
-          gradientTo: 'to-[#00E0FF]/30',
+          gradientTo: 'to-[#22d3ee]/30',
           shimmer: 'before:hidden',
-          progressBg: 'bg-gradient-to-r from-[#00E0FF]/80 to-[#008F8F]',
+          progressBg: 'bg-gradient-to-r from-[#22d3ee]/80 to-[#008F8F]',
         };
       default:
         return {
           bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
           bgHeader: 'bg-gradient-to-b from-[#212b01] to-[#161c01]',
           bgInactive: 'bg-[#161c01]',
-          border: 'border-[#D2FD9C]',
+          border: 'border-[#D2FD9C]/30',
           textPrimary: 'text-[#D2FD9C]',
           textSecondary: 'text-[#D2FD9C]/80',
           iconColor: '#D2FD9C',
@@ -679,7 +679,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           return (
             <motion.div
               key={vault.id}
-              className={`relative overflow-hidden rounded-2xl border-transparent ${colorScheme.bgInactive} transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-lg`}
+              className={`relative overflow-hidden rounded-2xl border ${colorScheme.border} ${colorScheme.bgInactive} transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-lg`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 * index, duration: 0.5 }}
@@ -720,8 +720,9 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                     initial={{ y: 0 }}
                     animate={{ y: [0, -5, 0] }}
                     transition={{ y: { duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' } }}
+                    style={{ willChange: 'transform', transform: 'translateZ(0)' }} // Fix for mobile jitter
                   >
-                    {getVaultIcon(vault.tier)}
+                    <VaultIcon tier={vault.tier} colorScheme={colorScheme} />
                   </motion.div>
 
                   <motion.div

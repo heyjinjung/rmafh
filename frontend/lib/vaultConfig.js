@@ -123,14 +123,15 @@ export function checkGoldUnlock(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createPlatinumMissions(api) {
-  const goldClaimed = api.gold_status === 'CLAIMED';
+  // 골드 금고가 CLAIMED 또는 UNLOCKED면 선행조건 완료
+  const goldUnlockedOrClaimed = api.gold_status === 'CLAIMED' || api.gold_status === 'UNLOCKED';
 
   return [
     {
       id: 'p0',
       label: '골드 금고 해제하기',
       hint: '선행 조건',
-      isDone: goldClaimed,
+      isDone: goldUnlockedOrClaimed,
       source: 'auto',
     },
     {
@@ -155,14 +156,15 @@ export function createPlatinumMissions(api) {
  * @param {Object} api - API 응답 데이터
  */
 export function createDiamondMissions(api) {
-  const platinumClaimed = api.platinum_status === 'CLAIMED';
+  // 플래티넘 금고가 CLAIMED 또는 UNLOCKED면 선행조건 완료
+  const platinumUnlockedOrClaimed = api.platinum_status === 'CLAIMED' || api.platinum_status === 'UNLOCKED';
 
   return [
     {
       id: 'd0',
       label: '플래티넘 금고 해제하기',
       hint: '선행 조건',
-      isDone: platinumClaimed,
+      isDone: platinumUnlockedOrClaimed,
       source: 'auto',
     },
     {
@@ -273,16 +275,13 @@ export function createVaultsFromApi(api) {
   const goldMissions = createGoldMissions(api);
   const goldProgress = Math.floor((goldMissions.filter(m => m.isDone).length / goldMissions.length) * 100);
 
-  const platinumProgress = Math.max(
-    0,
-    Math.min(100, Math.floor(((api.platinum_deposit_total || 0) / PLATINUM_UNLOCK.depositTotal) * 100))
-  );
+  // 플래티넘 진행률: 미션 기반 (3개 미션 중 완료된 개수)
+  const platinumMissions = createPlatinumMissions(api);
+  const platinumProgress = Math.floor((platinumMissions.filter(m => m.isDone).length / platinumMissions.length) * 100);
 
-  const diamondDepositTotal = api.diamond_deposit_total || api.diamond_deposit_current || 0;
-  const diamondProgress = Math.max(
-    0,
-    Math.min(100, Math.floor((diamondDepositTotal / DIAMOND_UNLOCK.depositTotal) * 100))
-  );
+  // 다이아 진행률: 미션 기반 (3개 미션 중 완료된 개수)
+  const diamondMissions = createDiamondMissions(api);
+  const diamondProgress = Math.floor((diamondMissions.filter(m => m.isDone).length / diamondMissions.length) * 100);
 
   return [
     {
@@ -301,7 +300,7 @@ export function createVaultsFromApi(api) {
       status: mapApiStatusToUi(api.platinum_status),
       expiresAt: api.expires_at ? Date.parse(api.expires_at) : undefined,
       progress: platinumProgress,
-      missions: createPlatinumMissions(api),
+      missions: platinumMissions,
       meta: {
         depositTotal: api.platinum_deposit_total || 0,
         depositCount: api.platinum_deposit_count || 0,
@@ -318,10 +317,10 @@ export function createVaultsFromApi(api) {
         : api.expires_at
           ? Date.parse(api.expires_at)
           : undefined,
-      progress: Number.isFinite(diamondProgress) ? diamondProgress : 0,
-      missions: createDiamondMissions(api),
+      progress: diamondProgress,
+      missions: diamondMissions,
       meta: {
-        depositTotal: diamondDepositTotal,
+        depositTotal: api.diamond_deposit_total || api.diamond_deposit_current || 0,
         attendanceDays: api.diamond_attendance_days || 0,
       },
       colorScheme: VAULT_COLORS.diamond,
