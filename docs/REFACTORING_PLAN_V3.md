@@ -35,7 +35,9 @@
 | **P0** | 골드 미션 O/X | ✅ 완료 | BE API + FE 토글 UI + Proxy |
 | **P0** | 플래티넘/다이아 조건 | ✅ 완료 | 해금 조건 로직 + 테스트 |
 | **P0** | CSV cc_attendance_count | ✅ 완료 | 스키마 + 파싱 + DB 저장 |
-| **P0** | 신규 테스트 | ✅ 완료 | 51 passed, 2 skipped |
+| **P0** | 신규 테스트 | ✅ 완료 | 77 passed, 5 skipped (2026-01-10) |
+| **P1** | 누적입금 CRUD 제거 | ✅ 완료 | deposit 관련 코드 전체 삭제 |
+| **P1** | 가입일 편집 테스트 | ✅ 완료 | `test_admin_users_joined_date.py` 8개 |
 
 ### 생성된 SOT 파일 목록
 - ✅ `backend/app/constants/vault_config.py` (218줄)
@@ -47,6 +49,14 @@
 - ✅ `backend/tests/test_vault_unlock_v3.py` - 12개 테스트 (해금 조건)
 - ✅ `backend/tests/test_sot_consistency.py` - 14개 테스트 (SOT 정합성)
 - ✅ `backend/tests/test_daily_import_v3.py` - CSV Import 시나리오
+- ✅ `backend/tests/test_admin_users_joined_date.py` - 8개 테스트 (가입일 편집)
+
+### 삭제된 레거시 코드 (2026-01-10)
+- ❌ `AdminDepositUpdateRequest`, `AdminDepositUpdateResponse` (schemas.py)
+- ❌ `AdminBulkDepositUpdate` (schemas.py)
+- ❌ `POST /{user_id}/vault/deposit` 엔드포인트 (admin_vault.py)
+- ❌ `submitDepositUpdate` 함수 (AdminV2UsersGrid.jsx)
+- ❌ `deposit_total` 컬럼 및 관련 state (AdminV2UsersGrid.jsx)
 
 ### 해금 조건 정책 (SOT 준수)
 | 티어 | 해금 조건 |

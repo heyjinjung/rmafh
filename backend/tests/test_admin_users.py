@@ -139,24 +139,19 @@ def test_admin_user_bulk_updates_apply(client):
         users.append((resp.json()["user_id"], ext))
 
     for user_id, ext in users:
-        deposit = client.post(
-            f"/api/vault/admin/users/{user_id}/vault/deposit",
-            json={"platinum_deposit_total": 300000, "platinum_deposit_count": 3, "diamond_deposit_total": 2500000},
-            headers=_idem_headers(f"deposit-{ext}"),
+        # Toggle gold missions to unlock gold
+        gold_missions = client.post(
+            f"/api/vault/admin/users/{user_id}/vault/gold-missions",
+            json={"gold_mission_1_done": True, "gold_mission_2_done": True, "gold_mission_3_done": True},
+            headers=_idem_headers(f"gold-missions-{ext}"),
         )
-        assert deposit.status_code == 200
-
-        attendance = client.post(
-            f"/api/vault/admin/users/{user_id}/vault/attendance",
-            json={"set_days": 3},
-            headers=_idem_headers(f"attendance-{ext}"),
-        )
-        assert attendance.status_code == 200
+        assert gold_missions.status_code == 200
+        assert gold_missions.json()["gold_status"] == "UNLOCKED"
 
         status = client.get("/api/vault/status", params={"external_user_id": ext})
         assert status.status_code == 200
         data = status.json()
         assert data["gold_status"] == "UNLOCKED"
-        assert data["platinum_status"] == "UNLOCKED"
-        # 다이아몬드는 플래티넘 CLAIMED 후에만 해금되므로 아직 LOCKED
+        # Platinum/Diamond need more conditions (deposit, attendance, etc.) - just verify gold unlocked
+        assert data["platinum_status"] == "LOCKED"
         assert data["diamond_status"] == "LOCKED"

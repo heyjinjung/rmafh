@@ -110,13 +110,15 @@ class TestVaultServiceComputeStatus:
         result = compute_gold_status(True, True, True, "EXPIRED")
         assert result == "EXPIRED"
     
-    # Platinum status - compute_platinum_status(deposit_total, deposit_count, attendance_days, review_ok, gold_status, current_status)
+    # Platinum status - compute_platinum_status(deposit_total, deposit_count, attendance_days, review_ok, m1, m2, gold_status, current_status)
     def test_platinum_unlocked_when_conditions_met(self):
         result = compute_platinum_status(
             deposit_total=200_000,
             deposit_count=3,
             attendance_days=3,
             review_ok=True,
+            m1=True,
+            m2=True,
             gold_status="CLAIMED",
             current_status="LOCKED",
         )
@@ -128,6 +130,8 @@ class TestVaultServiceComputeStatus:
             deposit_count=3,
             attendance_days=3,
             review_ok=True,
+            m1=True,
+            m2=True,
             gold_status="CLAIMED",
             current_status="LOCKED",
         )
@@ -139,16 +143,20 @@ class TestVaultServiceComputeStatus:
             deposit_count=3,
             attendance_days=3,
             review_ok=True,
+            m1=True,
+            m2=True,
             gold_status="CLAIMED",
             current_status="CLAIMED",
         )
         assert result == "CLAIMED"
     
-    # Diamond status - compute_diamond_status(deposit_total, attendance_days, platinum_status, current_status)
+    # Diamond status - compute_diamond_status(deposit_total, attendance_days, m1, m2, platinum_status, current_status)
     def test_diamond_unlocked_when_deposit_sufficient(self):
         result = compute_diamond_status(
             deposit_total=2_000_000,
             attendance_days=2,
+            m1=True,
+            m2=True,
             platinum_status="CLAIMED",
             current_status="LOCKED",
         )
@@ -158,6 +166,8 @@ class TestVaultServiceComputeStatus:
         result = compute_diamond_status(
             deposit_total=1_000_000,
             attendance_days=2,
+            m1=True,
+            m2=True,
             platinum_status="CLAIMED",
             current_status="LOCKED",
         )
@@ -167,6 +177,8 @@ class TestVaultServiceComputeStatus:
         result = compute_diamond_status(
             deposit_total=2_000_000,
             attendance_days=2,
+            m1=True,
+            m2=True,
             platinum_status="CLAIMED",
             current_status="CLAIMED",
         )

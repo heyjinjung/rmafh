@@ -108,7 +108,11 @@ async def get_all_users(
                 uas.deposit_total,
                 uas.nickname,
                 uas.telegram_ok,
-                uas.joined_date
+                uas.joined_date,
+                vs.platinum_mission_1_done,
+                vs.platinum_mission_2_done,
+                vs.diamond_mission_1_done,
+                vs.diamond_mission_2_done
             """
             + "\n".join(base_sql)
             + f"\nORDER BY {order_col} {order_dir} NULLS LAST LIMIT %s OFFSET %s",
@@ -155,6 +159,10 @@ async def get_all_users(
                 "deposit_total": deposit_total,
                 "nickname": row[16] or "",
                 "telegram_ok": row[17] or False,
+                "platinum_mission_1_done": bool(row[19]),
+                "platinum_mission_2_done": bool(row[20]),
+                "diamond_mission_1_done": bool(row[21]),
+                "diamond_mission_2_done": bool(row[22]),
             })
 
         return {"users": users, "total": total, "page": page, "page_size": page_size}

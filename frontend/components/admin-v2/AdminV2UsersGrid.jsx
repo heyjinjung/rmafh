@@ -9,7 +9,6 @@ const columnDefs = [
   { key: 'gold_status', label: '골드 상태' },
   { key: 'platinum_status', label: '플래티넘 상태' },
   { key: 'diamond_status', label: '다이아 상태' },
-  { key: 'platinum_attendance_days', label: '출석(일)' },
   { key: 'expires_at', label: '만료일' },
 ];
 

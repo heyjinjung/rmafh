@@ -33,19 +33,19 @@ class TestSOTRewardAmounts:
 
 
 class TestSOTExpiryHours:
-    """Verify expiry hours match expected values."""
+    """Verify expiry hours match expected values (all 120 hours / 5 days)."""
     
     def test_gold_expiry(self):
-        assert VAULT_EXPIRY_HOURS["GOLD"] == 72
+        assert VAULT_EXPIRY_HOURS["GOLD"] == 120  # 5 days
     
     def test_platinum_expiry(self):
-        assert VAULT_EXPIRY_HOURS["PLATINUM"] == 72
+        assert VAULT_EXPIRY_HOURS["PLATINUM"] == 120  # 5 days
     
     def test_diamond_expiry(self):
         assert VAULT_EXPIRY_HOURS["DIAMOND"] == 120  # 5 days
     
     def test_default_expiry(self):
-        assert DEFAULT_EXPIRY_HOURS == 72
+        assert DEFAULT_EXPIRY_HOURS == 120  # 5 days
 
 
 class TestSOTUnlockThresholds:
