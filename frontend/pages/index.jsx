@@ -85,16 +85,31 @@ export default function Home() {
             <p style={styles.address} className="cc-address">평생주소 : 씨씨주소.COM</p>
           </div>
 
+          {/* User Info (New Position) */}
+          <div className="flex items-center justify-between mb-2">
+            {userNickname && (
+              <span className="text-sm font-bold text-white tracking-wide">
+                {userNickname} <span className="text-[#394508] font-normal text-xs ml-1 bg-[#D2FD9C] px-1.5 rounded-sm">Player</span>
+              </span>
+            )}
+            <button
+              onClick={handleLogout}
+              className="text-[11px] text-[#ff5555] border border-[#ff5555]/30 hover:bg-[#ff5555]/10 px-2 py-1 rounded transition-colors"
+            >
+              로그아웃
+            </button>
+          </div>
+
           {/* CTA Buttons (Square & Stylish) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', width: '100%', marginTop: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', width: '100%' }}>
             {/* CC Casino CTA */}
             <a
               href="https://ccc-001.com"
               target="_blank"
               rel="noreferrer"
-              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] hover:border-[#D2FD9C] transition-all duration-300 overflow-hidden"
+              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] transition-all duration-300 overflow-hidden hover:border-[#D2FD9C]/50"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}
                 className="mb-3 text-3xl"
@@ -107,9 +122,6 @@ export default function Home() {
               <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
                 Go to Game
               </span>
-              {/* Corner Accent */}
-              <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
             </a>
 
             {/* Telegram CTA */}
@@ -117,9 +129,9 @@ export default function Home() {
               href="https://t.me/+IE0NYpuze_k1YWZk"
               target="_blank"
               rel="noreferrer"
-              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] hover:border-[#D2FD9C] transition-all duration-300 overflow-hidden"
+              className="group relative flex flex-col items-center justify-center aspect-square bg-[#051a10] border border-[#0f3d24] transition-all duration-300 overflow-hidden hover:border-[#D2FD9C]/50"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <motion.div
                 whileHover={{ scale: 1.1, y: -2 }}
                 className="mb-3 text-3xl"
@@ -132,35 +144,7 @@ export default function Home() {
               <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
                 Channel
               </span>
-              {/* Corner Accent */}
-              <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-[#D2FD9C]/30 group-hover:w-full group-hover:h-full group-hover:opacity-10 transition-all duration-500 opacity-0" />
             </a>
-          </div>
-
-          {/* User Info & Logout */}
-          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[#D2FD9C]/20 to-transparent mb-2" />
-            <div className="flex items-center justify-between px-2">
-              {userNickname && (
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-[#D2FD9C]/60 uppercase tracking-widest">Player</span>
-                  <span className="text-sm text-white font-medium">{userNickname}</span>
-                </div>
-              )}
-              <button
-                onClick={handleLogout}
-                className="text-[11px] text-[#ff5555] hover:text-[#ff8888] border border-[#ff5555]/30 hover:border-[#ff5555] px-3 py-1 rounded-sm transition-all uppercase tracking-wider"
-              >
-                Logout
-              </button>
-            </div>
-            <Link
-              href="/guide"
-              className="w-full text-center py-3 border border-[#D2FD9C]/20 hover:border-[#D2FD9C]/60 bg-[#D2FD9C]/5 hover:bg-[#D2FD9C]/10 text-[#D2FD9C] text-xs font-bold tracking-widest transition-all uppercase"
-            >
-              Vault Guide Book
-            </Link>
           </div>
         </aside>
 

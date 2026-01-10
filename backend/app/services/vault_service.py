@@ -122,22 +122,22 @@ def compute_platinum_status(
 ) -> str:
     """Compute platinum status based on conditions.
     
-    Rules:
+    Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
-    - If attendance >= 3 AND total >= PLATINUM_UNLOCK threshold AND count >= 3 AND review_ok AND missions done, status is UNLOCKED
-    - Otherwise, keep current status
+    - Platinum UNLOCK: 골드해금 필수 + 미션1(누적입금 20만원) + 미션2(입금 3회) 완료
+    - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if (
-        attendance_days >= 3
-        and deposit_total >= PLATINUM_UNLOCK["deposit_total"]
-        and deposit_count >= PLATINUM_UNLOCK["deposit_count"]
-        and review_ok
-        and m1
-        and m2
-    ):
+    
+    # 선행 조건: 골드 해금 필수
+    if gold_status != "CLAIMED":
+        return current_status
+    
+    # 미션 토글이 모두 ON이면 UNLOCKED
+    if m1 and m2:
         return "UNLOCKED"
+    
     return current_status
 
 
@@ -149,22 +149,24 @@ def compute_diamond_status(
     platinum_status: str,
     current_status: str
 ) -> str:
-    """Compute diamond status based on total charge and attendance.
+    """Compute diamond status based on conditions.
     
-    Rules:
+    Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
-    - If platinum_status is CLAIMED and deposit_total >= DIAMOND_UNLOCK threshold and missions done, status is UNLOCKED
-    - Otherwise, keep current status
+    - Diamond UNLOCK: 플래티넘해금 필수 + 미션1(누적충전 200만원) + 미션2(CC출석 2회) 완료
+    - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
-    if (
-        platinum_status == "CLAIMED"
-        and deposit_total >= DIAMOND_UNLOCK["deposit_total"]
-        and m1
-        and m2
-    ):
+    
+    # 선행 조건: 플래티넘 해금 필수
+    if platinum_status != "CLAIMED":
+        return current_status
+    
+    # 미션 토글이 모두 ON이면 UNLOCKED
+    if m1 and m2:
         return "UNLOCKED"
+    
     return current_status
 
 

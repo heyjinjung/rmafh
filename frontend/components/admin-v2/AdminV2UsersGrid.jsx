@@ -52,7 +52,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [sortBy, setSortBy] = useState('expires_at');
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState(30);
   const [selectedRow, setSelectedRow] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [panelMode, setPanelMode] = useState('none'); // none | edit | create
@@ -608,7 +608,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
         <div className="flex items-center gap-2">
           <button
             type="button"
-            className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
+            className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 disabled:opacity-50"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
           >
@@ -617,12 +617,23 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
           <span>{page}페이지 · 총 {total.toLocaleString()}건</span>
           <button
             type="button"
-            className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
+            className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 disabled:opacity-50"
             onClick={() => setPage((p) => p + 1)}
             disabled={loading || page * pageSize >= total}
           >
             다음
           </button>
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
+            className="rounded border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-2 py-1 text-[var(--v2-text)] focus:outline-none focus:border-[var(--v2-accent)]/40"
+          >
+            <option value={10}>10개</option>
+            <option value={20}>20개</option>
+            <option value={30}>30개</option>
+            <option value={50}>50개</option>
+            <option value={100}>100개</option>
+          </select>
           <button
             type="button"
             className="rounded border border-[var(--v2-border)] px-3 py-1 text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40"
