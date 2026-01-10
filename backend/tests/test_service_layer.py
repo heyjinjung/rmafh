@@ -111,27 +111,30 @@ class TestVaultServiceComputeStatus:
         assert result == "EXPIRED"
     
     # Platinum status - compute_platinum_status(deposit_total, deposit_count, attendance_days, review_ok, m1, m2, gold_status, current_status)
-    def test_platinum_unlocked_when_conditions_met(self):
+    # 어드민 미션 토글은 선행 조건 없이 m1+m2만으로 UNLOCKED됨
+    def test_platinum_unlocked_when_missions_done(self):
+        """어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)"""
+        result = compute_platinum_status(
+            deposit_total=0,  # 선행 조건 무관
+            deposit_count=0,
+            attendance_days=0,
+            review_ok=False,
+            m1=True,
+            m2=True,
+            gold_status="LOCKED",  # 골드 상태 무관
+            current_status="LOCKED",
+        )
+        assert result == "UNLOCKED"
+    
+    def test_platinum_locked_when_missions_not_done(self):
+        """미션 미완료시 LOCKED 유지"""
         result = compute_platinum_status(
             deposit_total=200_000,
             deposit_count=3,
             attendance_days=3,
             review_ok=True,
             m1=True,
-            m2=True,
-            gold_status="CLAIMED",
-            current_status="LOCKED",
-        )
-        assert result == "UNLOCKED"
-    
-    def test_platinum_locked_when_deposit_insufficient(self):
-        result = compute_platinum_status(
-            deposit_total=100_000,
-            deposit_count=3,
-            attendance_days=3,
-            review_ok=True,
-            m1=True,
-            m2=True,
+            m2=False,  # 미션2 미완료
             gold_status="CLAIMED",
             current_status="LOCKED",
         )
@@ -151,23 +154,26 @@ class TestVaultServiceComputeStatus:
         assert result == "CLAIMED"
     
     # Diamond status - compute_diamond_status(deposit_total, attendance_days, m1, m2, platinum_status, current_status)
-    def test_diamond_unlocked_when_deposit_sufficient(self):
+    # 어드민 미션 토글은 선행 조건 없이 m1+m2만으로 UNLOCKED됨
+    def test_diamond_unlocked_when_missions_done(self):
+        """어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)"""
         result = compute_diamond_status(
-            deposit_total=2_000_000,
-            attendance_days=2,
+            deposit_total=0,  # 선행 조건 무관
+            attendance_days=0,
             m1=True,
             m2=True,
-            platinum_status="CLAIMED",
+            platinum_status="LOCKED",  # 플래티넘 상태 무관
             current_status="LOCKED",
         )
         assert result == "UNLOCKED"
     
-    def test_diamond_locked_when_deposit_insufficient(self):
+    def test_diamond_locked_when_missions_not_done(self):
+        """미션 미완료시 LOCKED 유지"""
         result = compute_diamond_status(
-            deposit_total=1_000_000,
+            deposit_total=2_000_000,
             attendance_days=2,
             m1=True,
-            m2=True,
+            m2=False,  # 미션2 미완료
             platinum_status="CLAIMED",
             current_status="LOCKED",
         )

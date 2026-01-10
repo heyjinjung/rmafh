@@ -648,7 +648,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
       </div>
 
       <div className="mt-4 rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)]/60">
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px] h-[600px]">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px] h-[800px]">
           <div
             className="relative overflow-auto"
             role="presentation"

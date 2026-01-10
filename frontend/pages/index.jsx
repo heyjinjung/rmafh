@@ -77,7 +77,7 @@ export default function Home() {
 
           {/* Header */}
           <div style={styles.header}>
-            <h1 style={styles.title} className="title cc-title">
+            <h1 style={styles.title} className="title cc-title break-keep">
               <span style={{ color: '#D2FD9C' }}>씨씨카지노</span>
               <br />
               <span style={{ color: '#FFFFFF' }}>신규회원 전용금고</span>
@@ -116,8 +116,8 @@ export default function Home() {
               >
                 🎰
               </motion.div>
-              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors">
-                CASINO
+              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors break-keep text-center leading-tight">
+                씨씨카지노
               </span>
               <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
                 Go to Game
@@ -138,8 +138,8 @@ export default function Home() {
               >
                 📢
               </motion.div>
-              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors">
-                NOTICE
+              <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors break-keep text-center leading-tight">
+                씨씨공식<br />텔레채널
               </span>
               <span className="relative z-10 text-[#ffffff]/40 text-[10px] mt-1 group-hover:text-[#ffffff]/80 transition-colors uppercase tracking-[0.2em]">
                 Channel
@@ -432,19 +432,19 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
       case 'gold':
         return {
           bgActive: 'bg-gradient-to-b from-[#394508] to-[#212b01]',
-          bgHeader: 'bg-gradient-to-b from-[#212b01] to-[#161c01]',
-          bgInactive: 'bg-[#161c01]',
-          border: 'border-[#D2FD9C]',
+          bgHeader: 'bg-[#1a1400]', // Distinct Gold Tint
+          bgInactive: 'bg-[#1a1400]',
+          border: 'border-transparent',
           textPrimary: 'text-[#D2FD9C]',
           textSecondary: 'text-[#D2FD9C]/80',
           iconColor: '#D2FD9C',
-          iconGlow: '0 0 20px rgba(210, 253, 156, 0.6)',
+          iconGlow: 'none',
           buttonBg: 'bg-gradient-to-r from-[#394508] to-[#4A5A0A]',
           buttonHover: 'hover:from-[#4A5A0A] hover:to-[#5A6A1A]',
           buttonDisabled: 'bg-[#282D1A]/50',
           gradientFrom: 'from-[#394508]',
           gradientTo: 'to-[#D2FD9C]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-[#D2FD9C]/10 before:to-transparent',
+          shimmer: 'before:hidden',
           progressBg: 'bg-gradient-to-r from-[#D2FD9C]/80 to-[#394508]',
         };
       case 'platinum':

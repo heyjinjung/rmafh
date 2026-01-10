@@ -124,17 +124,13 @@ def compute_platinum_status(
     
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
-    - Platinum UNLOCK: 골드해금 필수 + 미션1(누적입금 20만원) + 미션2(입금 3회) 완료
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
+    - 선행 조건(골드 CLAIMED)은 어드민 강제 토글이므로 체크 안 함
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
     
-    # 선행 조건: 골드 해금 필수
-    if gold_status != "CLAIMED":
-        return current_status
-    
-    # 미션 토글이 모두 ON이면 UNLOCKED
+    # 미션 토글이 모두 ON이면 UNLOCKED (어드민 강제 토글)
     if m1 and m2:
         return "UNLOCKED"
     
@@ -153,17 +149,13 @@ def compute_diamond_status(
     
     Rules (SOT SEQUENCE_STATE_VAULT_V2.md):
     - If current status is CLAIMED or EXPIRED, don't change
-    - Diamond UNLOCK: 플래티넘해금 필수 + 미션1(누적충전 200만원) + 미션2(CC출석 2회) 완료
     - 어드민 미션 토글은 조건 충족을 수동 확인한 것이므로 m1+m2=true면 UNLOCKED
+    - 선행 조건(플래티넘 CLAIMED)은 어드민 강제 토글이므로 체크 안 함
     """
     if current_status in {"CLAIMED", "EXPIRED"}:
         return current_status
     
-    # 선행 조건: 플래티넘 해금 필수
-    if platinum_status != "CLAIMED":
-        return current_status
-    
-    # 미션 토글이 모두 ON이면 UNLOCKED
+    # 미션 토글이 모두 ON이면 UNLOCKED (어드민 강제 토글)
     if m1 and m2:
         return "UNLOCKED"
     
