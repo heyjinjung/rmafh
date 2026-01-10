@@ -48,19 +48,8 @@ def get_or_create_vault_row(cur, user_id: int, now: datetime) -> Tuple | None:
     if row:
         return row
 
-    # Try to get joined_date from snapshot to set initial expiry
-    cur.execute("SELECT joined_date FROM user_admin_snapshot WHERE user_id=%s", (user_id,))
-    snap_row = cur.fetchone()
-    joined_date = snap_row[0] if snap_row else None
-
-    if joined_date:
-        # If we have a joined_date, expiry is 120h (5 days) from that date
-        # Note: joined_date is a date object, we treat it as the start of that day in UTC
-        from datetime import time, timezone
-        base_time = datetime.combine(joined_date, time.min).replace(tzinfo=timezone.utc)
-        expires_at = base_time + timedelta(hours=DEFAULT_EXPIRY_HOURS)
-    else:
-        expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
+    # SOT: Expiry is always 120h (5 days) from creation, ignoring joined_date
+    expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
 
     cur.execute(
         """

@@ -83,9 +83,8 @@ export const VAULT_COLORS = {
 
 /**
  * 골드 금고 미션 생성
- * - g1: telegram_ok에서 자동 (CSV -> gold_mission_1_done)
- * - g2/g3: 어드민 토글 (UI 표시용)
- * - 골드 해금은 telegram_ok만 충족하면 UNLOCKED
+ * - g1/g2/g3: 어드민 토글
+ * - 골드 해금: 3개 미션 모두 완료 시 UNLOCKED
  * @param {Object} api - API 응답 데이터
  */
 export function createGoldMissions(api) {
@@ -94,29 +93,29 @@ export function createGoldMissions(api) {
       id: 'g1',
       label: 'CC카지노 공식채널 입장',
       hint: '각종 이벤트 및 보너스 드랍 진행',
-      isDone: Boolean(api.gold_mission_1_done ?? api.telegram_ok),  // CSV에서 자동
-      source: 'csv',
+      isDone: Boolean(api.gold_mission_1_done),
+      source: 'admin',
     },
     {
       id: 'g2',
       label: '담당실장 공식채널 입장',
       hint: '본사혜택 외 추가 이벤트 진행',
-      isDone: Boolean(api.gold_mission_2_done),  // 어드민 토글 (UI 표시용)
+      isDone: Boolean(api.gold_mission_2_done),
       source: 'admin',
     },
     {
       id: 'g3',
       label: '간편 본인확인',
       hint: '담당실장에게 본인 확인',
-      isDone: Boolean(api.gold_mission_3_done),  // 어드민 토글 (UI 표시용)
+      isDone: Boolean(api.gold_mission_3_done),
       source: 'admin',
     },
   ];
 }
 
-// 골드 해금 조건: telegram_ok만 충족하면 해금
+// 골드 해금 조건: 3개 미션 모두 완료
 export function checkGoldUnlock(api) {
-  return Boolean(api.telegram_ok);
+  return Boolean(api.gold_mission_1_done) && Boolean(api.gold_mission_2_done) && Boolean(api.gold_mission_3_done);
 }
 
 /**

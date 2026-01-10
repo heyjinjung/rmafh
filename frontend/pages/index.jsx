@@ -229,8 +229,11 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
   const apiFetch = useCallback(async (path, options = {}) => {
     const res = await fetch(path, {
+      cache: 'no-store', // Force no cache for sync
       headers: {
         'Content-Type': 'application/json',
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         ...(options.headers || {}),
       },
       ...options,

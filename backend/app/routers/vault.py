@@ -91,14 +91,14 @@ async def user_login(body: UserLoginRequest):
 
         now = now_utc()
         expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
-        initial_gold_status = "UNLOCKED" if telegram_ok else "LOCKED"
+        # 초기 상태는 모두 LOCKED - 미션 토글로만 상태 변경
         cur.execute(
             """
             INSERT INTO vault_status (user_id, expires_at, gold_status, platinum_status, diamond_status)
-            VALUES (%s, %s, %s, 'LOCKED', 'LOCKED')
+            VALUES (%s, %s, 'LOCKED', 'LOCKED', 'LOCKED')
             ON CONFLICT (user_id) DO NOTHING
             """,
-            (user_id, expires_at, initial_gold_status),
+            (user_id, expires_at),
         )
 
         conn.commit()
@@ -111,8 +111,17 @@ async def user_login(body: UserLoginRequest):
 
 
 @router.get("/status")
-async def vault_status(user_id: int | None = None, external_user_id: str | None = None):
+async def vault_status(
+    response: Response,
+    user_id: int | None = None, 
+    external_user_id: str | None = None
+):
     """Return vault status snapshot for the given user."""
+    # Prevent caching to ensure admin updates are seen immediately
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
     now = now_utc()
     with db.get_conn() as conn:
         cur = conn.cursor()
@@ -134,7 +143,10 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
                    vs.platinum_mission_1_done,
                    vs.platinum_mission_2_done,
                    vs.diamond_mission_1_done,
-                   vs.diamond_mission_2_done
+                   vs.diamond_mission_2_done,
+                   vs.gold_mission_1_done,
+                   vs.gold_mission_2_done,
+                   vs.gold_mission_3_done
               FROM vault_status vs
               LEFT JOIN user_admin_snapshot uas ON vs.user_id = uas.user_id
              WHERE vs.user_id=%s
@@ -169,6 +181,9 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
     platinum_mission_2_done = bool(row[9]) if row and row[9] is not None else False
     diamond_mission_1_done = bool(row[10]) if row and row[10] is not None else False
     diamond_mission_2_done = bool(row[11]) if row and row[11] is not None else False
+    gold_mission_1_done = bool(row[12]) if row and row[12] is not None else False
+    gold_mission_2_done = bool(row[13]) if row and row[13] is not None else False
+    gold_mission_3_done = bool(row[14]) if row and row[14] is not None else False
 
     telegram_ok = review_row["telegram_ok"] if review_row else False
     platinum_review_done = review_row["review_ok"] if review_row else False
@@ -194,6 +209,9 @@ async def vault_status(user_id: int | None = None, external_user_id: str | None 
         "platinum_review_done": platinum_review_done,
         "telegram_ok": telegram_ok,
         "diamond_deposit_current": diamond_deposit_current,
+        "gold_mission_1_done": gold_mission_1_done,
+        "gold_mission_2_done": gold_mission_2_done,
+        "gold_mission_3_done": gold_mission_3_done,
         "platinum_mission_1_done": platinum_mission_1_done,
         "platinum_mission_2_done": platinum_mission_2_done,
         "diamond_mission_1_done": diamond_mission_1_done,
