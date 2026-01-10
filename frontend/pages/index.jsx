@@ -467,21 +467,21 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
         };
       case 'diamond':
         return {
-          bgActive: 'bg-gradient-to-b from-[#0A7C65] to-[#065446]',
-          bgHeader: 'bg-gradient-to-b from-[#065446] to-[#032C26]',
-          bgInactive: 'bg-[#032C26]',
-          border: 'border-[#0AA787]',
-          textPrimary: 'text-[#0AA787]',
-          textSecondary: 'text-[#0AA787]/80',
-          iconColor: '#0AA787',
-          iconGlow: '0 0 20px rgba(10, 167, 135, 0.6)',
-          buttonBg: 'bg-gradient-to-r from-[#0A7C65] to-[#0AA787]',
-          buttonHover: 'hover:from-[#0AA787] hover:to-[#0CC39F]',
-          buttonDisabled: 'bg-[#032C26]/50',
-          gradientFrom: 'from-[#0A7C65]',
-          gradientTo: 'to-[#0AA787]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-[#0AA787]/10 before:to-transparent',
-          progressBg: 'bg-gradient-to-r from-[#0AA787]/80 to-[#0A7C65]',
+          bgActive: 'bg-gradient-to-b from-[#008F8F] to-[#006666]',
+          bgHeader: 'bg-gradient-to-b from-[#006666] to-[#003333]',
+          bgInactive: 'bg-[#003333]',
+          border: 'border-transparent', // Clean: No border
+          textPrimary: 'text-[#00E0FF]',
+          textSecondary: 'text-[#00E0FF]/80',
+          iconColor: '#00E0FF',
+          iconGlow: 'none', // Clean: No glow
+          buttonBg: 'bg-gradient-to-r from-[#008F8F] to-[#00E0FF]',
+          buttonHover: 'hover:from-[#00E0FF] hover:to-[#33Eaff]',
+          buttonDisabled: 'bg-[#003333]/50',
+          gradientFrom: 'from-[#008F8F]',
+          gradientTo: 'to-[#00E0FF]/30',
+          shimmer: 'before:hidden', // Clean: No shimmer
+          progressBg: 'bg-gradient-to-r from-[#00E0FF]/80 to-[#008F8F]',
         };
       default:
         return {
@@ -569,20 +569,16 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
             <svg width="72" height="72" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
                 <linearGradient id="diamondGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#0AA787" />
-                  <stop offset="100%" stopColor="#0DD8AC" />
+                  <stop offset="0%" stopColor="#00E0FF" />
+                  <stop offset="100%" stopColor="#33EAFF" />
                 </linearGradient>
-                <filter id="diamondGlow">
-                  <feGaussianBlur stdDeviation="1.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
               </defs>
-              <rect x="8" y="16" width="48" height="36" rx="4" stroke="url(#diamondGradient)" strokeWidth="2" filter="url(#diamondGlow)" />
-              <circle cx="32" cy="34" r="8" stroke="url(#diamondGradient)" strokeWidth="2" filter="url(#diamondGlow)" />
-              <path d="M28 12H36V20H28V12Z" stroke="url(#diamondGradient)" strokeWidth="2" filter="url(#diamondGlow)" />
-              <path d="M32 34V38" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" filter="url(#diamondGlow)" />
-              <path d="M26 28L32 34L38 28" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#diamondGlow)" />
-              <path d="M24 34L32 42L40 34L32 26L24 34Z" stroke="url(#diamondGradient)" strokeWidth="2" filter="url(#diamondGlow)" />
+              <rect x="8" y="16" width="48" height="36" rx="4" stroke="url(#diamondGradient)" strokeWidth="2" />
+              <circle cx="32" cy="34" r="8" stroke="url(#diamondGradient)" strokeWidth="2" />
+              <path d="M28 12H36V20H28V12Z" stroke="url(#diamondGradient)" strokeWidth="2" />
+              <path d="M32 34V38" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" />
+              <path d="M26 28L32 34L38 28" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M24 34L32 42L40 34L32 26L24 34Z" stroke="url(#diamondGradient)" strokeWidth="2" />
             </svg>
           </div>
         );
@@ -601,7 +597,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     <div
       className="min-h-full text-white p-4 md:p-6 lg:p-8"
       style={{
-        backgroundImage: 'radial-gradient(circle at center, #0A0A0A 0%, #050505 70%, #030303 100%)',
+        backgroundColor: '#020b07', // Clean Flat Deep Green
         backgroundAttachment: 'fixed',
       }}
     >
@@ -726,15 +722,12 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           return (
             <motion.div
               key={vault.id}
-              className={`relative overflow-hidden rounded-2xl ${isSelected ? `border-2 ${colorScheme.border}` : 'border border-gray-800'
-                } bg-black/80 transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.5)]`}
+              className={`relative overflow-hidden rounded-2xl border-transparent bg-white/[0.03] transition-all duration-300 h-full flex flex-col backdrop-blur-sm`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 * index, duration: 0.5 }}
               whileHover={{
-                boxShadow: `0 14px 40px rgba(0,0,0,0.7), 0 0 20px rgba(255,255,255,0.06)`,
                 y: -5 * animationIntensity,
-                borderColor: colorScheme.iconColor,
                 transition: { duration: 0.3 },
               }}
               onClick={() => handleVaultSelect(vault.id)}
