@@ -122,9 +122,95 @@ const diamondProgress = Math.floor((diamondMissions.filter(m => m.isDone).length
 
 ---
 
+### 6. 미션 토글 되돌리기 기능 구현
+
+**문제**: 
+1. 어드민이 미션 토글을 OFF로 변경해도 UNLOCKED 상태가 LOCKED로 되돌아가지 않음
+2. 오수령된 CLAIMED 상태 복구 방법 없음
+
+**원인**: `vault_service.py`의 `compute_*_status` 함수들이 UNLOCKED/CLAIMED 상태면 `return current_status`로 상태 유지
+
+**해결**: `vault_service.py` 수정 (3개 함수)
+
+```python
+# Before: CLAIMED, EXPIRED 둘 다 보호
+if current_status in {"CLAIMED", "EXPIRED"}:
+    return current_status
+
+# After: EXPIRED만 보호 (CLAIMED 되돌리기 허용)
+if current_status == "EXPIRED":
+    return current_status
+
+# 미션 조건에 따라 동적 계산
+return "UNLOCKED" if (m1 and m2) else "LOCKED"
+```
+
+**변경된 로직**:
+| 현재 상태 | 미션 조건 | 결과 |
+|----------|----------|------|
+| LOCKED | ✅ + ✅ | UNLOCKED |
+| UNLOCKED | ❌ | LOCKED (되돌리기) |
+| CLAIMED | ✅ + ✅ | UNLOCKED (오수령 복구) |
+| CLAIMED | ❌ | LOCKED (오수령 복구) |
+| EXPIRED | any | EXPIRED (변경 불가) |
+
+**테스트 수정**: `test_service_layer.py`
+- `test_gold_status_claimed_not_changed` → `test_gold_status_claimed_can_be_reverted`
+- `test_platinum_claimed_not_changed` → `test_platinum_claimed_can_be_reverted`
+- `test_diamond_claimed_not_changed` → `test_diamond_claimed_can_be_reverted`
+
+**검증**: 미션 토글 테스트 13개 통과
+
+---
+
+## 📁 수정된 파일 목록
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `backend/app/routers/vault.py` | 72시간 → DEFAULT_EXPIRY_HOURS (2곳) |
+| `backend/app/routers/admin_users.py` | 72시간 → DEFAULT_EXPIRY_HOURS + import |
+| `backend/tests/conftest.py` | vault → vault_test DB 분리 |
+| `frontend/lib/vaultConfig.js` | 상태 매핑, 선행조건, 진행률 로직 수정 |
+| `frontend/pages/index.jsx` | getVaultIcon → VaultIcon 컴포넌트 |
+| `backend/app/services/vault_service.py` | CLAIMED 되돌리기 허용 (3개 함수) |
+| `backend/tests/test_service_layer.py` | CLAIMED 되돌리기 테스트 수정 (3개) |
+
+---
+
+## ✅ 테스트 결과
+
+- **전체 테스트**: 109개 통과, 6개 스킵
+- **SOT 일관성 테스트**: 13개 통과
+- **미션 토글 테스트**: 13개 통과 ✅
+
+---
+
+## 📋 현재 상태
+
+### 백엔드 SOT (`vault_config.py`)
+- `DEFAULT_EXPIRY_HOURS = 120` (5일)
+- `VAULT_EXPIRY_HOURS = {GOLD: 120, PLATINUM: 120, DIAMOND: 120}`
+
+### 프론트엔드 SOT (`vaultConfig.js`)
+- `DEFAULT_EXPIRY_HOURS = 120`
+- 상태 매핑: UNLOCKED → 'available', CLAIMED → 'opened'
+
+### 미션 토글 되돌리기 규칙
+- **EXPIRED**: 변경 불가 (기간 만료)
+- **CLAIMED**: 미션 토글로 되돌리기 가능 (오수령 복구)
+- **UNLOCKED/LOCKED**: 미션 토글로 자유롭게 전환
+
+### DB 구조
+- `vault`: 실제 개발/프로덕션 데이터
+- `vault_test`: 테스트 전용 (매 실행 초기화)
+
+---
+
 ## 🔜 다음 단계
 
 1. ~~선행조건 로직 수정~~ ✅ 완료
 2. ~~진행률 미션 기반 계산~~ ✅ 완료
-3. 전체 통합 테스트
-4. 프로덕션 배포 준비
+3. ~~미션 토글 되돌리기 기능~~ ✅ 완료
+4. 어드민 페이지에서 CLAIMED 유저 복구 테스트
+5. 전체 통합 테스트
+6. 프로덕션 배포 준비

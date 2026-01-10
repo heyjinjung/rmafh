@@ -710,7 +710,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
               <div className={`${colorScheme.bgHeader} p-4 pb-6 flex flex-col items-center relative overflow-hidden`}>
                 {/* Subtle Background Logo - Enlarged & Lower Opacity */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.1]">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.05]">
                   <div className="relative w-[206px] h-[206px]">
                     <Image
                       src={ICON_LOGO}
@@ -736,10 +736,10 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                 </div>
 
                 {/* Icon & Status Group - Stacked for impact */}
-                <div className="mb-6 flex flex-col items-center justify-center gap-3 relative z-10 w-full h-[140px]">
+                <div className="mb-6 flex flex-col items-center justify-center gap-3 relative z-10 w-full min-h-[160px]">
                   {/* Icon with CSS Animation */}
                   <div className="animate-float">
-                    <VaultIcon tier={vault.tier} colorScheme={colorScheme} size="96px" />
+                    <VaultIcon tier={vault.tier} colorScheme={colorScheme} size="114px" />
                   </div>
 
                   {/* Status Badge */}
