@@ -4,6 +4,7 @@ def _idem_headers(prefix: str):
     return {"x-idempotency-key": f"{prefix}-{uuid4()}"}
 
 def test_platinum_missions_unlock_status(client):
+    """어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)"""
     ext_id = f"ext-plat-logic-{uuid4()}"
     create = client.post(
         "/api/vault/admin/users",
@@ -19,12 +20,6 @@ def test_platinum_missions_unlock_status(client):
     )
     assert create.status_code == 200
     user_id = create.json()["user_id"]
-
-    client.post(
-        f"/api/vault/admin/users/{user_id}/vault/attendance",
-        json={"set_days": 3},
-        headers=_idem_headers("att"),
-    )
     
     r1 = client.post(
         f"/api/vault/admin/users/{user_id}/vault/platinum-missions",
@@ -32,9 +27,11 @@ def test_platinum_missions_unlock_status(client):
         headers=_idem_headers("plat-m"),
     )
     assert r1.status_code == 200
-    assert r1.json()["platinum_status"] == "LOCKED"
+    # 어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)
+    assert r1.json()["platinum_status"] == "UNLOCKED"
 
 def test_diamond_missions_unlock_status(client):
+    """어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)"""
     ext_id = f"ext-dia-logic-{uuid4()}"
     create = client.post(
         "/api/vault/admin/users",
@@ -57,4 +54,5 @@ def test_diamond_missions_unlock_status(client):
         headers=_idem_headers("dia-m"),
     )
     assert r1.status_code == 200
-    assert r1.json()["diamond_status"] == "LOCKED"
+    # 어드민 미션 토글: m1+m2 ON이면 UNLOCKED (선행조건 무관)
+    assert r1.json()["diamond_status"] == "UNLOCKED"

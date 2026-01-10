@@ -462,25 +462,25 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           buttonDisabled: 'bg-[#032210]/50',
           gradientFrom: 'from-[#075a28]',
           gradientTo: 'to-[#07AF4D]/30',
-          shimmer: 'before:bg-gradient-to-r before:from-transparent before:via-[#07AF4D]/10 before:to-transparent',
+          shimmer: 'before:hidden',
           progressBg: 'bg-gradient-to-r from-[#07AF4D]/80 to-[#075a28]',
         };
       case 'diamond':
         return {
           bgActive: 'bg-gradient-to-b from-[#008F8F] to-[#006666]',
-          bgHeader: 'bg-gradient-to-b from-[#006666] to-[#003333]',
-          bgInactive: 'bg-[#003333]',
-          border: 'border-transparent', // Clean: No border
+          bgHeader: 'bg-[#00181a]', // Distinct Diamond Tint
+          bgInactive: 'bg-[#00181a]',
+          border: 'border-transparent',
           textPrimary: 'text-[#00E0FF]',
           textSecondary: 'text-[#00E0FF]/80',
           iconColor: '#00E0FF',
-          iconGlow: 'none', // Clean: No glow
+          iconGlow: 'none',
           buttonBg: 'bg-gradient-to-r from-[#008F8F] to-[#00E0FF]',
           buttonHover: 'hover:from-[#00E0FF] hover:to-[#33Eaff]',
           buttonDisabled: 'bg-[#003333]/50',
           gradientFrom: 'from-[#008F8F]',
           gradientTo: 'to-[#00E0FF]/30',
-          shimmer: 'before:hidden', // Clean: No shimmer
+          shimmer: 'before:hidden',
           progressBg: 'bg-gradient-to-r from-[#00E0FF]/80 to-[#008F8F]',
         };
       default:
@@ -722,7 +722,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           return (
             <motion.div
               key={vault.id}
-              className={`relative overflow-hidden rounded-2xl border-transparent bg-white/[0.03] transition-all duration-300 h-full flex flex-col backdrop-blur-sm`}
+              className={`relative overflow-hidden rounded-2xl border-transparent ${colorScheme.bgInactive} transition-all duration-300 h-full flex flex-col backdrop-blur-sm shadow-lg`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 * index, duration: 0.5 }}
