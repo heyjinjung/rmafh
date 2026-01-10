@@ -632,11 +632,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
         >
-          <span className="absolute -right-4 -bottom-4 w-10 h-10 opacity-40">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" stroke="#D2FD9C" strokeWidth="0.5" strokeDasharray="2 2" />
-            </svg>
-          </span>
+          {/* SVG Removed */}
 
           <span className="bg-gradient-to-r from-[#FFE259] via-[#D2FD9C] to-white bg-clip-text text-transparent relative z-10">
             미션 금고 챌린지
