@@ -249,7 +249,13 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
   const [notice, setNotice] = useState('');
   // 골드→플래티넘 해금 직후 토스트 노출 제어
   const [showPlatinumUnlockedToast, setShowPlatinumUnlockedToast] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
   const prevStatusRef = useRef();
+
+  // Define handleVaultSelect manually since it was missing
+  const handleVaultSelect = useCallback((id) => {
+    setSelectedVault(id);
+  }, []);
 
   const [serverClock, setServerClock] = useState({
     fetchedAtMs: 0,
@@ -510,6 +516,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
   const claimVault = useCallback(
     async (tier) => {
+      if (isClaiming) return; // Prevent double/infinite clicks
+      setIsClaiming(true);
       setNotice('');
       setError('');
       try {
@@ -539,9 +547,11 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
         await refreshStatus();
       } catch (e) {
         setError(e?.message || '수령 처리에 실패했습니다.');
+      } finally {
+        setIsClaiming(false);
       }
     },
-    [apiFetch, refreshStatus, basePath]
+    [apiFetch, refreshStatus, basePath, isClaiming]
   );
 
 
