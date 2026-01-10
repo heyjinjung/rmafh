@@ -43,12 +43,17 @@ def db_url():
     - If DATABASE_URL is set, always respect it.
     - If running inside Docker, default to the compose service host `db`.
     - Otherwise (local machine), default to `localhost` (compose publishes 5432).
+    
+    NOTE: Tests use a separate database 'vault_test' to avoid destroying dev data.
     """
     env_url = os.getenv("DATABASE_URL")
     if env_url:
+        # Replace database name with vault_test for isolation
+        if "/vault" in env_url and "/vault_test" not in env_url:
+            env_url = env_url.replace("/vault", "/vault_test")
         return _with_connect_timeout(env_url)
     host = "db" if _running_in_docker() else "localhost"
-    return _with_connect_timeout(f"postgresql://vault:vaultpass@{host}:5432/vault")
+    return _with_connect_timeout(f"postgresql://vault:vaultpass@{host}:5432/vault_test")
 
 
 @pytest.fixture(scope="session")

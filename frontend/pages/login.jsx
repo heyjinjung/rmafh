@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
 
-const ICON_STAR = '/logo.png';
+const ICON_LOGO = '/logo.png';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,7 +15,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    
+
     if (!nickname.trim()) {
       setError('닉네임을 입력해주세요');
       return;
@@ -63,8 +63,14 @@ export default function LoginPage() {
         <div className="w-full max-w-md space-y-8">
           {/* 로고 */}
           <div className="text-center space-y-4">
-            <div className="flex justify-center">
-              <Image src={ICON_STAR} alt="CC Casino" width={64} height={64} className="h-16 w-16" priority />
+            <div className="flex justify-center relative h-16 w-full">
+              <Image
+                src={ICON_LOGO}
+                alt="CC Casino"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
             <div>
               <h1 className="text-3xl font-bold">CC CASINO</h1>

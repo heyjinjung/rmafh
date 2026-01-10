@@ -14,7 +14,7 @@ import {
 import { safeJsonPretty } from '../components/admin/utils';
 
 // Figma Assets (URLs are time-limited by Figma)
-const ICON_STAR = '/logo.png';
+const ICON_LOGO = '/logo.png';
 const ICON_GAME = '/logo.png';
 const ICON_TELEGRAM = '/telegram.png';
 
@@ -494,14 +494,14 @@ export default function AdminPage() {
                       `}
                       >
                         <div className={`text-3xl transition-all ${activeSection === 'users'
-                            ? 'scale-110'
-                            : ''
+                          ? 'scale-110'
+                          : ''
                           }`}>
                           ⭐
                         </div>
                         <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${activeSection === 'users'
-                            ? 'text-gold-primary'
-                            : 'text-gold-primary/80'
+                          ? 'text-gold-primary'
+                          : 'text-gold-primary/80'
                           }`}>
                           전체<br />회원
                         </div>
@@ -526,14 +526,14 @@ export default function AdminPage() {
                       `}
                       >
                         <div className={`text-3xl transition-all ${activeSection === 'csv'
-                            ? 'scale-110'
-                            : ''
+                          ? 'scale-110'
+                          : ''
                           }`}>
                           📊
                         </div>
                         <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${activeSection === 'csv'
-                            ? 'text-gold-primary'
-                            : 'text-gold-primary/80'
+                          ? 'text-gold-primary'
+                          : 'text-gold-primary/80'
                           }`}>
                           일일<br />업로드
                         </div>
@@ -558,14 +558,14 @@ export default function AdminPage() {
                       `}
                       >
                         <div className={`text-3xl transition-all ${activeSection === 'extend'
-                            ? 'scale-110'
-                            : ''
+                          ? 'scale-110'
+                          : ''
                           }`}>
                           ⏰
                         </div>
                         <div className={`font-semibold text-[11px] text-center transition-colors leading-tight ${activeSection === 'extend'
-                            ? 'text-gold-primary'
-                            : 'text-gold-primary/80'
+                          ? 'text-gold-primary'
+                          : 'text-gold-primary/80'
                           }`}>
                           만료<br />연장
                         </div>

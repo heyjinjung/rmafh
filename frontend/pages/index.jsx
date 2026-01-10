@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { VAULT_REWARDS, VAULT_EXPIRY_HOURS, DIAMOND_UNLOCK, createVaultsFromApi } from '../lib/vaultConfig';
 
 /* ─── Figma Assets ─── */
-const ICON_STAR = '/logo.png';
+const ICON_LOGO = '/logo.png';
 const ICON_GAME = '/logo.png';
 const ICON_TELEGRAM = '/telegram.png';
 
@@ -70,7 +70,15 @@ export default function Home() {
           {/* Nav */}
           <nav style={styles.nav}>
             <div style={styles.logo}>
-              <Image src={ICON_STAR} alt="CC Casino" width={26} height={27} style={styles.logoIcon} priority />
+              <div style={{ position: 'relative', width: '26px', height: '27px', marginRight: '8px' }}>
+                <Image
+                  src={ICON_LOGO}
+                  alt="CC Casino"
+                  fill
+                  style={{ objectFit: 'contain' }}
+                  priority
+                />
+              </div>
               <span style={styles.logoText} className="cc-logoText">CC CASINO</span>
             </div>
           </nav>
@@ -507,87 +515,37 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
     }
   };
 
-  const getVaultIcon = (tier) => {
+  /* ─── Vault Icon ─── */
+  const VaultIcon = ({ tier, colorScheme }) => {
     const iconStyle = {
-      filter: `drop-shadow(${tier === 'gold'
-        ? '0 0 8px rgba(210, 253, 156, 0.5)'
-        : tier === 'platinum'
-          ? '0 0 8px rgba(7, 175, 77, 0.5)'
-          : '0 0 8px rgba(10, 167, 135, 0.5)'
-        })`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '72px',
+      height: '72px',
     };
 
-    switch (tier) {
-      case 'gold':
-        return (
-          <div style={iconStyle}>
-            <svg width="72" height="72" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#FFE259" />
-                  <stop offset="100%" stopColor="#D2FD9C" />
-                </linearGradient>
-                <filter id="goldGlow">
-                  <feGaussianBlur stdDeviation="1.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-              <rect x="8" y="16" width="48" height="36" rx="4" stroke="url(#goldGradient)" strokeWidth="2" filter="url(#goldGlow)" />
-              <circle cx="32" cy="34" r="8" stroke="url(#goldGradient)" strokeWidth="2" filter="url(#goldGlow)" />
-              <path d="M28 12H36V20H28V12Z" stroke="url(#goldGradient)" strokeWidth="2" filter="url(#goldGlow)" />
-              <path d="M32 34V38" stroke="url(#goldGradient)" strokeWidth="2" strokeLinecap="round" filter="url(#goldGlow)" />
-              <path d="M26 28L32 34L38 28" stroke="url(#goldGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#goldGlow)" />
-              <path d="M16 20L16 48" stroke="url(#goldGradient)" strokeWidth="2" filter="url(#goldGlow)" />
-              <path d="M48 20L48 48" stroke="url(#goldGradient)" strokeWidth="2" filter="url(#goldGlow)" />
-            </svg>
-          </div>
-        );
-      case 'platinum':
-        return (
-          <div style={iconStyle}>
-            <svg width="72" height="72" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="platinumGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#07AF4D" />
-                  <stop offset="100%" stopColor="#09DF63" />
-                </linearGradient>
-                <filter id="platinumGlow">
-                  <feGaussianBlur stdDeviation="1.5" result="blur" />
-                  <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-              </defs>
-              <rect x="8" y="16" width="48" height="36" rx="4" stroke="url(#platinumGradient)" strokeWidth="2" filter="url(#platinumGlow)" />
-              <circle cx="32" cy="34" r="8" stroke="url(#platinumGradient)" strokeWidth="2" filter="url(#platinumGlow)" />
-              <path d="M28 12H36V20H28V12Z" stroke="url(#platinumGradient)" strokeWidth="2" filter="url(#platinumGlow)" />
-              <path d="M32 34V38" stroke="url(#platinumGradient)" strokeWidth="2" strokeLinecap="round" filter="url(#platinumGlow)" />
-              <path d="M26 28L32 34L38 28" stroke="url(#platinumGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" filter="url(#platinumGlow)" />
-              <rect x="20" y="22" width="24" height="2" rx="1" fill="url(#platinumGradient)" filter="url(#platinumGlow)" />
-              <rect x="20" y="26" width="24" height="2" rx="1" fill="url(#platinumGradient)" filter="url(#platinumGlow)" />
-            </svg>
-          </div>
-        );
-      case 'diamond':
-        return (
-          <div style={iconStyle}>
-            <svg width="72" height="72" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="diamondGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" stopColor="#00E0FF" />
-                  <stop offset="100%" stopColor="#33EAFF" />
-                </linearGradient>
-              </defs>
-              <rect x="8" y="16" width="48" height="36" rx="4" stroke="url(#diamondGradient)" strokeWidth="2" />
-              <circle cx="32" cy="34" r="8" stroke="url(#diamondGradient)" strokeWidth="2" />
-              <path d="M28 12H36V20H28V12Z" stroke="url(#diamondGradient)" strokeWidth="2" />
-              <path d="M32 34V38" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" />
-              <path d="M26 28L32 34L38 28" stroke="url(#diamondGradient)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M24 34L32 42L40 34L32 26L24 34Z" stroke="url(#diamondGradient)" strokeWidth="2" />
-            </svg>
-          </div>
-        );
-      default:
-        return null;
+    // 3D Asset Paths
+    const assetMap = {
+      gold: '/assets/images/icon_3d_gold.png',
+      platinum: '/assets/images/icon_3d_platinum.png',
+      diamond: '/assets/images/icon_3d_diamond_cyan.png',
+    };
+
+    const imgSrc = assetMap[tier];
+
+    if (imgSrc) {
+      return (
+        <div style={iconStyle}>
+          <img
+            src={imgSrc}
+            alt={`${tier} vault icon`}
+            className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+          />
+        </div>
+      );
     }
+    return null;
   };
 
   const selected = vaults.find((v) => v.id === selectedVault) || vaults[0];
