@@ -120,9 +120,14 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <motion.div
                 whileHover={{ scale: 1.1, rotate: 5 }}
-                className="mb-3 text-3xl"
+                className="mb-3 relative w-10 h-10"
               >
-                🎰
+                <Image
+                  src={ICON_LOGO}
+                  alt="Game"
+                  fill
+                  className="object-contain"
+                />
               </motion.div>
               <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors break-keep text-center leading-tight">
                 씨씨카지노
@@ -142,9 +147,14 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-br from-[#D2FD9C]/0 via-[#D2FD9C]/0 to-[#D2FD9C]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <motion.div
                 whileHover={{ scale: 1.1, y: -2 }}
-                className="mb-3 text-3xl"
+                className="mb-3 relative w-10 h-10"
               >
-                📢
+                <Image
+                  src="/telegram.png"
+                  alt="Telegram"
+                  fill
+                  className="object-contain"
+                />
               </motion.div>
               <span className="relative z-10 text-[#D2FD9C] font-bold text-sm tracking-wide group-hover:text-white transition-colors break-keep text-center leading-tight">
                 씨씨공식<br />텔레채널
@@ -215,12 +225,16 @@ export default function Home() {
           .footer { height: 144px !important; padding: 20px !important; }
         }
         @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
+          0% { transform: translate3d(0, 0, 0); }
+          50% { transform: translate3d(0, -6px, 0); }
+          100% { transform: translate3d(0, 0, 0); }
         }
         .animate-float {
-          animation: float 3s ease-in-out infinite;
+          animation: float 3.5s ease-in-out infinite;
           will-change: transform;
+          backface-visibility: hidden;
+          perspective: 1000px;
+          transform: translate3d(0, 0, 0); /* Force HW acceleration */
         }
       `}</style>
     </>
@@ -710,7 +724,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
               <div className={`${colorScheme.bgHeader} p-4 pb-6 flex flex-col items-center relative overflow-hidden`}>
                 {/* Subtle Background Logo - Enlarged & Lower Opacity */}
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.05]">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.03]">
                   <div className="relative w-[206px] h-[206px]">
                     <Image
                       src={ICON_LOGO}

@@ -38,16 +38,16 @@
 *   **배경**: `backdrop-filter: blur(20px)` 적용. **테두리(Border-right) 제거**.
 *   **레이아웃 구조**:
     1.  **헤더 (Top)**:
-        *   Logo: `26x27px` 아이콘 + "CC CASINO" 텍스트.
-        *   Title: "씨씨카지노 신규회원 전용금고" (`#FFFFFF`, `#D2FD9C` 강조).
+        *   Logo: `26x26px` 아이콘 + "CC CASINO" 텍스트.
+        *   Title: "씨씨카지노 신규회원 전용금고" 사이드바 줄바뀜 한글깨짐 없게 주의할것  (`#FFFFFF`, `#D2FD9C` 강조).
     2.  **유저 정보 (Middle)**:
         *   배치: 헤더 바로 하단.
         *   구성: `[닉네임] Player` (Text-only) + `로그아웃` (Small Button).
         *   스타일: 불필요한 카드 배경 제거, 텍스트 위주 배치.
     3.  **CTA 네비게이션 (Bottom)**:
         *   Grid: `2 Columns` (1:1 비율 정사각형).
-        *   Item 1: **CASINO** (슬롯 아이콘). 배경 `#051a10`. Hover 시 테두리 `#D2FD9C` (50% Opacity).
-        *   Item 2: **NOTICE** (확성기 아이콘). 배경 `#051a10`.
+        *   Item 1: **씨씨카지노** (슬롯 아이콘). 배경 `#051a10`. Hover 시 테두리 `#D2FD9C` (50% Opacity).
+        *   Item 2: **씨씨공식텔레채널** (확성기 아이콘). 배경 `#051a10`. - 한글 줄바꿈 깨짐없게 주의 
         *   Interaction: 호버 시 아이콘 `Scale 1.1` + `Rotate 5deg`. **Glow 효과 제거**.
 
 ### B. 메인 콘텐츠 - 금고 카드 (Vault Cards)
@@ -55,6 +55,8 @@
     *   **Border**: `Transparent` (투명). 등급별 그라디언트 테두리 제거.
     *   **Shadow**: `None` (제거). 외부 발광 효과 삭제.
     *   **Background**: `rgba(0,0,0, 0.8)` (짙은 반투명 검정).
+ㄴ 각 금고별로 통일성은 있지만 각자의 특징이 부각되게 설정값이 달라야함 !! 
+
 *   **아이콘 (Assets)**:
     *   **Gold**: 기존 3D 금괴 유지.
     *   **Platinum**: 기존 3D 플래티넘 유지.
