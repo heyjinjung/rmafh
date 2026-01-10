@@ -263,7 +263,7 @@ async def claim_vault(body: ClaimRequest, user_id: int | None = None, external_u
         row = cur.fetchone()
 
         if not row:
-            expires_at = now + timedelta(hours=72)
+            expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
             cur.execute(
                 """
                 INSERT INTO vault_status
@@ -338,7 +338,7 @@ async def attendance(user_id: int | None = None, external_user_id: str | None = 
         row = cur.fetchone()
 
         if not row:
-            expires_at = now + timedelta(hours=72)
+            expires_at = now + timedelta(hours=DEFAULT_EXPIRY_HOURS)
             cur.execute(
                 """
                 INSERT INTO vault_status

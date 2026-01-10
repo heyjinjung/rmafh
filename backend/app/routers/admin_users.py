@@ -29,6 +29,7 @@ from app.services.common import (
     parse_joined_date,
 )
 from app.services.vault_service import get_or_create_vault_row
+from app.constants.vault_config import DEFAULT_EXPIRY_HOURS
 
 router = APIRouter(prefix="/api/vault/admin/users", tags=["admin-users"])
 
@@ -243,7 +244,7 @@ async def admin_create_user(
                 VALUES (%s, %s, %s, 'LOCKED', 'LOCKED')
                 ON CONFLICT (user_id) DO NOTHING
                 """,
-                (user_id, now + timedelta(hours=72), ("UNLOCKED" if telegram_ok else "LOCKED")),
+                (user_id, now + timedelta(hours=DEFAULT_EXPIRY_HOURS), ("UNLOCKED" if telegram_ok else "LOCKED")),
             )
 
             admin_user = request.client.host if request.client else "unknown"

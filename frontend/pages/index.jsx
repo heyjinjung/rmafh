@@ -873,7 +873,7 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
                       </div>
                       <div>
                         <p className={`text-sm font-medium ${mission.isDone ? 'text-white' : 'text-gray-400'}`}>{mission.label}</p>
-                        {mission.hint && <p className="text-xs text-gray-500 mt-1 italic">{mission.hint}</p>}
+                        {vault.tier === 'gold' && mission.hint && <p className="text-xs text-gray-500 mt-1 italic">{mission.hint}</p>}
                       </div>
                     </motion.div>
                   ))}

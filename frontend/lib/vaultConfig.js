@@ -265,7 +265,7 @@ export function createVaultsFromApi(api) {
 
   const mapApiStatusToUi = (apiStatus) => {
     if (apiStatus === 'CLAIMED') return 'opened';
-    if (apiStatus === 'UNLOCKED') return 'unlocked';
+    if (apiStatus === 'UNLOCKED') return 'available';
     if (apiStatus === 'EXPIRED') return 'expired';
     return 'locked';
   };
