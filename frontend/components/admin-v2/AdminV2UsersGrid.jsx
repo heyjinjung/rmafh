@@ -95,6 +95,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [impactHelpOpen, setImpactHelpOpen] = useState(false);
 
   const apiFetch = useMemo(() => withIdempotency({ adminPassword, basePath }), [adminPassword, basePath]);
 
@@ -857,25 +858,15 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-3">
-                    <p className="text-sm text-[var(--v2-text)]">유저 페이지 금고 카드 표시가 바뀝니다.</p>
-
-                    <div className="text-xs text-[var(--v2-muted)]">
-                      LOCKED=잠금 · UNLOCKED=열기 · CLAIMED=수령 · EXPIRED=만료
-                    </div>
-
-                    <div className="grid gap-2">
-                      {[
-                        { label: '골드', status: goldStatus },
-                        { label: '플래티넘', status: platinumStatus },
-                        { label: '다이아', status: diamondStatus },
-                      ].map((it) => (
-                        <div key={it.label} className="flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2">
-                          <div className="text-sm font-semibold text-[var(--v2-text)]">{it.label} 금고</div>
-                          <div className="text-xs text-[var(--v2-muted)]">{userCardLabel(it.status)}</div>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="flex items-center justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setImpactHelpOpen(true)}
+                      className="rounded-full border border-[var(--v2-border)] bg-[var(--v2-surface)]/70 px-3 py-1 text-xs font-semibold text-[var(--v2-text)] hover:border-[var(--v2-accent)]/40 hover:bg-[var(--v2-surface-2)] transition-colors"
+                      aria-label="금고 카드 표시 도움말"
+                    >
+                      ? 금고 표시 도움말
+                    </button>
                   </div>
 
 
@@ -1021,6 +1012,51 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       </div>
                     </div>
                   </div>
+
+                  {impactHelpOpen ? (
+                    <div
+                      className="fixed inset-0 z-[11000]"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-label="금고 표시 도움말"
+                    >
+                      <button
+                        type="button"
+                        className="absolute inset-0 bg-black/65"
+                        onClick={() => setImpactHelpOpen(false)}
+                        aria-label="닫기"
+                      />
+                      <div className="absolute left-1/2 top-1/2 w-[min(520px,calc(100vw-32px))] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)] shadow-2xl">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--v2-border)]">
+                          <div className="text-sm font-extrabold text-[var(--v2-text)]">금고 카드 표시 도움말</div>
+                          <button
+                            type="button"
+                            onClick={() => setImpactHelpOpen(false)}
+                            className="rounded-lg border border-[var(--v2-border)] bg-transparent px-3 py-1 text-xs text-[var(--v2-muted)] hover:bg-[var(--v2-surface-2)] transition-colors"
+                          >
+                            닫기
+                          </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-3">
+                          <div className="text-sm text-[var(--v2-text)]">상태값에 따라 유저 페이지 금고 카드 표시가 바뀝니다.</div>
+                          <div className="grid gap-2">
+                            {[
+                              ['LOCKED', userCardLabel('LOCKED')],
+                              ['UNLOCKED', userCardLabel('UNLOCKED')],
+                              ['CLAIMED', userCardLabel('CLAIMED')],
+                              ['EXPIRED', userCardLabel('EXPIRED')],
+                            ].map(([k, v]) => (
+                              <div key={k} className="flex items-center justify-between rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-4 py-2">
+                                <div className="font-mono text-xs text-[var(--v2-muted)]">{k}</div>
+                                <div className="text-sm font-semibold text-[var(--v2-text)]">{v}</div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="text-xs text-[var(--v2-muted)]">골드/플래티넘/다이아 모두 동일 규칙을 사용합니다.</div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="sticky bottom-0 pt-4 pb-2 bg-[var(--v2-surface-2)] border-t border-[var(--v2-border)] flex gap-3">
                     <button
