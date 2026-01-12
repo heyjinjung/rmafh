@@ -347,7 +347,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
             {validation.errors.length === 0 ? (
               <div className="mt-2 text-[var(--v2-accent)]">오류가 없습니다. 적용 가능합니다.</div>
-            )}
+            ) : null}
           </div>
         )}
         {/* 실행 버튼 */}
