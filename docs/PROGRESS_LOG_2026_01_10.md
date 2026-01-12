@@ -214,3 +214,61 @@ return "UNLOCKED" if (m1 and m2) else "LOCKED"
 4. 어드민 페이지에서 CLAIMED 유저 복구 테스트
 5. 전체 통합 테스트
 6. 프로덕션 배포 준비
+
+---
+
+# 개발 진행 로그 - 2026-01-12
+
+## 🔥 긴급: 유저페이지 Mixed Content 차단 대응
+
+**증상**: HTTPS 페이지에서 `http://cc-premium.com/api/vault/status?...` 호출 시 Mixed Content로 브라우저가 요청을 차단
+
+**해결(프론트)**: [frontend/pages/index.jsx](../frontend/pages/index.jsx)
+- API 호출 경로가 동일 오리진인데도 절대 URL(특히 `http://`)로 넘어오면, 브라우저에서 **상대경로(`/api/...`)로 정규화**하여 Mixed Content를 근본 차단
+- `?external_user_id=...` 쿼리 앞에 불필요한 슬래시(`/status/?x=y`)가 붙지 않도록 정리 (`/status?x=y`)
+
+**효과**:
+- 페이지가 HTTPS로 로드될 때 동일 오리진 API 요청이 `http://`로 내려가도 최종 fetch는 `/api/...`로 수행되어 차단되지 않음
+
+---
+
+## 🔧 어드민 v2 린트/파서 차단 해제
+
+**증상**: `frontend: lint` 실행 시 [frontend/components/admin-v2/AdminV2ImportsFlow.jsx](../frontend/components/admin-v2/AdminV2ImportsFlow.jsx)에서
+`Parsing error: Unexpected token, expected ":"`
+
+**원인**: JSX에서 삼항 연산자 `condition ? (...)` 형태로만 작성되어 `: ...` 분기가 누락됨
+
+**해결**:
+- `condition ? (...) : null` 형태로 수정하여 파서 에러 제거
+
+---
+
+## 🚀 서버 배포(업데이트/빌드) 메모
+
+서버에서 보통 아래 순서로 당겨오고 재빌드:
+
+```bash
+cd /opt/2026
+git fetch --all --prune
+git checkout main
+git pull
+docker compose up -d --build api web worker
+docker compose ps
+```
+
+---
+
+## ⚠️ 현재 이슈: 502 (Bad Gateway)
+
+**증상**: `https://cc-premium.com/` 및 `/favicon.ico`가 502
+
+**상태**:
+- 컨테이너는 `api(18000->8000)`, `web(3002->3000)` 모두 Up
+
+**다음 확인(운영 점검 체크리스트)**:
+1. `docker compose logs --tail=200 web`
+2. `docker compose logs --tail=200 api`
+3. Nginx upstream 설정(도메인 → `web:3000`/호스트 포트 매핑) 재확인
+4. 호스트에서 `curl -i http://127.0.0.1:3002/` / `curl -i http://127.0.0.1:18000/api/health` 등으로 로컬 헬스체크
+
