@@ -104,6 +104,17 @@ function buildRowsForApi({ header, rows, mapping }) {
   return out;
 }
 
+function validateHeaderColumns(header) {
+  const cleaned = (header || []).map((h) => String(h || '').trim().replace(/^\uFEFF/, '')).filter(Boolean);
+  if (!cleaned.length) return { unknown: [], recognized: [] };
+
+  const allowed = new Set([...requiredFields, ...optionalFields]);
+  const aliasFlat = new Set(Object.values(fieldAliases).flat().map((v) => String(v).trim()));
+  const recognized = cleaned.filter((h) => allowed.has(h) || aliasFlat.has(h));
+  const unknown = cleaned.filter((h) => !allowed.has(h) && !aliasFlat.has(h));
+  return { unknown, recognized };
+}
+
 export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
   const [step, setStep] = useState(1);
   const [fileName, setFileName] = useState('');
@@ -135,32 +146,20 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     return buildRowsForApi({ header: parsed.header, rows: parsed.rows, mapping });
   }, [parsed.header, parsed.rows, mapping]);
 
-  const headerValidation = useMemo(() => {
-    const header = (parsed.header || []).map((h) => String(h || '').trim().replace(/^\uFEFF/, '')).filter(Boolean);
-    if (!header.length) return { ok: true, unknown: [], recognized: [] };
-
-    const allowed = new Set([...requiredFields, ...optionalFields]);
-    const recognized = [];
-    const aliasFlat = new Set(Object.values(fieldAliases).flat().map((v) => String(v).trim()));
-    header.forEach((h) => {
-      const isAllowed = allowed.has(h);
-      const isKnownAlias = aliasFlat.has(h);
-      if (isAllowed || isKnownAlias) recognized.push(h);
-    });
-    const unknown = header.filter((h) => !allowed.has(h) && !aliasFlat.has(h));
-    return { ok: unknown.length === 0, unknown, recognized };
-  }, [parsed.header]);
+  const headerValidation = useMemo(() => validateHeaderColumns(parsed.header), [parsed.header]);
 
   const validation = useMemo(() => {
     const errors = [];
     if (!csvText) errors.push('CSV 파일을 선택해주세요.');
     if (!mapping.external_user_id) errors.push('필수 매핑: external_user_id');
     if (mapping.external_user_id && rowsForApi.length === 0) errors.push('CSV에서 external_user_id를 하나도 찾지 못했어요.');
-    if (headerValidation.unknown.length) {
-      errors.push(`알 수 없는 컬럼이 포함되어 있어요: ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}`);
-    }
     if (rowCount > 10000) errors.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
-    return { errors, warnings: rowCount > 0 && rowCount <= 10000 ? [] : errors.length ? [] : ['경고 없음'] };
+    const warnings = [];
+    if (headerValidation.unknown.length) {
+      warnings.push(`알 수 없는 컬럼(무시됨): ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}`);
+    }
+    if (rowCount > 10000) warnings.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
+    return { errors, warnings };
   }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length, headerValidation.unknown.length, headerValidation.unknown]);
 
   const canProceed = () => {
@@ -227,8 +226,8 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
       'cc_attendance_count',
     ].join(',');
     const rows = [
-      ['user1', '홍길동', '2026-01-01', '10,000', '2026-01-10', 'O', 'X', '3'].join(','),
-      ['user2', '김철수', '2026-01-02', '20,000', '2026-01-11', 'X', 'O', '0'].join(','),
+      ['user1', '홍길동', '2026-01-01', '10000', '2026-01-10', 'O', 'X', '3'].join(','),
+      ['user2', '김철수', '2026-01-02', '20000', '2026-01-11', 'X', 'O', '0'].join(','),
     ];
     const bom = '\uFEFF';
     const example = bom + [header, ...rows].join('\r\n');
@@ -288,8 +287,9 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                 cc_attendance_count: resolveHeader(headerSet, 'cc_attendance_count') || prev.cc_attendance_count,
               }));
 
-              if (headerValidation.unknown.length) {
-                pushToast({ ok: false, message: 'CSV 컬럼 확인 필요', detail: `알 수 없는 컬럼: ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}` });
+              const hv = validateHeaderColumns(p.header);
+              if (hv.unknown.length) {
+                pushToast({ ok: false, message: 'CSV 컬럼 확인 필요', detail: `알 수 없는 컬럼(무시됨): ${hv.unknown.slice(0, 6).join(', ')}${hv.unknown.length > 6 ? '…' : ''}` });
               }
             };
             reader.readAsArrayBuffer(file);
@@ -336,7 +336,16 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                 <b>오류가 있습니다:</b>
                 <ul>{validation.errors.map((e) => <li key={e}>{e}</li>)}</ul>
               </div>
-            ) : (
+            ) : null}
+
+            {validation.warnings.length > 0 ? (
+              <div className="mt-2 text-[var(--v2-muted)]">
+                <b>확인 사항:</b>
+                <ul>{validation.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+              </div>
+            ) : null}
+
+            {validation.errors.length === 0 ? (
               <div className="mt-2 text-[var(--v2-accent)]">오류가 없습니다. 적용 가능합니다.</div>
             )}
           </div>

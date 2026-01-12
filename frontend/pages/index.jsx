@@ -492,7 +492,20 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
   });
 
   const apiFetch = useCallback(async (path, options = {}) => {
-    const res = await fetch(path, {
+    const normalizedPath = (() => {
+      if (typeof window === 'undefined') return path;
+      try {
+        const url = new URL(path, window.location.href);
+        if (url.origin === window.location.origin) {
+          return `${url.pathname}${url.search}${url.hash}`;
+        }
+      } catch {
+        // ignore
+      }
+      return path;
+    })();
+
+    const res = await fetch(normalizedPath, {
       cache: 'no-store', // Force no cache for sync
       headers: {
         'Content-Type': 'application/json',
@@ -536,8 +549,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
         (localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')).external_user_id : null);
 
       const endpoint = extUserId
-        ? `${basePath}/api/vault/status/?external_user_id=${encodeURIComponent(extUserId)}`
-        : `${basePath}/api/vault/status/`;
+        ? `${basePath}/api/vault/status?external_user_id=${encodeURIComponent(extUserId)}`
+        : `${basePath}/api/vault/status`;
 
       const data = await apiFetch(endpoint);
       // 골드→플래티넘 해금 직후 토스트 노출 로직
@@ -647,8 +660,8 @@ function VaultChallenge({ animationIntensity = 1, showTimer = true, basePath = '
 
         const vaultType = tier.toUpperCase();
         const endpoint = extUserId
-          ? `${basePath}/api/vault/claim/?external_user_id=${encodeURIComponent(extUserId)}`
-          : `${basePath}/api/vault/claim/`;
+            ? `${basePath}/api/vault/claim?external_user_id=${encodeURIComponent(extUserId)}`
+            : `${basePath}/api/vault/claim`;
 
         const res = await apiFetch(endpoint, {
           method: 'POST',
