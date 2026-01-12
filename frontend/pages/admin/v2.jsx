@@ -258,23 +258,28 @@ export default function AdminV2Page() {
               textColor: '#e9eef5',
               // 툴팁/스포트라이트 이동 체감 개선
               transition: 'all 220ms ease-in-out',
+              fontFamily:
+                "system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif",
             },
             tooltip: {
               borderRadius: 14,
               boxShadow: '0 20px 70px rgba(0,0,0,0.55)',
               maxWidth: 420,
+              border: '1px solid rgba(233,238,245,0.12)',
             },
             tooltipContainer: {
               padding: 16,
               fontSize: 13,
               lineHeight: 1.6,
+              textAlign: 'left',
             },
             tooltipTitle: {
               color: '#e9eef5',
               fontWeight: 800,
-              fontSize: 13,
+              fontSize: 14,
               letterSpacing: '0.02em',
               lineHeight: 1.6,
+              marginBottom: 4,
             },
             tooltipContent: {
               color: '#e9eef5',
@@ -292,6 +297,7 @@ export default function AdminV2Page() {
               lineHeight: 1.2,
               borderRadius: 10,
               padding: '10px 14px',
+              minWidth: 72,
             },
             buttonBack: {
               color: '#e9eef5',
@@ -301,6 +307,7 @@ export default function AdminV2Page() {
               padding: '10px 14px',
               fontSize: 13,
               lineHeight: 1.2,
+              minWidth: 72,
             },
             buttonSkip: {
               color: '#e9eef5',
@@ -310,6 +317,7 @@ export default function AdminV2Page() {
               padding: '10px 14px',
               fontSize: 13,
               lineHeight: 1.2,
+              minWidth: 72,
             },
             spotlight: {
               borderRadius: 14,
