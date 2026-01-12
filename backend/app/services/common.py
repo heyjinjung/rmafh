@@ -64,6 +64,19 @@ def idempotency_scope(request) -> str:
 
 def idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash: str) -> Dict[str, Any]:
     """Start idempotency check. Returns status dict."""
+
+    def _handle_existing(existing_row):
+        existing_hash, status, response_status, response_body = existing_row
+        if existing_hash != request_hash:
+            raise HTTPException(status_code=409, detail="IDEMPOTENCY_KEY_REUSE")
+        if status == "DONE":
+            return {
+                "status": "replayed",
+                "response_status": int(response_status or 200),
+                "response_body": response_body,
+            }
+        return {"status": "in_progress"}
+
     cur.execute(
         """
         SELECT request_hash, status, response_status, response_body
@@ -75,43 +88,46 @@ def idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash:
     )
     row = cur.fetchone()
     if row:
-        existing_hash, status, response_status, response_body = row
-        if existing_hash != request_hash:
-            logger.warning(
-                "idempotency_key_reuse endpoint=%s scope=%s key=%s status=%s",
-                endpoint, scope, key, status,
-            )
-            raise HTTPException(status_code=409, detail="IDEMPOTENCY_KEY_REUSE")
-        if status == "DONE":
-            logger.info(
-                "idempotency_replayed endpoint=%s scope=%s key=%s status=%s",
-                endpoint, scope, key, status,
-            )
-            return {
-                "status": "replayed",
-                "response_status": int(response_status or 200),
-                "response_body": response_body,
-            }
-        logger.info(
-            "idempotency_in_progress endpoint=%s scope=%s key=%s status=%s",
-            endpoint, scope, key, status,
-        )
-        return {"status": "in_progress"}
+        return _handle_existing(row)
 
+    # 만료된 키는 재사용 가능해야 합니다.
+    # 그렇지 않으면 SELECT(expires_at > NOW)로는 못 찾는데 INSERT는 PK 충돌로 실패할 수 있습니다.
     expires_at = now_utc() + timedelta(hours=config.IDEMPOTENCY_TTL_HOURS)
     cur.execute(
         """
         INSERT INTO idempotency_keys
             (key, scope, endpoint, request_hash, status, expires_at)
         VALUES (%s, %s, %s, %s, 'IN_PROGRESS', %s)
+        ON CONFLICT (key, scope, endpoint)
+        DO UPDATE
+           SET request_hash=EXCLUDED.request_hash,
+               status='IN_PROGRESS',
+               response_status=NULL,
+               response_body=NULL,
+               expires_at=EXCLUDED.expires_at,
+               updated_at=NOW()
+         WHERE idempotency_keys.expires_at <= NOW()
         """,
         (key, scope, endpoint, request_hash, expires_at),
     )
-    logger.info(
-        "idempotency_recorded endpoint=%s scope=%s key=%s status=IN_PROGRESS",
-        endpoint, scope, key,
+
+    if cur.rowcount == 1:
+        return {"status": "recorded"}
+
+    cur.execute(
+        """
+        SELECT request_hash, status, response_status, response_body
+          FROM idempotency_keys
+         WHERE key=%s AND scope=%s AND endpoint=%s
+           AND expires_at > NOW()
+        """,
+        (key, scope, endpoint),
     )
-    return {"status": "recorded"}
+    row = cur.fetchone()
+    if row:
+        return _handle_existing(row)
+
+    raise HTTPException(status_code=409, detail="IDEMPOTENCY_CONFLICT")
 
 
 def idempotency_finish(cur, *, key: str, scope: str, endpoint: str, response_status: int, response_body: Dict[str, Any]):

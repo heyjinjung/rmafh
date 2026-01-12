@@ -314,18 +314,8 @@ def _hash_request_body(body: Dict[str, Any]) -> str:
 
 
 def _idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash: str) -> Dict[str, Any]:
-    cur.execute(
-        """
-        SELECT request_hash, status, response_status, response_body
-          FROM idempotency_keys
-         WHERE key=%s AND scope=%s AND endpoint=%s
-           AND expires_at > NOW()
-        """,
-        (key, scope, endpoint),
-    )
-    row = cur.fetchone()
-    if row:
-        existing_hash, status, response_status, response_body = row
+    def _handle_existing(existing_row):
+        existing_hash, status, response_status, response_body = existing_row
         if existing_hash != request_hash:
             logger.warning(
                 "idempotency_key_reuse endpoint=%s scope=%s key=%s status=%s",
@@ -357,22 +347,65 @@ def _idempotency_start(cur, *, key: str, scope: str, endpoint: str, request_hash
         )
         return {"status": "in_progress"}
 
+    cur.execute(
+        """
+        SELECT request_hash, status, response_status, response_body
+          FROM idempotency_keys
+         WHERE key=%s AND scope=%s AND endpoint=%s
+           AND expires_at > NOW()
+        """,
+        (key, scope, endpoint),
+    )
+    row = cur.fetchone()
+    if row:
+        return _handle_existing(row)
+
+    # 만료된 키는 재사용 가능해야 합니다(배포 환경에서도 TTL 이후 재시도가 발생할 수 있음).
+    # 기존 로직은 expires_at > NOW()만 조회해서 만료 row를 못 보고, INSERT가 PK 충돌로 죽을 수 있습니다.
     expires_at = _now() + timedelta(hours=config.IDEMPOTENCY_TTL_HOURS)
     cur.execute(
         """
         INSERT INTO idempotency_keys
             (key, scope, endpoint, request_hash, status, expires_at)
         VALUES (%s, %s, %s, %s, 'IN_PROGRESS', %s)
+        ON CONFLICT (key, scope, endpoint)
+        DO UPDATE
+           SET request_hash=EXCLUDED.request_hash,
+               status='IN_PROGRESS',
+               response_status=NULL,
+               response_body=NULL,
+               expires_at=EXCLUDED.expires_at,
+               updated_at=NOW()
+         WHERE idempotency_keys.expires_at <= NOW()
         """,
         (key, scope, endpoint, request_hash, expires_at),
     )
-    logger.info(
-        "idempotency_recorded endpoint=%s scope=%s key=%s status=IN_PROGRESS",
-        endpoint,
-        scope,
-        key,
+
+    # rowcount==1이면 (신규 insert) 또는 (만료 row 갱신)으로 기록 성공
+    if cur.rowcount == 1:
+        logger.info(
+            "idempotency_recorded endpoint=%s scope=%s key=%s status=IN_PROGRESS",
+            endpoint,
+            scope,
+            key,
+        )
+        return {"status": "recorded"}
+
+    # 경쟁 조건/미만료 row가 존재하는 경우: 다시 조회해서 기존 로직으로 처리
+    cur.execute(
+        """
+        SELECT request_hash, status, response_status, response_body
+          FROM idempotency_keys
+         WHERE key=%s AND scope=%s AND endpoint=%s
+           AND expires_at > NOW()
+        """,
+        (key, scope, endpoint),
     )
-    return {"status": "recorded"}
+    row = cur.fetchone()
+    if row:
+        return _handle_existing(row)
+
+    raise HTTPException(status_code=409, detail="IDEMPOTENCY_CONFLICT")
 
 
 def _idempotency_finish(cur, *, key: str, scope: str, endpoint: str, response_status: int, response_body: Dict[str, Any]):

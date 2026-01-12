@@ -334,6 +334,7 @@ const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
     justifyContent: 'center',
     width: size,
     height: size,
+    position: 'relative',
   };
 
   // 3D Asset Paths
@@ -348,10 +349,12 @@ const VaultIcon = ({ tier, colorScheme, size = '72px' }) => {
   if (imgSrc) {
     return (
       <div style={iconStyle}>
-        <img
+        <Image
           src={imgSrc}
           alt={`${tier} vault icon`}
-          className="w-full h-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
+          fill
+          sizes={size}
+          className="object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.5)]"
         />
       </div>
     );

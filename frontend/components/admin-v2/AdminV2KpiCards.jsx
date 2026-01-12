@@ -69,7 +69,7 @@ export default function AdminV2KpiCards({ adminPassword, basePath }) {
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="v2-kpi">
       <div className="grid gap-4 md:grid-cols-3">
         {cards.map((card) => (
           <div

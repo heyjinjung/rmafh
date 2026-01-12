@@ -1,6 +1,7 @@
 import Head from 'next/head';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
+import dynamic from 'next/dynamic';
 import {
   AdminV2Layout,
   AdminV2KpiCards,
@@ -8,6 +9,9 @@ import {
   AdminV2ImportsFlow,
   AdminV2NotificationsPanel,
 } from '../../components/admin-v2';
+
+const Joyride = dynamic(() => import('react-joyride'), { ssr: false });
+const ADMIN_V2_TOUR_STORAGE_KEY = 'admin_v2_tour_seen_v1';
 
 export default function AdminV2Page() {
   const router = useRouter();
@@ -19,6 +23,56 @@ export default function AdminV2Page() {
   const adminV2Enabled = process.env.NEXT_PUBLIC_ADMIN_V2_ENABLED !== 'false';
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [tourRun, setTourRun] = useState(false);
+
+  const tourSteps = useMemo(
+    () => [
+      {
+        target: '[data-tour="v2-kpi"]',
+        placement: 'bottom',
+        title: '요약',
+        content: '최근 작업/알림/실패 건수를 한 번에 확인합니다.',
+        disableBeacon: true,
+      },
+      {
+        target: '[data-tour="v2-users-search"]',
+        placement: 'bottom',
+        title: '사용자 찾기',
+        content: 'CC ID 또는 닉네임으로 검색하세요. 결과는 아래 표에 뜹니다.',
+      },
+      {
+        target: '[data-tour="v2-users"]',
+        placement: 'top',
+        title: '사용자 목록',
+        content: '표에서 사용자를 클릭하면 오른쪽에 상세/편집 패널이 열립니다.',
+      },
+      {
+        target: '[data-tour="v2-users-detail"]',
+        placement: 'left',
+        title: '상세/편집',
+        content: '오른쪽 패널에서 사용자 정보/상태를 확인하고 필요한 항목만 수정하세요. (비어있으면 표에서 사용자를 먼저 클릭하세요)',
+      },
+      {
+        target: '[data-tour="v2-imports-upload"]',
+        placement: 'bottom',
+        title: 'CSV 업로드',
+        content: '회원정보를 CSV로 올립니다. 먼저 미리보기로 값이 맞는지 확인하세요.',
+      },
+      {
+        target: '[data-tour="v2-imports-apply"]',
+        placement: 'top',
+        title: '적용',
+        content: '오류가 없을 때만 적용됩니다. 적용 전에 파일/행 수를 꼭 확인하세요.',
+      },
+      {
+        target: '[data-tour="v2-logout"]',
+        placement: 'left',
+        title: '로그아웃',
+        content: '작업이 끝나면 로그아웃해서 접근을 종료하세요.',
+      },
+    ],
+    []
+  );
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -32,6 +86,16 @@ export default function AdminV2Page() {
     setUserLoggedIn(Boolean(savedUser));
     setDidBoot(true);
   }, []);
+
+  useEffect(() => {
+    if (!didBoot) return;
+    if (typeof window === 'undefined') return;
+    // 자동 실행은 하지 않음(요청대로 도움말 버튼 트리거)
+    // 다만, 저장소 키가 없으면 초기값을 심어둠(추후 버전 관리용)
+    if (localStorage.getItem(ADMIN_V2_TOUR_STORAGE_KEY) === null) {
+      localStorage.setItem(ADMIN_V2_TOUR_STORAGE_KEY, '0');
+    }
+  }, [didBoot]);
 
   useEffect(() => {
     if (!didBoot) return;
@@ -147,8 +211,108 @@ export default function AdminV2Page() {
       <Head>
         <title>Vault 어드민 v2</title>
       </Head>
+      {didBoot ? (
+        <Joyride
+          run={tourRun}
+          steps={tourSteps}
+          continuous
+          showSkipButton={false}
+          showProgress={false}
+          hideCloseButton
+          scrollToFirstStep
+          scrollDuration={450}
+          scrollOffset={120}
+          spotlightPadding={10}
+          disableOverlayClose
+          // 투어 중에도 '하이라이트된 영역'은 클릭 가능해야
+          // 사용자 클릭 → 상세 패널 확인 같은 흐름이 막히지 않습니다.
+          spotlightClicks
+          callback={(data) => {
+            const status = String(data?.status || '').toLowerCase();
+            const type = String(data?.type || '').toLowerCase();
+
+            if (type === 'error:target_not_found') {
+              return;
+            }
+
+            if (status === 'finished' || status === 'skipped') {
+              setTourRun(false);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem(ADMIN_V2_TOUR_STORAGE_KEY, '1');
+              }
+            }
+          }}
+          locale={{
+            back: '이전',
+            close: '완료',
+            last: '완료',
+            next: '다음',
+          }}
+          styles={{
+            options: {
+              zIndex: 10000,
+              arrowColor: '#161a20',
+              backgroundColor: '#161a20',
+              overlayColor: 'rgba(0, 0, 0, 0.65)',
+              primaryColor: '#b7f75a',
+              textColor: '#e9eef5',
+              // 툴팁/스포트라이트 이동 체감 개선
+              transition: 'all 220ms ease-in-out',
+            },
+            tooltip: {
+              borderRadius: 14,
+              boxShadow: '0 20px 70px rgba(0,0,0,0.55)',
+            },
+            tooltipContainer: {
+              padding: 16,
+            },
+            tooltipTitle: {
+              color: '#e9eef5',
+              fontWeight: 800,
+              fontSize: 14,
+              letterSpacing: '0.02em',
+            },
+            tooltipContent: {
+              color: '#e9eef5',
+              fontSize: 13,
+              lineHeight: 1.55,
+            },
+            buttonNext: {
+              backgroundColor: '#b7f75a',
+              color: '#000000',
+              fontWeight: 800,
+              borderRadius: 10,
+              padding: '10px 14px',
+            },
+            buttonBack: {
+              color: '#e9eef5',
+              backgroundColor: 'transparent',
+              border: '1px solid #2b3139',
+              borderRadius: 10,
+              padding: '10px 14px',
+            },
+            buttonSkip: {
+              color: '#e9eef5',
+              backgroundColor: 'transparent',
+              border: '1px solid rgba(233,238,245,0.25)',
+              borderRadius: 10,
+              padding: '10px 14px',
+            },
+            spotlight: {
+              borderRadius: 14,
+              transition: 'all 220ms ease-in-out',
+            },
+          }}
+        />
+      ) : null}
       <AdminV2Layout
         active="dashboard"
+        onHelp={() => {
+          if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+          setTourRun(true);
+        }}
         onLogout={() => {
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem('adminPassword');

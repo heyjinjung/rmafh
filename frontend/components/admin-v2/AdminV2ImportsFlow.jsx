@@ -187,7 +187,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
   };
 
   return (
-    <section id="imports" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5">
+    <section id="imports" className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" data-tour="v2-imports">
       <h2 className="text-lg font-bold text-[var(--v2-accent)] mb-2">회원정보 가져오기</h2>
       <ol className="mb-4 list-decimal pl-4 text-sm text-[var(--v2-muted)]">
         <li>아래에서 CSV 파일을 올려주세요. <button type="button" className="ml-2 underline text-[var(--v2-accent)]" onClick={downloadExample}>예시 파일 다운로드</button></li>
@@ -196,7 +196,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
       </ol>
       <div className="space-y-4">
         {/* 파일 업로드 */}
-        <label className="flex items-center gap-3">
+        <label className="flex items-center gap-3" data-tour="v2-imports-upload">
           <span className="font-semibold">CSV 파일 올리기</span>
           <input type="file" accept=".csv" className="hidden" aria-label="CSV 파일 업로드" onChange={(e) => {
             const file = e.target.files?.[0];
@@ -274,6 +274,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
         {/* 실행 버튼 */}
         <button
           type="button"
+          data-tour="v2-imports-apply"
           className="w-full rounded-lg bg-[var(--v2-accent)] px-4 py-3 text-sm font-semibold text-black mt-4"
           disabled={!csvText || validation.errors.length > 0}
           onClick={() => runImport({ runMode: 'APPLY' })}

@@ -27,6 +27,21 @@ const statusLabel = (s) => {
   }
 };
 
+const userCardLabel = (s) => {
+  switch (s) {
+    case 'LOCKED':
+      return '잠금 표시';
+    case 'UNLOCKED':
+      return '열기 가능';
+    case 'CLAIMED':
+      return '수령 완료';
+    case 'EXPIRED':
+      return '만료 표시';
+    default:
+      return '상태 확인';
+  }
+};
+
 const sortableKeys = new Set(['created_at', 'expires_at', 'external_user_id', 'nickname', 'gold_status', 'platinum_status', 'diamond_status']);
 
 const Switch = ({ checked, onChange, disabled, activeColor = 'var(--v2-accent)' }) => (
@@ -525,7 +540,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
   }, [onTargetChange, selectedRow]);
 
   return (
-    <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="users">
+    <div className="rounded-2xl border border-[var(--v2-border)] bg-[var(--v2-surface)]/80 p-5" id="users" data-tour="v2-users">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">사용자</p>
@@ -555,6 +570,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
         <div>
           <label className="text-xs uppercase tracking-[0.2em] text-[var(--v2-muted)]">검색</label>
           <input
+            data-tour="v2-users-search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="CC ID 또는 닉네임"
@@ -709,7 +725,7 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
             </table>
           </div>
 
-          <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0 flex flex-col h-full overflow-hidden">
+          <aside className="border-t border-[var(--v2-border)] bg-[var(--v2-surface-2)] p-4 lg:border-l lg:border-t-0 flex flex-col h-full overflow-hidden" data-tour="v2-users-detail">
             <div className="flex items-center justify-between shrink-0 mb-4">
               <p className="font-ibm text-lg font-bold text-[var(--v2-text)]">
                 사용자 상세
@@ -839,6 +855,36 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                         />
                       </div>
                     </div>
+                  </div>
+
+                  <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">유저 화면 영향(핵심)</div>
+                      <div className="text-[10px] text-[var(--v2-muted)]">LOCKED/UNLOCKED/CLAIMED/EXPIRED</div>
+                    </div>
+                    <p className="text-sm text-[var(--v2-text)]">유저 페이지 금고 카드 표시가 바뀝니다.</p>
+
+                    <div className="text-xs text-[var(--v2-muted)]">
+                      LOCKED=잠금 · UNLOCKED=열기 · CLAIMED=수령 · EXPIRED=만료
+                    </div>
+
+                    <div className="grid gap-2">
+                      {[
+                        { label: '골드', status: goldStatus },
+                        { label: '플래티넘', status: platinumStatus },
+                        { label: '다이아', status: diamondStatus },
+                      ].map((it) => (
+                        <div key={it.label} className="flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2">
+                          <div className="text-sm font-semibold text-[var(--v2-text)]">{it.label} 금고</div>
+                          <div className="text-xs text-[var(--v2-muted)]">
+                            <span className="mr-2">현재: <span className="text-[var(--v2-text)] font-semibold">{it.status}</span> <span className="opacity-80">({statusLabel(it.status)})</span></span>
+                            <span className="opacity-90">→ {userCardLabel(it.status)}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className="text-xs text-[var(--v2-muted)]">팁: 플래티넘·다이아는 ★ 조건 충족 후 해제가 자연스럽습니다.</p>
                   </div>
 
 
