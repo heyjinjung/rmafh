@@ -153,14 +153,13 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     if (!csvText) errors.push('CSV 파일을 선택해주세요.');
     if (!mapping.external_user_id) errors.push('필수 매핑: external_user_id');
     if (mapping.external_user_id && rowsForApi.length === 0) errors.push('CSV에서 external_user_id를 하나도 찾지 못했어요.');
-    if (rowCount > 10000) errors.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
     const warnings = [];
     if (headerValidation.unknown.length) {
       warnings.push(`알 수 없는 컬럼(무시됨): ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}`);
     }
     if (rowCount > 10000) warnings.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
     return { errors, warnings };
-  }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length, headerValidation.unknown.length, headerValidation.unknown]);
+  }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length, headerValidation.unknown]);
 
   const canProceed = () => {
     if (step === 1) return Boolean(fileName && csvText);
