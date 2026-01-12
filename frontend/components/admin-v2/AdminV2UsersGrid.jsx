@@ -858,10 +858,6 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                   </div>
 
                   <div className="rounded-xl border border-[var(--v2-border)] bg-[var(--v2-surface)] p-5 shadow-sm space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs uppercase tracking-wider text-[var(--v2-muted)] font-semibold">유저 화면 영향(핵심)</div>
-                      <div className="text-[10px] text-[var(--v2-muted)]">LOCKED/UNLOCKED/CLAIMED/EXPIRED</div>
-                    </div>
                     <p className="text-sm text-[var(--v2-text)]">유저 페이지 금고 카드 표시가 바뀝니다.</p>
 
                     <div className="text-xs text-[var(--v2-muted)]">
@@ -876,15 +872,10 @@ export default function AdminV2UsersGrid({ adminPassword, basePath, onTargetChan
                       ].map((it) => (
                         <div key={it.label} className="flex items-center justify-between rounded-lg border border-[var(--v2-border)] bg-[var(--v2-surface-2)] px-3 py-2">
                           <div className="text-sm font-semibold text-[var(--v2-text)]">{it.label} 금고</div>
-                          <div className="text-xs text-[var(--v2-muted)]">
-                            <span className="mr-2">현재: <span className="text-[var(--v2-text)] font-semibold">{it.status}</span> <span className="opacity-80">({statusLabel(it.status)})</span></span>
-                            <span className="opacity-90">→ {userCardLabel(it.status)}</span>
-                          </div>
+                          <div className="text-xs text-[var(--v2-muted)]">{userCardLabel(it.status)}</div>
                         </div>
                       ))}
                     </div>
-
-                    <p className="text-xs text-[var(--v2-muted)]">팁: 플래티넘·다이아는 ★ 조건 충족 후 해제가 자연스럽습니다.</p>
                   </div>
 
 
