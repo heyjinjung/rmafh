@@ -3,10 +3,22 @@ import { extractErrorInfo, withIdempotency } from '../../lib/apiClient';
 import { pushToast } from './toastBus';
 
 const requiredFields = ['external_user_id'];
-const optionalFields = ['nickname', 'deposit_total', 'joined_at', 'last_deposit_at', 'telegram_ok', 'review_ok'];
+const optionalFields = ['nickname', 'deposit_total', 'joined_at', 'last_deposit_at', 'telegram_ok', 'review_ok', 'cc_attendance_count'];
+
+const fieldAliases = {
+  external_user_id: ['external_user_id', '아이디', 'CC ID', 'CC_ID', 'cc_id'],
+  nickname: ['nickname', '닉네임'],
+  joined_at: ['joined_at', 'joined_date', '가입일'],
+  deposit_total: ['deposit_total', '입금액', '누적입금', '누적 입금'],
+  last_deposit_at: ['last_deposit_at', '입금일', '마지막입금일'],
+  telegram_ok: ['telegram_ok', '텔레그램'],
+  review_ok: ['review_ok', '리뷰'],
+  cc_attendance_count: ['cc_attendance_count', '출석횟수', '출석 횟수'],
+};
 
 function parseDelimited(text) {
   const rawLines = String(text || '')
+    .replace(/^\uFEFF/, '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n');
@@ -17,7 +29,11 @@ function parseDelimited(text) {
 
   if (!lines.length) return { header: [], rows: [] };
 
-  const toCells = (line) => line.split(/[\t,;]/).map((c) => String(c).trim().replace(/^"|"$/g, ''));
+  const toCells = (line) =>
+    line
+      .replace(/^\uFEFF/, '')
+      .split(/[\t,;]/)
+      .map((c) => String(c).trim().replace(/^"|"$/g, ''));
   const header = toCells(lines[0]);
   const rows = [];
   for (let i = 1; i < lines.length; i += 1) {
@@ -42,11 +58,14 @@ function coerceInt(v) {
 function buildRowsForApi({ header, rows, mapping }) {
   const idxByName = new Map();
   header.forEach((name, idx) => {
-    idxByName.set(String(name || '').trim(), idx);
+    const key = String(name || '').trim().replace(/^\uFEFF/, '');
+    idxByName.set(key, idx);
+    idxByName.set(key.toLowerCase(), idx);
   });
 
   const get = (cells, colName) => {
-    const idx = idxByName.get(colName);
+    const rawKey = String(colName || '').trim().replace(/^\uFEFF/, '');
+    const idx = idxByName.get(rawKey) ?? idxByName.get(rawKey.toLowerCase());
     if (idx === undefined) return '';
     return cells[idx];
   };
@@ -78,6 +97,7 @@ function buildRowsForApi({ header, rows, mapping }) {
     }
     if (mapping.telegram_ok) row.telegram_ok = coerceBool(get(cells, mapping.telegram_ok));
     if (mapping.review_ok) row.review_ok = coerceBool(get(cells, mapping.review_ok));
+    if (mapping.cc_attendance_count) row.cc_attendance_count = coerceInt(get(cells, mapping.cc_attendance_count));
 
     out.push(row);
   });
@@ -97,6 +117,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     last_deposit_at: '',
     telegram_ok: '',
     review_ok: '',
+    cc_attendance_count: '',
   });
   const [mode, setMode] = useState('SHADOW');
   const [riskAck, setRiskAck] = useState('');
@@ -114,14 +135,33 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
     return buildRowsForApi({ header: parsed.header, rows: parsed.rows, mapping });
   }, [parsed.header, parsed.rows, mapping]);
 
+  const headerValidation = useMemo(() => {
+    const header = (parsed.header || []).map((h) => String(h || '').trim().replace(/^\uFEFF/, '')).filter(Boolean);
+    if (!header.length) return { ok: true, unknown: [], recognized: [] };
+
+    const allowed = new Set([...requiredFields, ...optionalFields]);
+    const recognized = [];
+    const aliasFlat = new Set(Object.values(fieldAliases).flat().map((v) => String(v).trim()));
+    header.forEach((h) => {
+      const isAllowed = allowed.has(h);
+      const isKnownAlias = aliasFlat.has(h);
+      if (isAllowed || isKnownAlias) recognized.push(h);
+    });
+    const unknown = header.filter((h) => !allowed.has(h) && !aliasFlat.has(h));
+    return { ok: unknown.length === 0, unknown, recognized };
+  }, [parsed.header]);
+
   const validation = useMemo(() => {
     const errors = [];
     if (!csvText) errors.push('CSV 파일을 선택해주세요.');
     if (!mapping.external_user_id) errors.push('필수 매핑: external_user_id');
     if (mapping.external_user_id && rowsForApi.length === 0) errors.push('CSV에서 external_user_id를 하나도 찾지 못했어요.');
+    if (headerValidation.unknown.length) {
+      errors.push(`알 수 없는 컬럼이 포함되어 있어요: ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}`);
+    }
     if (rowCount > 10000) errors.push('10,000행 초과 시 10,000행 단위로 배치 Job으로 분할됩니다.');
     return { errors, warnings: rowCount > 0 && rowCount <= 10000 ? [] : errors.length ? [] : ['경고 없음'] };
-  }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length]);
+  }, [csvText, mapping.external_user_id, rowCount, rowsForApi.length, headerValidation.unknown.length, headerValidation.unknown]);
 
   const canProceed = () => {
     if (step === 1) return Boolean(fileName && csvText);
@@ -176,14 +216,37 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
 
   // 예시 파일 다운로드 함수
   const downloadExample = () => {
-    const example = 'external_user_id,nickname,deposit_total\nuser1,홍길동,10000\nuser2,김철수,20000';
-    const blob = new Blob([example], { type: 'text/csv' });
+    const header = [
+      'external_user_id',
+      'nickname',
+      'joined_at',
+      'deposit_total',
+      'last_deposit_at',
+      'telegram_ok',
+      'review_ok',
+      'cc_attendance_count',
+    ].join(',');
+    const rows = [
+      ['user1', '홍길동', '2026-01-01', '10,000', '2026-01-10', 'O', 'X', '3'].join(','),
+      ['user2', '김철수', '2026-01-02', '20,000', '2026-01-11', 'X', 'O', '0'].join(','),
+    ];
+    const bom = '\uFEFF';
+    const example = bom + [header, ...rows].join('\r\n');
+    const blob = new Blob([example], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'import_example.csv';
+    a.download = 'vault_import_example_utf8.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const resolveHeader = (headerSet, key) => {
+    const candidates = fieldAliases[key] || [key];
+    for (const c of candidates) {
+      if (headerSet.has(c)) return c;
+    }
+    return '';
   };
 
   return (
@@ -198,7 +261,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
         {/* 파일 업로드 */}
         <label className="flex items-center gap-3" data-tour="v2-imports-upload">
           <span className="font-semibold">CSV 파일 올리기</span>
-          <input type="file" accept=".csv" className="hidden" aria-label="CSV 파일 업로드" onChange={(e) => {
+          <input type="file" accept=".csv,text/csv" className="hidden" aria-label="CSV 파일 업로드" onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
             setFileName(file.name);
@@ -212,17 +275,22 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
               const p = parseDelimited(text);
               setParsed(p);
               // best-effort default mapping: exact match
-              const headerSet = new Set((p.header || []).map((h) => String(h || '').trim()));
+              const headerSet = new Set((p.header || []).map((h) => String(h || '').trim().replace(/^\uFEFF/, '')));
               setMapping((prev) => ({
                 ...prev,
-                external_user_id: headerSet.has('external_user_id') ? 'external_user_id' : (p.header || [])[0] || '',
-                nickname: headerSet.has('nickname') ? 'nickname' : prev.nickname,
-                deposit_total: headerSet.has('deposit_total') ? 'deposit_total' : prev.deposit_total,
-                joined_at: headerSet.has('joined_at') ? 'joined_at' : prev.joined_at,
-                last_deposit_at: headerSet.has('last_deposit_at') ? 'last_deposit_at' : prev.last_deposit_at,
-                telegram_ok: headerSet.has('telegram_ok') ? 'telegram_ok' : prev.telegram_ok,
-                review_ok: headerSet.has('review_ok') ? 'review_ok' : prev.review_ok,
+                external_user_id: resolveHeader(headerSet, 'external_user_id') || (p.header || [])[0] || '',
+                nickname: resolveHeader(headerSet, 'nickname') || prev.nickname,
+                deposit_total: resolveHeader(headerSet, 'deposit_total') || prev.deposit_total,
+                joined_at: resolveHeader(headerSet, 'joined_at') || prev.joined_at,
+                last_deposit_at: resolveHeader(headerSet, 'last_deposit_at') || prev.last_deposit_at,
+                telegram_ok: resolveHeader(headerSet, 'telegram_ok') || prev.telegram_ok,
+                review_ok: resolveHeader(headerSet, 'review_ok') || prev.review_ok,
+                cc_attendance_count: resolveHeader(headerSet, 'cc_attendance_count') || prev.cc_attendance_count,
               }));
+
+              if (headerValidation.unknown.length) {
+                pushToast({ ok: false, message: 'CSV 컬럼 확인 필요', detail: `알 수 없는 컬럼: ${headerValidation.unknown.slice(0, 6).join(', ')}${headerValidation.unknown.length > 6 ? '…' : ''}` });
+              }
             };
             reader.readAsArrayBuffer(file);
           }} />
@@ -243,6 +311,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                     <th className="px-3 py-2 uppercase tracking-[0.12em]">last_deposit_at</th>
                     <th className="px-3 py-2 uppercase tracking-[0.12em]">telegram_ok</th>
                     <th className="px-3 py-2 uppercase tracking-[0.12em]">review_ok</th>
+                    <th className="px-3 py-2 uppercase tracking-[0.12em]">cc_attendance_count</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--v2-border)]">
@@ -255,6 +324,7 @@ export default function AdminV2ImportsFlow({ adminPassword, basePath }) {
                       <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.last_deposit_at || ''}</td>
                       <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.telegram_ok ? '✓' : '✗'}</td>
                       <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.review_ok ? '✓' : '✗'}</td>
+                      <td className="px-3 py-2 font-mono text-[var(--v2-text)]">{row.cc_attendance_count || 0}</td>
                     </tr>
                   ))}
                 </tbody>
